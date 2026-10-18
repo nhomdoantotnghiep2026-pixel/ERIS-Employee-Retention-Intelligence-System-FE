@@ -1,0 +1,50 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { createErdSeed,makeRow,validateDatabase } from '../src/erd/database.ts';
+import { createSurvey,submitSurvey } from '../src/erd/surveys.ts';
+import { employeeView,yearsCovered } from '../src/erd/employeeView.ts';
+import { saveSnapshotRows,saveRunRows,loadRunViews } from '../src/erd/runPersistence.ts';
+import { prepareSnapshot,createDemoRun } from '../src/workflows/domain.ts';
+test('HR survey -> ESS response -> answer rows -> employee feature, with ownership and duplicate checks', () => {
+  const db=createErdSeed();
+  const hr=db.users[0], ess=db.users[3];
+  const survey=createSurvey(db,hr.id,{ title:'Survey',description:'',start_date:'2026-10-01',end_date:'2026-10-31',questions:[{ question_text:'Satisfaction?',dimension_code:'job_satisfaction',required:true }] });
+  const question=db.survey_questions[0];
+  assert.throws(() => submitSurvey(db,ess.id,survey.id,[],'2026-10-18'), /required/i);
+  assert.throws(() => submitSurvey(db,hr.id,survey.id,[{ question_id:question.id,score:4,comment:'' }],'2026-10-18'), /linked Employee/i);
+  submitSurvey(db,ess.id,survey.id,[{ question_id:question.id,score:4,comment:'Good' }],'2026-10-18');
+  validateDatabase(db);
+  assert.equal(employeeView(db,db.employees[0],{},new Date().toISOString().slice(0,10)).jobSatisfaction,4);
+  assert.equal(employeeView(db,db.employees[1],{},new Date().toISOString().slice(0,10)).jobSatisfaction,0);
+  assert.throws(() => submitSurvey(db,ess.id,survey.id,[{ question_id:question.id,score:4,comment:'' }],'2026-10-18'), /already submitted/i);
+});
+test('employee education and position are joined from their own tables', () => {
+  const db=createErdSeed(), employee=db.employees[0];
+  db.employee_educations.push(makeRow('employee_educations',{ employee_id:employee.id,education_level:3,field_of_study:'IT' }));
+  employee.date_of_birth='1998-01-15';employee.hire_date='2024-01-01';
+  const view=employeeView(db,employee,{},'2026-10-18');
+  assert.equal(view.educationLevel,3);assert.equal(view.age,28);assert.ok(view.tenure>2);
+  assert.equal(view.jobLevel,db.positions.find(row => row.id === employee.position_id)?.job_level);
+  assert.equal('education_level' in employee,false);
+});
+test('age is derived at the snapshot date and overlapping experience is counted once', () => {
+  const db=createErdSeed();db.employees[0].date_of_birth='2000-10-19';
+  assert.equal(employeeView(db,db.employees[0],{},'2026-10-18').age,25);
+  assert.equal(employeeView(db,db.employees[0],{},'2026-10-19').age,26);
+  const years=yearsCovered([{ start:'2020-01-01',end:'2022-01-01' },{ start:'2021-01-01',end:'2023-01-01' }],'2026-10-18');
+  assert.ok(years>2.99 && years<3.01);
+});
+test('snapshot/run/result/explanation persist separately with valid FK chains and round-trip to UI', () => {
+  const db=createErdSeed();
+  const view={ ...employeeView(db,db.employees[0]),age:28,tenure:2,jobSatisfaction:3,environmentSatisfaction:3,educationLevel:3,distanceFromHomeKm:0,totalWorkingYears:5,yearsInCurrentRole:1,yearsSinceLastPromotion:0,yearsWithCurrentManager:1,overtimeHours:0 };
+  const snapshot=prepareSnapshot([view],{ start:'2026-10-01',end:'2026-10-18',scope:'' });
+  saveSnapshotRows(db,snapshot);
+  const run=createDemoRun(snapshot,{ version:'v1',status:'Active' },[view],[{ employeeId:view.id,probability:0.7,explanations:[{ feature_name:'job_satisfaction',feature_value:3,impact_value:-0.1,impact_direction:'decrease',rank_order:1 }] }]);
+  saveRunRows(db,run,db.users[1].id);validateDatabase(db);
+  assert.equal(db.ai_input.length,1);assert.equal(db.model_run.length,1);assert.equal(db.prediction_results.length,1);assert.equal(db.explainable.length,1);
+  assert.equal(db.model_run[0].created_by,db.users[1].id);
+  assert.equal(loadRunViews(db)[0].results[0].explanations[0].feature_value,3);
+  assert.equal('results' in db.model_run[0],false);assert.equal('mode' in db.model_run[0],false);
+  db.prediction_results[0].employee_id=db.employees[1].id;
+  assert.throws(() => validateDatabase(db), /same employee/i);
+});

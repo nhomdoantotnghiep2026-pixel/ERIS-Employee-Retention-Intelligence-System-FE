@@ -1,0 +1,37 @@
+# ERIS Frontend
+
+Frontend độc lập cho ERIS, tách từ bản làm việc hiện tại. Repo này chứa giao diện React, dữ liệu demo và kiểm tra frontend cho bốn role: HR, Data / AI Analyst, System Administrator, Employee / ESS.
+
+## Chạy trên máy
+
+Cài Node.js 24 trở lên. Mở terminal ngay tại thư mục repo (ví dụ D:/ERIS-FE):
+
+```powershell
+npm ci
+npm run dev
+```
+
+Mở địa chỉ Local mà Vite hiển thị. Cổng mặc định là 5173; nếu đang bận, Vite dùng cổng khác.
+
+## Kiểm tra
+
+```powershell
+npm test
+npm run typecheck
+npm run build
+```
+
+Tests bao gồm phân quyền theo role, nhập CSV/XLSX, dữ liệu demo theo hợp đồng ERD, khảo sát, chuẩn bị dữ liệu, mô hình/dự đoán mẫu và Employee gửi yêu cầu → HR duyệt → Employee xem kết quả.
+
+## Phạm vi frontend
+
+- Dữ liệu hiện tại là demo trong trình duyệt; đổi role trong cùng tab giữ dữ liệu của phiên.
+- Mô hình và kết quả AI là minh họa, chưa phải dịch vụ suy luận thật.
+- Các kiểu dữ liệu/quan hệ ERD trong src/erd phục vụ giao diện và kiểm tra dữ liệu demo; không tạo database PostgreSQL.
+- src/lib/supabase.ts và src/services là mã client dành cho tích hợp sau. Không có thông tin đăng nhập hoặc cấu hình dự án Supabase được chuyển sang.
+- Repo FE không chứa backend server, SQL hoặc migration. Bài kiểm tra schema PostgreSQL và công cụ sinh SQL được giữ ở dự án cũ, không thuộc bộ kiểm tra frontend này.
+- Không đưa node_modules, dist, .env hay thư mục .git của dự án cũ vào repo.
+
+## Nhánh làm việc
+
+Bản chuyển frontend nằm trên nhánh frontend/role-workflows để nhóm review. Chưa merge vào main. Dự án cũ và repo cũ được giữ nguyên.

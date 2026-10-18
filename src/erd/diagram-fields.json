@@ -1,0 +1,186 @@
+﻿{
+    "users":  [
+                  "id",
+                  "email",
+                  "password",
+                  "role_id",
+                  "status",
+                  "employee_id",
+                  "created_at",
+                  "updated_at"
+              ],
+    "departments":  [
+                        "id",
+                        "code",
+                        "name",
+                        "description",
+                        "status",
+                        "created_at",
+                        "updated_at"
+                    ],
+    "positions":  [
+                      "id",
+                      "code",
+                      "name",
+                      "job_level",
+                      "description",
+                      "status",
+                      "created_at",
+                      "updated_at"
+                  ],
+    "employees":  [
+                      "id",
+                      "employee_code",
+                      "full_name",
+                      "email",
+                      "phone",
+                      "date_of_birth",
+                      "gender",
+                      "address",
+                      "distance_from_home_km",
+                      "department_id",
+                      "position_id",
+                      "hire_date",
+                      "employment_type",
+                      "employment_status",
+                      "current_salary",
+                      "created_at",
+                      "updated_at"
+                  ],
+    "employee_educations":  [
+                                "id",
+                                "employee_id",
+                                "education_level",
+                                "field_of_study",
+                                "institution",
+                                "graduation_year",
+                                "created_at",
+                                "updated_at"
+                            ],
+    "employee_work_experiences":  [
+                                      "id",
+                                      "employee_id",
+                                      "company_name",
+                                      "position_title",
+                                      "start_date",
+                                      "end_date",
+                                      "description",
+                                      "created_at",
+                                      "updated_at"
+                                  ],
+    "employee_job_histories":  [
+                                   "employee_id",
+                                   "department_id",
+                                   "position_id",
+                                   "manager_id",
+                                   "change_type",
+                                   "start_date",
+                                   "end_date",
+                                   "created_at",
+                                   "id"
+                               ],
+    "surveys":  [
+                    "id",
+                    "title",
+                    "description",
+                    "start_date",
+                    "end_date",
+                    "status",
+                    "created_by",
+                    "created_at",
+                    "updated_at"
+                ],
+    "survey_questions":  [
+                             "id",
+                             "survey_id",
+                             "question_text",
+                             "dimension_code",
+                             "required",
+                             "created_at",
+                             "display_order"
+                         ],
+    "survey_responses":  [
+                             "id",
+                             "survey_id",
+                             "employee_id",
+                             "submitted_at",
+                             "created_at"
+                         ],
+    "survey_answers":  [
+                           "id",
+                           "response_id",
+                           "question_id",
+                           "score",
+                           "comment",
+                           "created_at"
+                       ],
+    "ai_input":  [
+                     "id",
+                     "employee_id",
+                     "snapshot_date",
+                     "age",
+                     "department_id",
+                     "position_id",
+                     "job_level",
+                     "education_level",
+                     "monthly_income",
+                     "distance_from_home_km",
+                     "total_working_years",
+                     "years_at_company",
+                     "years_in_current_role",
+                     "years_since_last_promotion",
+                     "job_satisfaction",
+                     "environment_satisfaction",
+                     "overtime_hours",
+                     "created_at",
+                     "years_with_current_manager"
+                 ],
+    "model_run":  [
+                      "id",
+                      "name",
+                      "period_start",
+                      "period_end",
+                      "status",
+                      "total_employees",
+                      "model_version",
+                      "created_by",
+                      "started_at",
+                      "completed_at",
+                      "created_at"
+                  ],
+    "prediction_results":  [
+                               "id",
+                               "prediction_run_id",
+                               "employee_id",
+                               "snapshot_id",
+                               "attrition_probability",
+                               "risk_level",
+                               "prediction_label",
+                               "created_at"
+                           ],
+    "explainable":  [
+                        "id",
+                        "prediction_result_id",
+                        "feature_name",
+                        "feature_value",
+                        "impact_value",
+                        "impact_direction",
+                        "rank_order",
+                        "created_at"
+                    ],
+    "audit_logs":  [
+                       "id",
+                       "user_id",
+                       "entity_type",
+                       "entity_id",
+                       "action",
+                       "old_value",
+                       "new_value",
+                       "created_at"
+                   ],
+    "role":  [
+                 "id",
+                 "name",
+                 "description"
+             ]
+}
