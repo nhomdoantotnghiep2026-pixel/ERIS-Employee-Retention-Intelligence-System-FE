@@ -39,3 +39,7 @@ Bản chuyển frontend nằm trên nhánh frontend/role-workflows để nhóm r
 ## Ảnh giới thiệu trên landing
 
 Landing dùng ba ảnh chụp dashboard HR, System Admin và Employee / ESS do nhóm cung cấp trong public/product-previews. Component LandingProductPreview hiển thị đồng thời ba ảnh xòe như cánh quạt: HR ở trước, Admin bên trái, Employee bên phải; bấm từng ảnh để mở ảnh gốc; các số liệu trong ảnh là trạng thái demo lúc chụp, không phải dữ liệu đang cập nhật. Các ảnh người dùng ở trang login vẫn được giữ nguyên.
+
+## Hướng dẫn sử dụng
+
+Nút ? trên thanh đầu trang mở hướng dẫn tương ứng với role đang đăng nhập ở mọi trang làm việc. Mỗi bước có liên kết đến chức năng được cấp quyền. Chọn bước sẽ đóng hướng dẫn; có thể đóng bằng nút X, Escape hoặc bấm ra ngoài. Hướng dẫn không còn hiển thị thành khối trên dashboard.

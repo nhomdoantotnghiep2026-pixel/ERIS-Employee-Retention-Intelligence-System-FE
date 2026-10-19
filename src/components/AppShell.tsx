@@ -1,5 +1,4 @@
 import { EnterpriseHeader } from './EnterpriseHeader';
-import { RoleJourney } from './RoleJourney';
 import { type ReactNode, useEffect, useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import {
@@ -275,7 +274,6 @@ export function AppShell({ children, breadcrumb }: { children: ReactNode; breadc
         <EnterpriseHeader breadcrumb={breadcrumb} sidebarOpen={sidebarOpen} toggleSidebar={toggleSidebar} links={NAV_BY_ROLE} />
         <main id="main-content" tabIndex={-1} className="flex-1 overflow-y-auto bg-[radial-gradient(circle_at_top_right,rgba(249,115,22,0.07),transparent_28rem)] outline-none">
           <div className="eris-content mx-auto w-full max-w-[1480px] p-4 sm:p-5 lg:p-6">
-            <RoleJourney />
             {children}
           </div>
         </main>

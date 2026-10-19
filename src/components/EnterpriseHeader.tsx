@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Bell, Check, CheckCheck, ChevronDown, HelpCircle, Languages, LogOut, PanelLeft } from 'lucide-react';
+import { Bell, Check, CheckCheck, ChevronDown, HelpCircle, Languages, LogOut, PanelLeft, X } from 'lucide-react';
 import { useRole, type UserRole } from '../context/RoleContext';
 import { useLanguage } from '../context/LanguageContext';
+import { RoleJourney } from './RoleJourney';
 
 type Link = { label: string; to: string };
 type Props = { breadcrumb?: string[]; sidebarOpen: boolean; toggleSidebar: () => void; links: Record<UserRole, { items: Link[] }[]> };
@@ -22,6 +23,7 @@ export function EnterpriseHeader({ breadcrumb, sidebarOpen, toggleSidebar, links
   const [panel, setPanel] = useState<'language' | 'notifications' | 'help' | 'account' | null>(null);
   const [read, setRead] = useState<string[]>(() => { try { return JSON.parse(sessionStorage.getItem('eris-notifications-read') || '[]'); } catch { return []; } });
   const root = useRef<HTMLElement>(null);
+  const helpButton = useRef<HTMLButtonElement>(null);
   const pages = links[user.role].flatMap(group => group.items);
   const notificationItems = notices[user.role];
   const key = (i: number) => `${user.role}:${i}`;
@@ -38,7 +40,7 @@ export function EnterpriseHeader({ breadcrumb, sidebarOpen, toggleSidebar, links
   useEffect(() => { setPanel(null); }, [pathname, user.role]);
   useEffect(() => {
     const outside = (event: PointerEvent) => { if (!root.current?.contains(event.target as Node)) setPanel(null); };
-    const keyboard = (event: KeyboardEvent) => { if (event.key === 'Escape') setPanel(null); };
+    const keyboard = (event: KeyboardEvent) => { if (event.key === 'Escape') { if (root.current?.querySelector('#workspace-guide')) helpButton.current?.focus(); setPanel(null); } };
     document.addEventListener('pointerdown', outside); document.addEventListener('keydown', keyboard);
     return () => { document.removeEventListener('pointerdown', outside); document.removeEventListener('keydown', keyboard); };
   }, []);
@@ -97,7 +99,13 @@ export function EnterpriseHeader({ breadcrumb, sidebarOpen, toggleSidebar, links
         <button className={iconButton} aria-label={`${t('Notifications')}, ${unread} unread`} onClick={() => setPanel(panel === 'notifications' ? null : 'notifications')}><Bell size={20} />{unread > 0 && <span className="absolute right-1 top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-white px-1 text-[9px] font-bold text-orange-600">{unread}</span>}</button>
         {panel === 'notifications' && <section className={popover}><div className="flex items-center justify-between border-b border-slate-100 p-4"><div><h2 className="font-bold">{t('Notifications')}</h2><p className="text-xs text-slate-500">{t('Your latest updates')}</p></div><button onClick={() => markRead(notificationItems.map((_, i) => key(i)))} className="flex h-9 w-9 items-center justify-center rounded-full text-orange-600 hover:bg-orange-50" aria-label={t('Mark all as read')}><CheckCheck size={18} /></button></div>{notificationItems.map((notice, i) => <button key={notice.to} onClick={() => { markRead([key(i)]); go(notice.to); }} className="flex w-full gap-3 border-b border-slate-100 p-4 text-left hover:bg-orange-50"><span className={`mt-1 h-2 w-2 shrink-0 rounded-full ${read.includes(key(i)) ? 'bg-slate-200' : 'bg-orange-500'}`} /><span><b className="block text-sm">{t(notice.title)}</b><span className="mt-1 block text-xs leading-5 text-slate-500">{t(notice.detail)}</span></span></button>)}</section>}
       </div>
-      <div className="relative hidden sm:block"><button className={iconButton} aria-label={t('Help center')} onClick={() => setPanel(panel === 'help' ? null : 'help')}><HelpCircle size={20} /></button>{panel === 'help' && <section className={popover + ' p-5'}><h2 className="font-bold">{t('Workspace guide')}</h2><p className="mt-2 text-sm leading-6 text-slate-600">{t('Use the sidebar to explore tools for your role and search for the page you need.')}</p></section>}</div>
+      <div className="relative">
+        <button ref={helpButton} type="button" className={iconButton} aria-label={t('Help center')} aria-expanded={panel === 'help'} aria-controls="workspace-guide" onClick={() => setPanel(panel === 'help' ? null : 'help')}><HelpCircle size={20} /></button>
+        {panel === 'help' && <div id="workspace-guide" role="region" aria-labelledby="workspace-guide-title" className="fixed right-3 top-[72px] max-h-[calc(100dvh-90px)] w-[calc(100vw-24px)] overflow-y-auto overscroll-contain rounded-2xl border border-slate-200 bg-white text-slate-800 shadow-2xl shadow-slate-900/15 sm:absolute sm:right-0 sm:top-[calc(100%+12px)] sm:max-h-[min(75dvh,680px)] sm:w-[440px] sm:max-w-[calc(100vw-24px)]">
+          <button type="button" onClick={() => { setPanel(null); helpButton.current?.focus(); }} className="absolute right-3 top-3 flex h-9 w-9 items-center justify-center rounded-full text-slate-500 hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-orange-500" aria-label={t('Close')}><X size={18}/></button>
+          <RoleJourney onNavigate={() => setPanel(null)} />
+        </div>}
+      </div>
       <div className="relative">
         <button onClick={() => setPanel(panel === 'account' ? null : 'account')} className="flex min-h-12 items-center gap-2 rounded-full bg-white px-2 py-1 text-left text-slate-800 shadow-sm hover:bg-orange-50 sm:pr-4" aria-label={t('Account menu')}><span className="flex h-9 w-9 items-center justify-center rounded-full bg-orange-100 text-xs font-bold text-orange-700">{user.initials}</span><span className="hidden lg:block"><b className="block max-w-32 truncate text-xs">{user.name}</b><span className="block text-[10px] text-slate-500">{t(user.role)}</span></span><ChevronDown size={14} className="hidden text-slate-400 sm:block" /></button>
         {panel === 'account' && <section className={accountPopover}><button onClick={handleSignOut} className="flex h-10 w-full items-center gap-2 rounded-lg px-3 text-sm font-semibold text-red-600 transition-colors hover:bg-red-50 focus-visible:outline-2 focus-visible:outline-red-500"><LogOut size={16} />{t('Sign out')}</button></section>}
