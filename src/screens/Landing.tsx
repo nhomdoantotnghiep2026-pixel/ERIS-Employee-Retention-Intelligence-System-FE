@@ -1,14 +1,13 @@
 import { useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
+import { LandingProductPreview } from '../components/LandingProductPreview';
 import { animate, motion, MotionConfig, useInView, useMotionValue, useTransform } from 'motion/react';
 import {
   Activity,
   ArrowRight,
-  BarChart3,
   BrainCircuit,
   BriefcaseBusiness,
   Building2,
-  Check,
   ChevronRight,
   Database,
   Factory,
@@ -20,7 +19,6 @@ import {
   LockKeyhole,
   MailCheck,
   ShieldCheck,
-  Sparkles,
   Store,
   UserCog,
   UsersRound,
@@ -150,97 +148,6 @@ function AnimatedMetric({ target, suffix = '', pad = 0, delay = 0, label }: { ta
   );
 }
 
-function ProductStage() {
-  return (
-    <div className="landing-stage relative mx-auto mt-16 h-[420px] w-full max-w-6xl sm:h-[500px] lg:mt-20 lg:h-[570px]" aria-label="Minh hoạ dashboard phân tích nhân sự ERIS">
-      <motion.div
-        initial={{ opacity: 0, x: -90, y: 42, rotate: -16, scale: 0.86 }}
-        animate={{ opacity: 1, x: 0, y: 0, rotate: -8, scale: 1 }}
-        transition={{ type: 'spring', stiffness: 105, damping: 20, delay: 0.7 }}
-        className="absolute left-[4%] top-[16%] hidden w-[30%] overflow-hidden rounded-[28px] border-[5px] border-white bg-white shadow-[0_24px_60px_rgba(71,85,105,0.16)] md:block"
-        aria-hidden="true"
-      >
-        <img src="/login-slides/hr-collaboration.png" alt="" className="aspect-[4/5] w-full object-cover" />
-        <div className="p-4"><p className="text-xs font-bold uppercase tracking-[0.12em] text-orange-600">HR review</p><p className="mt-1 text-sm font-bold text-slate-900">Thảo luận trước khi hành động</p></div>
-      </motion.div>
-
-      <motion.div
-        initial={{ opacity: 0, x: 90, y: 42, rotate: 16, scale: 0.86 }}
-        animate={{ opacity: 1, x: 0, y: 0, rotate: 8, scale: 1 }}
-        transition={{ type: 'spring', stiffness: 105, damping: 20, delay: 0.7 }}
-        className="absolute right-[4%] top-[16%] hidden w-[30%] overflow-hidden rounded-[28px] border-[5px] border-white bg-white shadow-[0_24px_60px_rgba(71,85,105,0.16)] md:block"
-        aria-hidden="true"
-      >
-        <img src="/login-slides/hr-leadership.png" alt="" className="aspect-[4/5] w-full object-cover" />
-        <div className="p-4"><p className="text-xs font-bold uppercase tracking-[0.12em] text-orange-600">Executive insight</p><p className="mt-1 text-sm font-bold text-slate-900">Báo cáo rõ ràng cho quản lý</p></div>
-      </motion.div>
-
-      <motion.div
-        initial={{ opacity: 0, x: '-50%', y: 95, scale: 0.82 }}
-        animate={{ opacity: 1, x: '-50%', y: 0, scale: 1 }}
-        transition={{ type: 'spring', stiffness: 115, damping: 22, delay: 0.48 }}
-        className="absolute left-1/2 top-0 z-10 w-[94%] max-w-[760px] overflow-hidden rounded-[30px] border-[6px] border-white bg-white shadow-[0_32px_80px_rgba(124,45,18,0.18)] sm:w-[82%]"
-      >
-        <div className="flex h-12 items-center gap-2 border-b border-slate-100 bg-slate-50 px-5">
-          <span className="h-2.5 w-2.5 rounded-full bg-red-400" /><span className="h-2.5 w-2.5 rounded-full bg-amber-400" /><span className="h-2.5 w-2.5 rounded-full bg-emerald-400" />
-          <span className="ml-auto rounded-full bg-orange-100 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-orange-700">HR workspace</span>
-        </div>
-        <div className="p-4 sm:p-6">
-          <div className="flex items-start justify-between gap-4">
-            <div><p className="text-[10px] font-bold uppercase tracking-[0.16em] text-orange-600">Workforce risk monitor</p><h2 className="mt-1 text-xl font-bold text-slate-950 sm:text-2xl">Tổng quan giữ chân nhân viên</h2></div>
-            <span className="hidden rounded-full border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-500 sm:block">Tháng này</span>
-          </div>
-          <div className="mt-5 grid grid-cols-3 gap-2 sm:gap-3">
-            {[
-              ['142', 'Đang theo dõi', 'text-slate-950'],
-              ['18', 'Rủi ro cao', 'text-red-600'],
-              ['76%', 'Độ tin cậy', 'text-emerald-700'],
-            ].map(([value, label, color]) => (
-              <div key={label} className="rounded-[16px] bg-slate-50 p-3 ring-1 ring-slate-100 sm:p-4">
-                <p className={`font-mono text-xl font-bold sm:text-2xl ${color}`}>{value}</p><p className="mt-1 text-[10px] font-semibold text-slate-500 sm:text-xs">{label}</p>
-              </div>
-            ))}
-          </div>
-          <div className="mt-4 grid gap-3 sm:grid-cols-[1.3fr_0.7fr]">
-            <div className="rounded-[18px] border border-slate-100 p-4">
-              <div className="flex items-center justify-between"><p className="text-sm font-bold text-slate-900">Phân bổ rủi ro</p><BarChart3 size={17} className="text-slate-400" /></div>
-              <div className="mt-4 space-y-3">
-                {[
-                  ['Cao', '22%', 'bg-red-500'], ['Trung bình', '41%', 'bg-amber-500'], ['Thấp', '68%', 'bg-emerald-500'],
-                ].map(([label, width, color]) => (
-                  <div key={label}><div className="mb-1 flex justify-between text-[10px] font-semibold text-slate-500 sm:text-xs"><span>{label}</span><span>{width}</span></div><div className="h-2 rounded-full bg-slate-100"><div className={`h-full rounded-full ${color}`} style={{ width }} /></div></div>
-                ))}
-              </div>
-            </div>
-            <div className="rounded-[18px] bg-orange-50 p-4 ring-1 ring-orange-100">
-              <div className="flex items-center gap-2 text-xs font-bold text-orange-800"><Sparkles size={15} /> AI insight</div>
-              <p className="mt-3 text-[11px] leading-5 text-slate-600 sm:text-xs">Mức độ gắn kết giảm và tăng ca kéo dài là hai tín hiệu cần HR xem xét.</p>
-              <div className="mt-4 flex items-center gap-2"><div className="h-8 w-8 rounded-full bg-orange-200" /><div><p className="text-[10px] font-bold text-slate-900">HR review</p><p className="text-[9px] text-slate-500">Đang chờ xử lý</p></div></div>
-            </div>
-          </div>
-        </div>
-      </motion.div>
-
-      <motion.div
-        initial={{ opacity: 0, x: -45, scale: 0.75 }}
-        animate={{ opacity: 1, x: 0, y: [0, -12, 0], scale: 1 }}
-        transition={{ opacity: { delay: 1.05, duration: 0.35 }, x: { delay: 1.05, type: 'spring', stiffness: 150 }, y: { delay: 1.5, duration: 4.2, repeat: Infinity, ease: 'easeInOut' }, scale: { delay: 1.05, type: 'spring' } }}
-        className="absolute left-[1%] top-[52%] z-20 hidden rounded-full border-2 border-white bg-white px-4 py-3 shadow-[0_16px_35px_rgba(15,23,42,0.15)] sm:flex sm:items-center sm:gap-3 lg:left-[6%]"
-      >
-        <span className="grid h-9 w-9 place-items-center rounded-full bg-red-50 text-red-600"><Activity size={17} /></span><span><b className="block text-sm text-slate-900">18 cảnh báo</b><span className="text-[10px] text-slate-500">Cần HR xem xét</span></span>
-      </motion.div>
-      <motion.div
-        initial={{ opacity: 0, x: 45, scale: 0.75 }}
-        animate={{ opacity: 1, x: 0, y: [0, 12, 0], scale: 1 }}
-        transition={{ opacity: { delay: 1.2, duration: 0.35 }, x: { delay: 1.2, type: 'spring', stiffness: 150 }, y: { delay: 1.9, duration: 4.6, repeat: Infinity, ease: 'easeInOut' }, scale: { delay: 1.2, type: 'spring' } }}
-        className="absolute bottom-[8%] right-[1%] z-20 hidden rounded-full border-2 border-white bg-white px-4 py-3 shadow-[0_16px_35px_rgba(15,23,42,0.15)] sm:flex sm:items-center sm:gap-3 lg:right-[6%]"
-      >
-        <span className="grid h-9 w-9 place-items-center rounded-full bg-emerald-50 text-emerald-700"><Check size={17} strokeWidth={3} /></span><span><b className="block text-sm text-slate-900">12 hành động</b><span className="text-[10px] text-slate-500">Đã hoàn thành</span></span>
-      </motion.div>
-    </div>
-  );
-}
-
 function OrganizationMarquee() {
   const items = [...organizationTypes, ...organizationTypes];
 
@@ -330,7 +237,7 @@ export default function Landing() {
           <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.6, delay: 0.65 }} className="mt-5 flex items-center gap-2 text-sm font-medium text-slate-500"><ShieldCheck size={17} className="text-emerald-600" /> AI hỗ trợ phân tích · HR quyết định cuối cùng</motion.p>
         </div>
 
-        <ProductStage />
+        <LandingProductPreview />
       </section>
 
       <OrganizationMarquee />

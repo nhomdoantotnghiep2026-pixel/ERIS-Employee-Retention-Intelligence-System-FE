@@ -35,3 +35,7 @@ Tests bao gồm phân quyền theo role, nhập CSV/XLSX, dữ liệu demo theo 
 ## Nhánh làm việc
 
 Bản chuyển frontend nằm trên nhánh frontend/role-workflows để nhóm review. Chưa merge vào main. Dự án cũ và repo cũ được giữ nguyên.
+
+## Ảnh giới thiệu trên landing
+
+Landing dùng ba ảnh chụp dashboard HR, System Admin và Employee / ESS do nhóm cung cấp trong public/product-previews. Component LandingProductPreview cho phép chọn từng màn hình và mở ảnh gốc; các số liệu trong ảnh là trạng thái demo lúc chụp, không phải dữ liệu đang cập nhật. Các ảnh người dùng ở trang login vẫn được giữ nguyên.
