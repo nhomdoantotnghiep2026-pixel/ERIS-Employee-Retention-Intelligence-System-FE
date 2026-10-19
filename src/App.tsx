@@ -23,6 +23,8 @@ import ErdOwnProfile from './screens/ErdOwnProfile';
 import ErdSchema from './screens/ErdSchema';
 import ErdEmployeeDetails from './screens/ErdEmployeeDetails';
 import Landing from './screens/Landing';
+import PublicDetail from './screens/PublicDetail';
+import { PUBLIC_TOPICS } from './data/publicTopics';
 import Login from './screens/Login';
 
 // HR
@@ -82,6 +84,7 @@ export default function App() {
         <BrowserRouter>
           <Routes>
           <Route path="/" element={<Landing />} />
+          {Object.values(PUBLIC_TOPICS).map(topic => <Route key={topic.id} path={topic.path} element={<PublicDetail topicId={topic.id} />} />)}
           <Route path="/login" element={<Login />} />
 
           {/* HR */}

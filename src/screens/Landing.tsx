@@ -1,6 +1,8 @@
 import { useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { LandingProductPreview } from '../components/LandingProductPreview';
+import { PublicHeader } from '../components/PublicHeader';
+import { PublicFooter } from '../components/PublicFooter';
 import { animate, motion, MotionConfig, useInView, useMotionValue, useTransform } from 'motion/react';
 import {
   Activity,
@@ -67,7 +69,7 @@ const workflow = [
 const accountFlow = [
   { icon: UserCog, title: 'Admin tạo tài khoản', text: 'Không có đăng ký công khai.' },
   { icon: LockKeyhole, title: 'Đăng nhập lần đầu', text: 'Dùng thông tin doanh nghiệp cấp.' },
-  { icon: MailCheck, title: 'Xác thực OTP', text: 'Xác minh qua email doanh nghiệp.' },
+  { icon: MailCheck, title: 'Xác thực doanh nghiệp', text: 'OTP được bổ sung khi tích hợp backend.' },
   { icon: ShieldCheck, title: 'Truy cập theo vai trò', text: 'Chỉ hiển thị chức năng được cấp.' },
 ];
 
@@ -81,21 +83,6 @@ const organizationTypes = [
   { icon: Store, label: 'Bán lẻ' },
   { icon: Globe2, label: 'Đội ngũ đa quốc gia' },
 ];
-
-function ErisLogo({ inverse = false }: { inverse?: boolean }) {
-  return (
-    <div className="flex items-center gap-3" aria-label="ERIS - Retention Intelligence">
-      <div className={`relative grid h-11 w-11 place-items-center rounded-full border-2 text-lg font-bold ${inverse ? 'border-orange-400 bg-white/10 text-orange-300' : 'border-orange-500 bg-white text-orange-600'}`}>
-        e
-        <span className={`absolute -right-0.5 -top-0.5 h-3 w-3 rounded-full bg-emerald-500 ring-2 ${inverse ? 'ring-slate-950' : 'ring-white'}`} aria-hidden="true" />
-      </div>
-      <div>
-        <div className={`text-lg font-bold tracking-[0.14em] ${inverse ? 'text-white' : 'text-slate-950'}`}>ERIS</div>
-        <div className={`text-[10px] font-semibold uppercase tracking-[0.16em] ${inverse ? 'text-slate-400' : 'text-slate-500'}`}>Retention Intelligence</div>
-      </div>
-    </div>
-  );
-}
 
 function AnimatedMetric({ target, suffix = '', pad = 0, delay = 0, label }: { target: number; suffix?: string; pad?: number; delay?: number; label: string }) {
   const ref = useRef<HTMLSpanElement>(null);
@@ -197,19 +184,7 @@ export default function Landing() {
     <main className="min-h-dvh overflow-hidden bg-white text-slate-800">
       <a href="#landing-content" className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[100] focus:rounded-full focus:bg-white focus:px-4 focus:py-3 focus:text-sm focus:font-bold focus:text-orange-700 focus:shadow-lg">Bỏ qua điều hướng</a>
 
-      <header className="fixed inset-x-0 top-0 z-50 px-4 pt-4 sm:px-7 sm:pt-6">
-        <motion.nav initial={{ opacity: 0, y: -34, scale: 0.96 }} animate={{ opacity: 1, y: 0, scale: 1 }} transition={{ type: 'spring', stiffness: 125, damping: 18, delay: 0.03 }} aria-label="Điều hướng giới thiệu" className="mx-auto flex h-[72px] w-full max-w-[1040px] items-center justify-between rounded-full border border-slate-200 bg-white/95 py-2 pl-5 pr-2 shadow-[0_16px_40px_rgba(71,85,105,0.12)] backdrop-blur-xl">
-          <ErisLogo />
-          <div className="hidden items-center lg:flex">
-            {[['Giải pháp', '#benefits'], ['Vai trò', '#roles'], ['Quy trình', '#workflow'], ['Bảo mật', '#security']].map(([label, href]) => (
-              <a key={href} href={href} className="rounded-full px-4 py-3 text-sm font-semibold text-slate-600 transition-colors duration-200 hover:bg-slate-50 hover:text-orange-700">{label}</a>
-            ))}
-          </div>
-          <Link to="/login" className="group inline-flex h-12 items-center justify-center gap-2 rounded-full bg-orange-600 px-5 text-sm font-bold text-white transition-all duration-200 hover:bg-orange-700 hover:shadow-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-500 active:scale-[0.97]">
-            Đăng nhập <ArrowRight size={17} className="transition-transform duration-200 group-hover:translate-x-0.5" />
-          </Link>
-        </motion.nav>
-      </header>
+      <PublicHeader />
 
       <section id="landing-content" className="relative flex flex-col items-center overflow-hidden rounded-b-[46px] bg-[#f8f9fb] px-4 pb-0 pt-[138px] shadow-[0_0_0_6px_#fff,0_22px_30px_rgba(140,150,169,0.10)] sm:px-7 sm:pt-[160px]">
         <div className="landing-dot-grid absolute inset-0" aria-hidden="true" />
@@ -314,7 +289,7 @@ export default function Landing() {
         </motion.section>
       </div>
 
-      <footer className="bg-slate-950 px-5 py-10 text-white sm:px-8"><div className="mx-auto flex max-w-7xl flex-col gap-6 md:flex-row md:items-center md:justify-between"><div><ErisLogo inverse /><p className="mt-3 text-sm text-slate-400">Employee Retention Intelligence System</p></div><p className="max-w-xl text-sm leading-6 text-slate-400 md:text-right">AI hỗ trợ phân tích và ưu tiên. Quyết định nhân sự cuối cùng thuộc về người có thẩm quyền trong doanh nghiệp.</p></div></footer>
+      <PublicFooter />
     </main>
     </MotionConfig>
   );
