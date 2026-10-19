@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { LoginAmbience } from '../components/LoginAmbience';
 import {
   ArrowLeft,
   ChevronDown,
@@ -104,6 +105,7 @@ export default function Login() {
 
   return (
     <main className="relative min-h-dvh overflow-hidden bg-[#fbfbfd] text-slate-700">
+      <LoginAmbience />
       <div
         aria-hidden="true"
         className="absolute -right-24 -top-24 h-64 w-64 rounded-full bg-gradient-to-br from-[#ffad37] to-[#ef6426] opacity-95 lg:hidden"
