@@ -1,7 +1,7 @@
 import { type ReactNode, useEffect, useState } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { RoleProvider, useRole } from './context/RoleContext';
-import { LanguageProvider } from './context/LanguageContext';
+import { LanguageProvider, useLanguage } from './context/LanguageContext';
 import { EmployeeProvider } from './context/EmployeeContext';
 import { WorkflowProvider } from './context/WorkflowContext';
 import { canAccessRoute, ROLE_HOME } from './workflows/access';
@@ -53,6 +53,7 @@ import SystemHealth from './screens/SystemHealth';
 import { hasRoutePermission, RBAC_UPDATED_EVENT } from './utils/rbacAccess';
 
 function RoleGuard({ children }: { children: ReactNode }) {
+  const { t } = useLanguage();
   const { user, isAuthenticated } = useRole();
   const { pathname } = useLocation();
   const [, setPermissionRevision] = useState(0);
@@ -64,7 +65,7 @@ function RoleGuard({ children }: { children: ReactNode }) {
   if (!isAuthenticated) return <Navigate to="/login" replace />;
   const allowedByRole = canAccessRoute(user.role, pathname);
   const allowed = allowedByRole && hasRoutePermission(user.role, pathname);
-  return allowed ? <>{children}</> : <AppShell breadcrumb={['Access denied']}><Card className="mx-auto max-w-xl p-8"><h1 className="text-xl font-bold text-slate-900">Không có quyền truy cập</h1><p className="my-4 text-sm text-slate-600">Vai trò {user.role} không được cấp quyền cho chức năng này.</p><Link to={ROLE_HOME[user.role]} className="text-orange-700 underline">Về trang chính của vai trò</Link></Card></AppShell>;
+  return allowed ? <>{children}</> : <AppShell breadcrumb={['Access denied']}><Card className="mx-auto max-w-xl p-8"><h1 className="text-xl font-bold text-slate-900">{t('Access denied')}</h1><p className="my-4 text-sm text-slate-600">{t('The {role} role is not authorized for this feature.', { role: t(user.role) })}</p><Link to={ROLE_HOME[user.role]} className="text-orange-700 underline">{t('Back to role home')}</Link></Card></AppShell>;
 }
 
 function RouteFallback() {

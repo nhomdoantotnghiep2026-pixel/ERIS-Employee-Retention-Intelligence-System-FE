@@ -1,3 +1,7 @@
+import { createTranslator } from '../utils/translateText';
+import { featureEnglish, featureVietnamese } from '../data/featureTranslations';
+import { workspaceEnglish, workspaceVietnamese } from '../data/workspaceTranslations';
+import { publicEnglish, publicVietnamese } from '../data/publicTranslations';
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 
 export type Language = 'en' | 'vi';
@@ -473,28 +477,37 @@ const vi: Dictionary = {
   'View interventions': 'Xem các can thiệp',
 };
 
+const vietnameseDictionary: Dictionary = { ...vi, ...publicVietnamese, ...workspaceVietnamese, ...featureVietnamese };
+const englishDictionary: Dictionary = { ...publicEnglish, ...workspaceEnglish, ...featureEnglish };
+// Vietnamese source copy may reuse an existing label. Resolve aliases to readable English, not field IDs.
+const reverseVietnamese = Object.fromEntries(Object.entries(vietnameseDictionary)
+  .filter(([source, target]) => !/[\u00c0-\u00d6\u00d8-\u00f6\u00f8-\u024f\u1ea0-\u1ef9]/.test(source) && source !== target)
+  .map(([source, target]) => [target, englishDictionary[source] || source]));
 const dictionaries: Record<Language, Dictionary> = {
-  en: {},
-  vi,
+  en: { ...reverseVietnamese, ...englishDictionary },
+  vi: vietnameseDictionary,
 };
 
 interface LanguageContextValue {
   language: Language;
   setLanguage: (language: Language) => void;
   toggleLanguage: () => void;
-  t: (text: string) => string;
+  t: (text: string | number | null | undefined, values?: Record<string, string | number>) => string;
 }
 
 const LanguageContext = createContext<LanguageContextValue | null>(null);
 
-export function LanguageProvider({ children }: { children: ReactNode }) {
+export function LanguageProvider({ children, initialLanguage }: { children: ReactNode; initialLanguage?: Language }) {
   const [language, setLanguageState] = useState<Language>(() => {
-    const stored = localStorage.getItem('eris-language');
-    return stored === 'vi' || stored === 'en' ? stored : 'en';
+    if (initialLanguage) return initialLanguage;
+    try {
+      const stored = localStorage.getItem('eris-language');
+      return stored === 'vi' || stored === 'en' ? stored : 'en';
+    } catch { return 'en'; }
   });
 
   const setLanguage = (next: Language) => {
-    localStorage.setItem('eris-language', next);
+    try { localStorage.setItem('eris-language', next); } catch { /* Keep switching usable when storage is unavailable. */ }
     document.documentElement.lang = next;
     setLanguageState(next);
   };
@@ -517,7 +530,7 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
     language,
     setLanguage,
     toggleLanguage: () => setLanguage(language === 'en' ? 'vi' : 'en'),
-    t: (text: string) => dictionaries[language][text] || text,
+    t: createTranslator(dictionaries[language], language),
   }), [language]);
 
   return <LanguageContext.Provider value={value}>{children}</LanguageContext.Provider>;

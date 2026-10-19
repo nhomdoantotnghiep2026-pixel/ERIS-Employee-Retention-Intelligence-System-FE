@@ -1,3 +1,4 @@
+import { useLanguage } from '../context/LanguageContext';
 import { AppShell } from '../components/AppShell';
 import { Card, Button, RiskBadge, Avatar, AIAdvisoryBanner } from '../components/ui';
 import { departments } from '../data/mockData';
@@ -8,6 +9,7 @@ import { useEmployees } from '../context/EmployeeContext';
 import { loadReports } from '../utils/reportStore';
 
 export default function ReportDetail() {
+  const { t } = useLanguage();
   const { reportId } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
@@ -16,7 +18,7 @@ export default function ReportDetail() {
   const returnTo = (location.state as { returnTo?: string } | null)?.returnTo || '/reports';
 
   if (!report) {
-    return <AppShell breadcrumb={['Reports', 'Not found']}><Card className="mx-auto max-w-xl p-8 text-center"><h1 className="text-xl font-bold text-slate-900">Report not found</h1><p className="mt-2 text-sm text-slate-500">This report does not exist or is no longer available in the current session.</p><Button className="mt-6" onClick={() => navigate('/reports')}>Back to reports</Button></Card></AppShell>;
+    return <AppShell breadcrumb={['Reports', 'Not found']}><Card className="mx-auto max-w-xl p-8 text-center"><h1 className="text-xl font-bold text-slate-900">{t("Report not found")}</h1><p className="mt-2 text-sm text-slate-500">{t("This report does not exist or is no longer available in the current session.")}</p><Button className="mt-6" onClick={() => navigate('/reports')}>{t("Back to reports")}</Button></Card></AppShell>;
   }
 
   const highRisk = employees.filter(e => e.riskLevel === 'High');
@@ -34,37 +36,32 @@ export default function ReportDetail() {
   return (
     <AppShell breadcrumb={['Reports', report.name]}>
       <button type="button" onClick={() => navigate(returnTo)} className="mb-3 inline-flex min-h-10 items-center gap-2 rounded-full px-3 text-sm font-semibold text-slate-500 transition-colors hover:bg-white hover:text-orange-700 focus-visible:outline-2 focus-visible:outline-orange-500">
-        <ArrowLeft size={17} /> Back to Report Library
-      </button>
+        <ArrowLeft size={17} /> {t("Back to Report Library")} </button>
       <div className="flex items-start justify-between mb-4">
         <div>
-          <h1 className="text-[22px] font-semibold text-gray-900">{report.name}</h1>
+          <h1 className="text-[22px] font-semibold text-gray-900">{t(report.name)}</h1>
           <div className="flex items-center gap-3 mt-0.5 text-[13px] text-gray-500">
-            <span>Generated: {report.lastGenerated}</span>
-            <span>·</span><span>All Departments</span>
-            <span>·</span><span>Current Workforce</span>
+            <span>{t("Generated:")} {t(report.lastGenerated)}</span>
+            <span>·</span><span>{t("All Departments")}</span>
+            <span>·</span><span>{t("Current Workforce")}</span>
           </div>
         </div>
         <div className="flex items-center gap-1.5">
-          <Button variant="secondary" size="sm" onClick={() => window.print()}><Printer size={13} /> Print</Button>
-          <Button variant="secondary" size="sm" onClick={exportCsv}><FileDown size={13} /> Export CSV</Button>
-          <Button variant="primary" size="sm" onClick={downloadPdf}><Download size={13} /> Download PDF</Button>
+          <Button variant="secondary" size="sm" onClick={() => window.print()}><Printer size={13} /> {t("Print")}</Button>
+          <Button variant="secondary" size="sm" onClick={exportCsv}><FileDown size={13} /> {t("Export CSV")}</Button>
+          <Button variant="primary" size="sm" onClick={downloadPdf}><Download size={13} /> {t("Download PDF")}</Button>
         </div>
       </div>
 
       <Card className="p-4 mb-4">
-        <div className="text-[14px] font-semibold text-gray-800 mb-2">Executive Summary</div>
-        <p className="text-[13px] font-medium text-gray-700 leading-relaxed">{report.description}</p>
-        <p className="text-[13px] text-gray-600 leading-relaxed">
-          This report provides an overview of predicted employee attrition risk as of September 2026. Based on AI-assisted analysis, 10.1% of employees (126 individuals) are currently identified as high predicted attrition risk, with Engineering and Sales departments showing the highest concentration. Overtime and low job satisfaction are the most prevalent contributing factors.
-        </p>
-        <p className="text-[13px] text-gray-600 leading-relaxed mt-2">
-          This report informs HR planning and retention initiatives. All information represents model predictions and should be reviewed by qualified HR personnel before informing any employment-related decisions.
-        </p>
+        <div className="text-[14px] font-semibold text-gray-800 mb-2">{t("Executive Summary")}</div>
+        <p className="text-[13px] font-medium text-gray-700 leading-relaxed">{t(report.description)}</p>
+        <p className="text-[13px] text-gray-600 leading-relaxed"> {t("This report provides an overview of predicted employee attrition risk as of September 2026. Based on AI-assisted analysis, 10.1% of employees (126 individuals) are currently identified as high predicted attrition risk, with Engineering and Sales departments showing the highest concentration. Overtime and low job satisfaction are the most prevalent contributing factors.")} </p>
+        <p className="text-[13px] text-gray-600 leading-relaxed mt-2"> {t("This report informs HR planning and retention initiatives. All information represents model predictions and should be reviewed by qualified HR personnel before informing any employment-related decisions.")} </p>
       </Card>
 
       <Card className="p-4 mb-4">
-        <div className="text-[14px] font-semibold text-gray-800 mb-3">Risk Distribution</div>
+        <div className="text-[14px] font-semibold text-gray-800 mb-3">{t("Risk Distribution")}</div>
         <div className="flex items-center gap-4 mb-3">
           {[
             { label: 'High Risk', count: 126, pct: '10.1%', color: 'text-red-600' },
@@ -74,8 +71,8 @@ export default function ReportDetail() {
             <div key={r.label} className="flex items-center gap-2.5 px-4 py-2.5 bg-gray-50 border border-gray-200" style={{ borderRadius: '5px' }}>
               <span className={`text-[22px] font-bold ${r.color}`}>{r.count}</span>
               <div>
-                <div className="text-[13px] text-gray-600">{r.label}</div>
-                <div className={`text-[12px] font-medium ${r.color}`}>{r.pct}</div>
+                <div className="text-[13px] text-gray-600">{t(r.label)}</div>
+                <div className={`text-[12px] font-medium ${r.color}`}>{t(r.pct)}</div>
               </div>
             </div>
           ))}
@@ -88,19 +85,19 @@ export default function ReportDetail() {
       </Card>
 
       <Card className="p-4 mb-4">
-        <div className="text-[14px] font-semibold text-gray-800 mb-3">Department Comparison</div>
+        <div className="text-[14px] font-semibold text-gray-800 mb-3">{t("Department Comparison")}</div>
         <table className="w-full">
           <thead>
             <tr className="border-b border-gray-200">
               {['Department', 'Total', 'High Risk', 'High Risk %', 'Avg Score'].map(h => (
-                <th key={h} className="pb-2 text-left text-[12px] font-medium text-gray-500 uppercase tracking-wide">{h}</th>
+                <th key={h} className="pb-2 text-left text-[12px] font-medium text-gray-500 uppercase tracking-wide">{t(h)}</th>
               ))}
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
             {departments.map(d => (
               <tr key={d.name}>
-                <td className="py-2 text-[13px] font-medium text-gray-800">{d.name}</td>
+                <td className="py-2 text-[13px] font-medium text-gray-800">{t(d.name)}</td>
                 <td className="py-2 text-[13px] text-gray-600">{d.employees}</td>
                 <td className="py-2 text-[13px] font-semibold text-red-600">{d.highRisk}</td>
                 <td className="py-2 text-[13px] text-gray-600">{Math.round(d.highRisk / d.employees * 100)}%</td>
@@ -112,12 +109,12 @@ export default function ReportDetail() {
       </Card>
 
       <Card className="p-4 mb-4">
-        <div className="text-[14px] font-semibold text-gray-800 mb-3">Employees Requiring Review</div>
+        <div className="text-[14px] font-semibold text-gray-800 mb-3">{t("Employees Requiring Review")}</div>
         <table className="w-full">
           <thead>
             <tr className="border-b border-gray-200 bg-gray-50">
               {['Employee', 'Department', 'Role', 'Risk Level', 'Score'].map(h => (
-                <th key={h} className="px-3 py-2 text-left text-[12px] font-medium text-gray-500 uppercase tracking-wide">{h}</th>
+                <th key={h} className="px-3 py-2 text-left text-[12px] font-medium text-gray-500 uppercase tracking-wide">{t(h)}</th>
               ))}
             </tr>
           </thead>
@@ -130,8 +127,8 @@ export default function ReportDetail() {
                     <span className="text-[13px] font-medium text-gray-800">{emp.name}</span>
                   </div>
                 </td>
-                <td className="px-3 h-[40px] text-[13px] text-gray-600">{emp.department}</td>
-                <td className="px-3 h-[40px] text-[13px] text-gray-600">{emp.role}</td>
+                <td className="px-3 h-[40px] text-[13px] text-gray-600">{t(emp.department)}</td>
+                <td className="px-3 h-[40px] text-[13px] text-gray-600">{t(emp.role)}</td>
                 <td className="px-3 h-[40px]"><RiskBadge level={emp.riskLevel} /></td>
                 <td className="px-3 h-[40px] text-[13px] font-semibold text-red-600">{emp.riskScore}%</td>
               </tr>
@@ -141,13 +138,9 @@ export default function ReportDetail() {
       </Card>
 
       <Card className="p-4 mb-4">
-        <div className="text-[14px] font-semibold text-gray-800 mb-2">Analysis Method</div>
-        <p className="text-[13px] text-gray-600 leading-relaxed">
-          Attrition risk predictions were generated using the ERIS Employee Attrition Prediction Model (v2.3), a supervised machine learning model trained on historical workforce data. Model evaluation: Accuracy 87.2%, F1 Score 84.1%, ROC-AUC 0.921.
-        </p>
-        <p className="text-[13px] text-gray-600 mt-2 leading-relaxed">
-          Contributing factor analysis estimates which workforce characteristics are most strongly associated with elevated risk predictions. These associations are not causal claims.
-        </p>
+        <div className="text-[14px] font-semibold text-gray-800 mb-2">{t("Analysis Method")}</div>
+        <p className="text-[13px] text-gray-600 leading-relaxed"> {t("Attrition risk predictions were generated using the ERIS Employee Attrition Prediction Model (v2.3), a supervised machine learning model trained on historical workforce data. Model evaluation: Accuracy 87.2%, F1 Score 84.1%, ROC-AUC 0.921.")} </p>
+        <p className="text-[13px] text-gray-600 mt-2 leading-relaxed"> {t("Contributing factor analysis estimates which workforce characteristics are most strongly associated with elevated risk predictions. These associations are not causal claims.")} </p>
       </Card>
 
       <AIAdvisoryBanner />

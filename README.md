@@ -51,3 +51,9 @@ Sidebar ghi nhớ các nhóm menu đang mở riêng cho từng role trong cùng 
 Bốn trang công khai: `/giai-phap`, `/vai-tro`, `/quy-trinh`, `/bao-mat`. Thanh điều hướng chung mở bảng nội dung khi rê chuột hoặc bấm tên mục; phím ArrowDown mở bảng và chuyển focus vào liên kết, Escape đóng bảng. Trên màn hình nhỏ, dùng nút menu để chọn chủ đề. Các liên kết dẫn đến đúng phần trong trang chi tiết.
 
 Nội dung bám theo bốn role và luồng làm việc hiện có, phân biệt rõ dữ liệu demo trong trình duyệt với xác thực, phân quyền máy chủ và PostgreSQL cần tích hợp sau.
+
+Bản xem thử ngôn ngữ công khai có nút VI / EN trên thanh điều hướng và trang login. Lựa chọn dùng chung với dashboard, lưu bằng eris-language và áp dụng khi chuyển trang hoặc tải lại. Nội dung trong các ảnh chụp dashboard là ảnh gốc nên không tự đổi ngôn ngữ.
+
+Dashboard của bốn role dùng cùng ngôn ngữ với trang công khai và login. Các nhãn sidebar, hướng dẫn theo role, trạng thái dịch vụ và câu chứa số lượng được dịch qua bộ từ điển chung; tên, email, mã và nội dung người dùng nhập được giữ nguyên.
+
+Bản dịch VI / EN đã mở rộng tới các trang chức năng đang gắn route của bốn role: danh bạ/hồ sơ, thêm và cập nhật hàng loạt, nhập tệp, rủi ro/báo cáo, hành động/kết quả, khảo sát, dữ liệu theo kỳ, mô hình/dự đoán, luồng dữ liệu, quản trị và tự phục vụ. Kiểm tra tự động gồm 42 trang/chế độ ở hai ngôn ngữ, nội dung điều kiện và các trường hợp đã có dữ liệu. Tên người, email, dữ liệu nhập và mã kỹ thuật không được đổi khi lưu.

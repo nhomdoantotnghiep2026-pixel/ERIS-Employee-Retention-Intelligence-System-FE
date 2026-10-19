@@ -1,3 +1,5 @@
+import { LanguageSwitcher } from '../components/LanguageSwitcher';
+import { useLanguage } from '../context/LanguageContext';
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { LoginAmbience } from '../components/LoginAmbience';
@@ -66,6 +68,8 @@ function ErisMark({ compact = false }: { compact?: boolean }) {
 }
 
 export default function Login() {
+  const { t } = useLanguage();
+  useEffect(() => { document.title = t('Đăng nhập') + ' | ERIS'; }, [t]);
   const navigate = useNavigate();
   const { user, isAuthenticated, setUser } = useRole();
   const [showPass, setShowPass] = useState(false);
@@ -112,7 +116,7 @@ export default function Login() {
       />
 
       <aside
-        aria-label="Câu chuyện về trải nghiệm nhân sự"
+        aria-label={t("Câu chuyện về trải nghiệm nhân sự")}
         className="absolute inset-y-0 right-0 hidden w-[43%] overflow-hidden bg-[#ef7428] lg:block"
         style={{ clipPath: 'ellipse(100% 94% at 100% 50%)' }}
       >
@@ -120,7 +124,7 @@ export default function Login() {
           <img
             key={slide.src}
             src={slide.src}
-            alt={slide.alt}
+            alt={t(slide.alt)}
             className={`absolute inset-0 h-full w-full object-cover transition-all duration-1000 ease-out motion-reduce:transition-none ${
               index === activeSlide ? 'scale-105 opacity-100' : 'scale-100 opacity-0'
             }`}
@@ -131,19 +135,19 @@ export default function Login() {
 
         <div className="absolute bottom-[11%] right-[7%] w-[64%] text-right text-white xl:right-[9%] xl:w-[58%]">
           <div className="transition-all duration-500 motion-reduce:transition-none" key={LOGIN_SLIDES[activeSlide].title}>
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-white/75">ERIS · People experience</p>
-            <h2 className="mt-3 text-2xl font-bold leading-tight xl:text-3xl">{LOGIN_SLIDES[activeSlide].title}</h2>
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-white/75">{t("ERIS · People experience")}</p>
+            <h2 className="mt-3 text-2xl font-bold leading-tight xl:text-3xl">{t(LOGIN_SLIDES[activeSlide].title)}</h2>
             <p className="ml-auto mt-3 max-w-[360px] text-sm leading-6 text-white/85 xl:text-base">
-              {LOGIN_SLIDES[activeSlide].description}
+              {t(LOGIN_SLIDES[activeSlide].description)}
             </p>
           </div>
 
-          <div className="mt-6 flex justify-end gap-2" aria-label="Chọn ảnh giới thiệu">
+          <div className="mt-6 flex justify-end gap-2" aria-label={t("Chọn ảnh giới thiệu")}>
             {LOGIN_SLIDES.map((slide, index) => (
               <button
                 key={slide.src}
                 type="button"
-                aria-label={`Hiển thị ảnh ${index + 1}: ${slide.title}`}
+                aria-label={`${t('Hiển thị ảnh')} ${index + 1}: ${t(slide.title)}`}
                 aria-pressed={index === activeSlide}
                 onClick={() => setActiveSlide(index)}
                 className={`h-2 rounded-full border border-white/80 transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white ${
@@ -157,9 +161,10 @@ export default function Login() {
 
       <section className="relative z-10 flex min-h-dvh w-full items-center px-5 py-8 sm:px-8 lg:w-[69%] lg:px-12 xl:w-[66%]">
         <div className="mx-auto w-full max-w-[590px]">
+          <div className="mb-4 flex justify-end"><LanguageSwitcher /></div>
           <Link
             to="/"
-            aria-label="Quay về trang giới thiệu ERIS"
+            aria-label={t("Quay về trang giới thiệu ERIS")}
             className="group relative mb-7 flex items-center justify-center overflow-hidden rounded-[26px] border border-white bg-white/95 px-7 py-5 shadow-[0_18px_55px_rgba(31,41,55,0.10)] transition-all duration-300 hover:-translate-y-1 hover:border-orange-100 hover:shadow-[0_24px_65px_rgba(234,88,12,0.16)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-orange-200 sm:px-10"
           >
             <span className="absolute left-4 top-1/2 grid h-10 w-10 -translate-y-1/2 place-items-center rounded-full bg-orange-50 text-orange-700 opacity-70 transition-all duration-300 group-hover:-translate-x-1 group-hover:opacity-100 group-focus-visible:-translate-x-1 group-focus-visible:opacity-100 sm:left-6" aria-hidden="true">
@@ -170,25 +175,22 @@ export default function Login() {
             </span>
             <div className="ml-4 border-l border-slate-200 pl-4 text-left">
               <div className="text-2xl font-bold tracking-[0.12em] text-slate-800">ERIS</div>
-              <div className="mt-1 text-[10px] font-semibold uppercase tracking-[0.13em] text-slate-400 sm:text-[11px]">
-                Employee Retention Intelligence System
-              </div>
+              <div className="mt-1 text-[10px] font-semibold uppercase tracking-[0.13em] text-slate-400 sm:text-[11px]"> {t("Employee Retention Intelligence System")} </div>
             </div>
             <span className="absolute inset-x-12 bottom-0 h-0.5 origin-center scale-x-0 bg-gradient-to-r from-transparent via-orange-500 to-transparent transition-transform duration-300 group-hover:scale-x-100 group-focus-visible:scale-x-100" aria-hidden="true" />
           </Link>
 
           <div className="px-1 sm:px-8">
             <div className="mb-5 text-center">
-              <h1 className="text-3xl font-bold tracking-tight text-slate-800">Đăng nhập</h1>
-              <p className="mt-2 text-sm text-slate-500">Truy cập không gian làm việc phù hợp với vai trò của bạn</p>
+              <h1 className="text-3xl font-bold tracking-tight text-slate-800">{t("Đăng nhập")}</h1>
+              <p className="mt-2 text-sm text-slate-500">{t("Truy cập không gian làm việc phù hợp với vai trò của bạn")}</p>
             </div>
 
             <div className="mb-5 flex items-start gap-3 rounded-[22px] bg-[#eef0f5] px-5 py-4 text-sm text-slate-600">
               <ShieldCheck className="mt-0.5 shrink-0 text-[#ef7628]" size={19} />
               <div>
-                <p className="font-semibold text-slate-700">Tài khoản dùng thử</p>
-                <p className="mt-1 leading-5">
-                  Chọn một vai trò bên dưới và dùng mật khẩu <span className="font-semibold text-slate-800">password</span>.
+                <p className="font-semibold text-slate-700">{t("Tài khoản dùng thử")}</p>
+                <p className="mt-1 leading-5"> {t("Chọn một vai trò bên dưới và dùng mật khẩu")} <span className="font-semibold text-slate-800">password</span>.
                 </p>
               </div>
             </div>
@@ -196,9 +198,7 @@ export default function Login() {
             <form onSubmit={handleSignIn} className="space-y-4" noValidate>
               <div>
                 <label htmlFor="demo-account" className="mb-1.5 flex items-center gap-2 text-[13px] font-medium text-slate-600">
-                  <UserRound size={15} />
-                  Tài khoản
-                </label>
+                  <UserRound size={15} /> {t("Tài khoản")} </label>
                 <div className="relative">
                   <select
                     id="demo-account"
@@ -211,7 +211,7 @@ export default function Login() {
                   >
                     {ROLE_USERS.map((roleUser, index) => (
                       <option key={roleUser.email} value={index}>
-                        {roleUser.name} — {roleUser.role}
+                        {roleUser.name} — {t(roleUser.role)}
                       </option>
                     ))}
                   </select>
@@ -223,7 +223,7 @@ export default function Login() {
                 </div>
                 <div className="mt-2 flex flex-wrap items-center gap-2 px-1">
                   <span className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold ${roleColors[selectedUser.role]}`}>
-                    {selectedUser.role}
+                    {t(selectedUser.role)}
                   </span>
                   <span className="text-xs text-slate-400">{selectedUser.email}</span>
                 </div>
@@ -231,9 +231,7 @@ export default function Login() {
 
               <div>
                 <label htmlFor="password" className="mb-1.5 flex items-center gap-2 text-[13px] font-medium text-slate-600">
-                  <LockKeyhole size={15} />
-                  Mật khẩu
-                </label>
+                  <LockKeyhole size={15} /> {t("Mật khẩu")} </label>
                 <div className="relative">
                   <input
                     id="password"
@@ -250,7 +248,7 @@ export default function Login() {
                   />
                   <button
                     type="button"
-                    aria-label={showPass ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
+                    aria-label={showPass ? t('Ẩn mật khẩu') : t('Hiện mật khẩu')}
                     onClick={() => setShowPass((visible) => !visible)}
                     className="absolute right-1 top-1/2 grid h-10 w-10 -translate-y-1/2 place-items-center rounded-lg text-slate-400 transition hover:bg-orange-50 hover:text-orange-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-300"
                   >
@@ -259,7 +257,7 @@ export default function Login() {
                 </div>
                 {error && (
                   <p id="login-error" role="alert" className="mt-2 text-xs font-semibold text-red-600">
-                    {error}
+                    {t(error)}
                   </p>
                 )}
               </div>
@@ -267,17 +265,13 @@ export default function Login() {
               <button
                 type="submit"
                 className="mt-1 h-12 w-full rounded-full bg-gradient-to-r from-[#fa8b2e] to-[#ef6827] text-sm font-semibold text-white shadow-[0_12px_28px_rgba(239,104,39,0.28)] transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_16px_32px_rgba(239,104,39,0.34)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-orange-200 active:translate-y-0"
-              >
-                Đăng nhập
-              </button>
+              > {t("Đăng nhập")} </button>
             </form>
 
-            <p className="mt-5 text-center text-xs leading-5 text-slate-400">
-              Tài khoản do doanh nghiệp cấp và quản lý. Liên hệ quản trị viên nếu bạn không thể đăng nhập.
-            </p>
+            <p className="mt-5 text-center text-xs leading-5 text-slate-400"> {t("Tài khoản do doanh nghiệp cấp và quản lý. Liên hệ quản trị viên nếu bạn không thể đăng nhập.")} </p>
           </div>
 
-          <footer className="mt-6 text-center text-[11px] text-slate-400">© 2026 ERIS · Graduation Capstone Project</footer>
+          <footer className="mt-6 text-center text-[11px] text-slate-400">{t("© 2026 ERIS · Graduation Capstone Project")}</footer>
         </div>
       </section>
 

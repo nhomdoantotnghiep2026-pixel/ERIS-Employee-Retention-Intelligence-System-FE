@@ -1,3 +1,4 @@
+import { useLanguage } from '../context/LanguageContext';
 import { Link, useLocation } from 'react-router-dom';
 import { ArrowRight } from 'lucide-react';
 import { useRole, type UserRole } from '../context/RoleContext';
@@ -32,19 +33,20 @@ const journeys: Record<UserRole, { title: string; steps: { title: string; detail
 
 export function RoleJourney({ onNavigate }: { onNavigate: () => void }) {
   const { user } = useRole();
+  const { t } = useLanguage();
   const { pathname } = useLocation();
   const journey = journeys[user.role];
   const steps = journey.steps.filter(step => hasRoutePermission(user.role, step.to));
   return <section aria-labelledby="workspace-guide-title" className="p-5">
-    <h2 id="workspace-guide-title" className="pr-9 text-base font-bold text-slate-900">{journey.title}</h2>
-    <p className="mb-4 mt-2 text-sm leading-6 text-slate-500">Thực hiện theo các bước bên dưới. Chọn “Mở bước này” để đến chức năng cần sử dụng.</p>
+    <h2 id="workspace-guide-title" className="pr-9 text-base font-bold text-slate-900">{t(journey.title)}</h2>
+    <p className="mb-4 mt-2 text-sm leading-6 text-slate-500">{t('Thực hiện theo các bước bên dưới. Chọn “Mở bước này” để đến chức năng cần sử dụng.')}</p>
     <ol className="space-y-3">{steps.map((step, index) => {
       const current = pathname === step.to || pathname.startsWith(step.to + '/');
       return <li key={step.title}><Link to={step.to} onClick={onNavigate} className={`group flex gap-3 rounded-xl border p-4 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-500 ${current ? 'border-orange-200 bg-orange-50' : 'border-slate-100 bg-slate-50 hover:border-orange-200 hover:bg-orange-50'}`}>
         <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-orange-100 text-xs font-bold text-orange-700">{index + 1}</span>
-        <div><h3 className="text-sm font-bold text-slate-800">{step.title}</h3><p className="mt-2 text-xs leading-5 text-slate-500">{step.detail}</p><span className="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-orange-700">Mở bước này <ArrowRight size={13}/></span></div>
+        <div><h3 className="text-sm font-bold text-slate-800">{t(step.title)}</h3><p className="mt-2 text-xs leading-5 text-slate-500">{t(step.detail)}</p><span className="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-orange-700">{t('Mở bước này')} <ArrowRight size={13}/></span></div>
       </Link></li>;
     })}</ol>
-    {steps.length === 0 && <p className="text-sm leading-6 text-slate-500">Tài khoản hiện chưa được cấp quyền truy cập các bước này. Vui lòng liên hệ quản trị viên để được hỗ trợ.</p>}
+    {steps.length === 0 && <p className="text-sm leading-6 text-slate-500">{t('Tài khoản hiện chưa được cấp quyền truy cập các bước này. Vui lòng liên hệ quản trị viên để được hỗ trợ.')}</p>}
   </section>;
 }

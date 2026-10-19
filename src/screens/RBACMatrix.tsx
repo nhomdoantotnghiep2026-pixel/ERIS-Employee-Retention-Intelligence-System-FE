@@ -1,3 +1,4 @@
+import { useLanguage } from '../context/LanguageContext';
 import { AppShell } from '../components/AppShell';
 import { Card, Button, ConfirmationDialog } from '../components/ui';
 import { CheckCircle, RotateCcw, Save, Shield, XCircle } from 'lucide-react';
@@ -98,6 +99,7 @@ export function loadPermissionMatrix(): PermissionMatrix {
 }
 
 export function PermissionMatrixPanel() {
+  const { t } = useLanguage();
   const [matrix, setMatrix] = useState<PermissionMatrix>(() => {
     return loadPermissionMatrix();
   });
@@ -188,28 +190,28 @@ export function PermissionMatrixPanel() {
     <div className="space-y-3">
       <div className="flex flex-col gap-3 rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-[0_1px_2px_rgba(15,23,42,0.04)] lg:flex-row lg:items-center lg:justify-between">
         <div className="min-w-0">
-          <h2 className="text-[16px] font-semibold text-slate-900">RBAC Permissions Matrix</h2>
-          <p className="mt-1 text-[13px] leading-5 text-slate-500">Grant or revoke module permissions for each role from one consolidated matrix.</p>
+          <h2 className="text-[16px] font-semibold text-slate-900">{t("RBAC Permissions Matrix")}</h2>
+          <p className="mt-1 text-[13px] leading-5 text-slate-500">{t("Grant or revoke module permissions for each role from one consolidated matrix.")}</p>
         </div>
         <div className="flex flex-wrap items-center gap-1.5">
-          <Button variant="secondary" size="sm" onClick={exportMatrix}>Export Matrix</Button>
+          <Button variant="secondary" size="sm" onClick={exportMatrix}>{t("Export Matrix")}</Button>
           {editing ? (
             <>
-              <Button variant="secondary" size="sm" onClick={cancelChanges}>Cancel</Button>
-              <Button variant="secondary" size="sm" onClick={resetDefaults}><RotateCcw size={13} /> Reset</Button>
-              <Button variant="primary" size="sm" onClick={saveChanges}><Save size={13} /> Save Changes</Button>
+              <Button variant="secondary" size="sm" onClick={cancelChanges}>{t("Cancel")}</Button>
+              <Button variant="secondary" size="sm" onClick={resetDefaults}><RotateCcw size={13} /> {t("Reset")}</Button>
+              <Button variant="primary" size="sm" onClick={saveChanges}><Save size={13} /> {t("Save Changes")}</Button>
             </>
           ) : (
-            <Button variant="primary" size="sm" onClick={startEditing}><Shield size={13} /> Edit Permissions</Button>
+            <Button variant="primary" size="sm" onClick={startEditing}><Shield size={13} /> {t("Edit Permissions")}</Button>
           )}
         </div>
       </div>
 
       {(editing || saved) && (
         <div className={`rounded-lg border px-4 py-3 text-[13px] ${editing ? 'border-orange-200 bg-orange-50 text-orange-800' : 'border-green-200 bg-green-50 text-green-700'}`}>
-          {editing
+          {t(editing
             ? `${changeCount} pending permission change${changeCount === 1 ? '' : 's'}. Click any check or x icon to grant/revoke access, then save.`
-            : 'Permission catalog saved in this browser.'}
+            : 'Permission catalog saved in this browser.')}
         </div>
       )}
 
@@ -221,11 +223,11 @@ export function PermissionMatrixPanel() {
           </colgroup>
           <thead>
             <tr className="border-b border-slate-200 bg-slate-50">
-              <th className="px-4 py-3 text-left text-[12px] font-medium text-slate-500 uppercase tracking-wide w-64">Permission</th>
+              <th className="px-4 py-3 text-left text-[12px] font-medium text-slate-500 uppercase tracking-wide w-64">{t("Permission")}</th>
               {roles.map((role, i) => (
                 <th key={role} className="px-3 py-3 text-center text-[12px] font-medium text-slate-500 uppercase tracking-wide w-36">
                   <span className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold ${roleColors[i]}`}>
-                    {role}
+                    {t(role)}
                   </span>
                 </th>
               ))}
@@ -236,16 +238,16 @@ export function PermissionMatrixPanel() {
               <Fragment key={`cat-${ci}`}>
                 <tr className="bg-slate-50/70 border-b border-slate-100">
                   <td colSpan={roles.length + 1} className="px-4 py-2 text-[11px] font-semibold text-slate-400 uppercase tracking-widest">
-                    {cat.category}
+                    {t(cat.category)}
                   </td>
                 </tr>
                 {cat.items.map((item, ii) => (
                   <tr key={`item-${ci}-${ii}`} className="border-b border-slate-50 hover:bg-slate-50/60">
-                    <td className="px-4 h-[44px] text-[13px] text-slate-700">{item.label}</td>
+                    <td className="px-4 h-[44px] text-[13px] text-slate-700">{t(item.label)}</td>
                     {roles.map(role => (
                       <td key={role} className="px-3 h-[44px] text-center">
                         <button
-                          aria-label={`${item.access[role] ? 'Revoke' : 'Grant'} ${item.label} for ${role}`}
+                          aria-label={t('{action} {permission} for {role}', { action: t(item.access[role] ? 'Revoke' : 'Grant'), permission: t(item.label), role: t(role) })}
                           aria-pressed={item.access[role]}
                           disabled={!editing}
                           onClick={() => togglePermission(cat.category, item.label, role)}
@@ -267,9 +269,9 @@ export function PermissionMatrixPanel() {
       </Card>
       <ConfirmationDialog
         open={Boolean(confirm)}
-        title={confirm?.title || ''}
-        description={confirm?.description || ''}
-        confirmLabel={confirm?.confirmLabel || 'Confirm'}
+        title={t(confirm?.title || '')}
+        description={t(confirm?.description || '')}
+        confirmLabel={t(confirm?.confirmLabel || 'Confirm')}
         tone={confirm?.tone || 'default'}
         onCancel={() => setConfirm(null)}
         onConfirm={() => {

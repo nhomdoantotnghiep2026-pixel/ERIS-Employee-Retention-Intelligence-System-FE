@@ -8,13 +8,13 @@ import { useNavigate } from 'react-router-dom';
 import { useErd } from '../erd/useErd';
 
 export default function AdminOverview() {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const navigate = useNavigate();
   const db = useErd();
   const users = db.users.map(row => ({ id:row.id,email:String(row.email),name:String(db.employees.find(employee => employee.id === row.employee_id)?.full_name || row.email),role:String(db.role.find(role => role.id === row.role_id)?.name),status:String(row.status) }));
   const entries = readAudit();
   const localDay = (value: string | Date) => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' }).format(new Date(value));
-  const activityLog = entries.slice(0, 8).map(entry => ({ time: new Date(entry.created_at).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' }), user: entry.user_name, activity: entry.action, module: entry.entity_type, status: 'Success' }));
+  const activityLog = entries.slice(0, 8).map(entry => ({ time: new Date(entry.created_at).toLocaleString(language === 'vi' ? 'vi-VN' : 'en-US', { timeZone: 'Asia/Ho_Chi_Minh' }), user: entry.user_name, activity: entry.action, module: entry.entity_type, status: 'Success' }));
   const activitiesToday = entries.filter(entry => localDay(entry.created_at) === localDay(new Date())).length;
   const activeUsers = users.filter(u => u.status === 'Active').length;
   const inactiveUsers = users.filter(u => u.status === 'Inactive').length;
@@ -28,22 +28,22 @@ export default function AdminOverview() {
           <Card className="px-5 py-3.5">
             <div className="text-[12px] text-gray-500 mb-1">{t('Total Users')}</div>
             <div className="text-[24px] font-semibold text-gray-900">{users.length}</div>
-            <div className="text-[12px] text-gray-400">{activeUsers} {t('active')} · {inactiveUsers} inactive</div>
+            <div className="text-[12px] text-gray-400">{activeUsers} {t('active')} · {inactiveUsers} {t('inactive')}</div>
           </Card>
           <Card className="px-5 py-3.5">
             <div className="text-[12px] text-gray-500 mb-1">{t('System Roles')}</div>
             <div className="text-[24px] font-semibold text-gray-900">4</div>
-            <div className="text-[12px] text-gray-400">HR, Analyst, Admin, Employee / ESS</div>
+            <div className="text-[12px] text-gray-400">{t('HR, Analyst, Admin, Employee / ESS')}</div>
           </Card>
           <Card className="px-5 py-3.5">
             <div className="text-[12px] text-gray-500 mb-1">{t('System Status')}</div>
-            <div className="text-[24px] font-semibold text-amber-600">Demo</div>
-            <div className="text-[12px] text-gray-400">Chưa xác minh health backend / AI service</div>
+            <div className="text-[24px] font-semibold text-amber-600">{t('Demo')}</div>
+            <div className="text-[12px] text-gray-400">{t('Backend / AI service health has not been verified')}</div>
           </Card>
           <Card className="px-5 py-3.5">
             <div className="text-[12px] text-gray-500 mb-1">{t('Activities Today')}</div>
             <div className="text-[24px] font-semibold text-gray-900">{activitiesToday}</div>
-            <div className="text-[12px] text-gray-400">Nhật ký thao tác trong phiên demo</div>
+            <div className="text-[12px] text-gray-400">{t('Activity log for the demo session')}</div>
           </Card>
       </div>
 
@@ -83,7 +83,7 @@ export default function AdminOverview() {
               <div key={u.id} className="flex items-center justify-between py-2 border-b border-gray-100 last:border-0">
                 <div>
                   <div className="text-[13px] font-medium text-gray-800">{u.name}</div>
-                  <div className="text-[11px] text-gray-400">{u.role}</div>
+                  <div className="text-[11px] text-gray-400">{t(u.role)}</div>
                 </div>
                 <StatusBadge status={u.status} />
               </div>
@@ -96,10 +96,10 @@ export default function AdminOverview() {
           <div className="text-[14px] font-semibold text-gray-800 mb-3">{t('Administration')}</div>
           <div className="space-y-1.5">
             {[
-              { label: 'Users Management', value: `${users.length} accounts` },
-              { label: 'Roles & Permissions', value: '4 roles' },
+              { label: 'Users Management', value: t('{count} accounts', { count: users.length }) },
+              { label: 'Roles & Permissions', value: t('{count} roles', { count: 4 }) },
               { label: 'System Configuration', value: 'Demo configuration' },
-              { label: 'System Activity Log', value: `${activitiesToday} today` },
+              { label: 'System Activity Log', value: t('{count} today', { count: activitiesToday }) },
             ].map(a => (
               <div
                 key={a.label}
@@ -139,9 +139,9 @@ export default function AdminOverview() {
               <tr key={i} className="hover:bg-gray-50/60">
                 <td className="px-3 h-[44px] font-mono text-[12px] text-gray-400 whitespace-nowrap">{a.time}</td>
                 <td className="px-3 h-[44px] text-[13px] font-medium text-gray-800">{a.user}</td>
-                <td className="px-3 h-[44px] text-[13px] text-gray-600">{a.activity}</td>
+                <td className="px-3 h-[44px] text-[13px] text-gray-600">{t(a.activity)}</td>
                 <td className="px-3 h-[44px]">
-                  <span className="text-[12px] bg-gray-100 text-gray-500 px-2 py-0.5 rounded">{a.module}</span>
+                  <span className="text-[12px] bg-gray-100 text-gray-500 px-2 py-0.5 rounded">{t(a.module)}</span>
                 </td>
                 <td className="px-3 h-[44px]"><StatusBadge status={a.status} /></td>
               </tr>

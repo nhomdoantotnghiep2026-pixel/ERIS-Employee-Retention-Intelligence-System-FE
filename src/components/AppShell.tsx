@@ -253,6 +253,8 @@ function Sidebar({ onNavigate, collapsed, onToggle }: { onNavigate?: () => void;
 
 export function AppShell({ children, breadcrumb }: { children: ReactNode; breadcrumb?: string[] }) {
   const { t } = useLanguage();
+  const pageTitle = t(breadcrumb?.[breadcrumb.length - 1] || 'Workspace');
+  useEffect(() => { document.title = pageTitle + ' | ERIS'; }, [pageTitle]);
   const { user } = useRole();
   const [sidebarOpen, setSidebarOpen] = useState(() => window.innerWidth >= 1024 && sessionStorage.getItem('eris-sidebar') !== 'closed');
   const toggleSidebar = () => setSidebarOpen(open => { sessionStorage.setItem('eris-sidebar', open ? 'closed' : 'open'); return !open; });

@@ -1,3 +1,4 @@
+import { useLanguage } from '../context/LanguageContext';
 import { AppShell } from '../components/AppShell';
 import { Card, SectionHeader, RiskBadge, Button, Tabs, AIAdvisoryBanner, ConfirmationDialog } from '../components/ui';
 import { useEffect, useState } from 'react';
@@ -54,6 +55,7 @@ const statusIcon: Record<InterventionStatus, typeof Clock> = {
 };
 
 export default function RetentionInterventions() {
+  const { t } = useLanguage();
   const navigate = useNavigate();
   const { employees } = useEmployees();
   const [params] = useSearchParams();
@@ -209,8 +211,8 @@ export default function RetentionInterventions() {
 
   return (
     <AppShell breadcrumb={['Performance & Retention', 'Retention Interventions']}>
-      <SectionHeader title="Retention Interventions" description="1-on-1 meetings, action plans, and escalations">
-        <Button variant="primary" size="sm" onClick={openNewIntervention}><Plus size={13} /> New Intervention</Button>
+      <SectionHeader title={t("Retention Interventions")} description={t("1-on-1 meetings, action plans, and escalations")}>
+        <Button variant="primary" size="sm" onClick={openNewIntervention}><Plus size={13} /> {t("New Intervention")}</Button>
       </SectionHeader>
 
       <div className="grid grid-cols-4 gap-4 mb-5">
@@ -221,7 +223,7 @@ export default function RetentionInterventions() {
           { label: 'Resolved (30d)', value: items.filter(i => i.status === 'Resolved').length, color: 'text-green-600' },
         ].map(s => (
           <Card key={s.label} className="p-4">
-            <div className="text-[12px] font-medium text-slate-500 uppercase tracking-wide mb-1">{s.label}</div>
+            <div className="text-[12px] font-medium text-slate-500 uppercase tracking-wide mb-1">{t(s.label)}</div>
             <div className={`text-[28px] font-semibold leading-none ${s.color}`}>{s.value}</div>
           </Card>
         ))}
@@ -243,20 +245,20 @@ export default function RetentionInterventions() {
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex items-center gap-2">
                     <div className="w-7 h-7 bg-orange-100 text-orange-700 rounded-full flex items-center justify-center text-[10px] font-semibold flex-shrink-0">
-                      {item.empName.split(' ').map(n => n[0]).slice(0, 2).join('')}
+                      {t(item.empName.split(' ').map(n => n[0]).slice(0, 2).join(''))}
                     </div>
                     <div>
-                      <div className="text-[13px] font-semibold text-slate-800">{item.empName}</div>
-                      <div className="text-[11px] text-slate-400">{item.dept}</div>
+                      <div className="text-[13px] font-semibold text-slate-800">{t(item.empName)}</div>
+                      <div className="text-[11px] text-slate-400">{t(item.dept)}</div>
                     </div>
                   </div>
                   <RiskBadge level={item.riskLevel} />
                 </div>
                 <div className="flex items-center justify-between mt-2">
                   <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] font-medium h-[20px] ${statusStyles[item.status]}`}>
-                    <Icon size={10} /> {item.status}
+                    <Icon size={10} /> {t(item.status)}
                   </span>
-                  <span className="text-[11px] text-slate-400">{item.type}</span>
+                  <span className="text-[11px] text-slate-400">{t(item.type)}</span>
                 </div>
               </Card>
             );
@@ -269,13 +271,13 @@ export default function RetentionInterventions() {
             <Card className="p-5">
               <div className="flex items-start justify-between mb-4">
                 <div>
-                  <div className="text-[18px] font-semibold text-slate-900">{selected.empName}</div>
-                  <div className="text-[13px] text-slate-500 mt-0.5">{selected.dept} · {selected.type}</div>
+                  <div className="text-[18px] font-semibold text-slate-900">{t(selected.empName)}</div>
+                  <div className="text-[13px] text-slate-500 mt-0.5">{t(selected.dept)} · {t(selected.type)}</div>
                 </div>
                 <div className="flex items-center gap-2">
                   <RiskBadge level={selected.riskLevel} score={selected.riskScore} />
                   <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[12px] font-medium ${statusStyles[selected.status]}`}>
-                    {selected.status}
+                    {t(selected.status)}
                   </span>
                 </div>
               </div>
@@ -287,29 +289,26 @@ export default function RetentionInterventions() {
                   ['Next Action Due', selected.nextAction],
                 ].map(([label, val]) => (
                   <div key={label} className="bg-slate-50 rounded-[5px] p-2.5">
-                    <div className="text-slate-400 mb-0.5">{label}</div>
-                    <div className="font-medium text-slate-700">{val}</div>
+                    <div className="text-slate-400 mb-0.5">{t(label)}</div>
+                    <div className="font-medium text-slate-700">{t(val)}</div>
                   </div>
                 ))}
               </div>
 
               <div className="mb-4">
-                <div className="text-[12px] font-medium text-slate-500 mb-1.5">Notes</div>
-                <div className="text-[13px] text-slate-700 bg-slate-50 p-3 rounded-[5px]">{selected.notes}</div>
+                <div className="text-[12px] font-medium text-slate-500 mb-1.5">{t("Notes")}</div>
+                <div className="text-[13px] text-slate-700 bg-slate-50 p-3 rounded-[5px]">{t(selected.notes)}</div>
               </div>
-              {selected.status !== 'Resolved' && <label className="mb-4 block text-sm text-slate-600">Ghi chú hoàn tất / bằng chứng<textarea className="mt-2 w-full rounded-xl border border-slate-300 p-3" maxLength={2000} value={resolutionNote} onChange={event => setResolutionNote(event.target.value)} /></label>}
-              <div className="mb-4 flex flex-wrap gap-3"><Button variant="secondary" disabled={selected.status === 'Resolved' || !resolutionNote.trim()} onClick={() => setConfirmResolve(true)}>Xác nhận hoàn tất hành động</Button><Button variant="secondary" onClick={() => navigate(`/outcomes?employee=${selected.empId}`)}>Ghi nhận kết quả thực tế</Button></div>
+              {selected.status !== 'Resolved' && <label className="mb-4 block text-sm text-slate-600">{t("Ghi chú hoàn tất / bằng chứng")}<textarea className="mt-2 w-full rounded-xl border border-slate-300 p-3" maxLength={2000} value={resolutionNote} onChange={event => setResolutionNote(event.target.value)} /></label>}
+              <div className="mb-4 flex flex-wrap gap-3"><Button variant="secondary" disabled={selected.status === 'Resolved' || !resolutionNote.trim()} onClick={() => setConfirmResolve(true)}>{t("Xác nhận hoàn tất hành động")}</Button><Button variant="secondary" onClick={() => navigate(`/outcomes?employee=${selected.empId}`)}>{t("Ghi nhận kết quả thực tế")}</Button></div>
 
               <div className="flex gap-2 pt-4 border-t border-slate-100">
                 <Button variant="primary" size="sm" onClick={openSchedule}>
-                  <Calendar size={13} /> Schedule 1-on-1
-                </Button>
+                  <Calendar size={13} /> {t("Schedule 1-on-1")} </Button>
                 <Button variant="secondary" size="sm" onClick={openPlan}>
-                  <FileText size={13} /> Update Action Plan
-                </Button>
+                  <FileText size={13} /> {t("Update Action Plan")} </Button>
                 <Button variant="secondary" size="sm" className="ml-auto" onClick={openEscalate}>
-                  <ArrowUpCircle size={13} /> Escalate to Director
-                </Button>
+                  <ArrowUpCircle size={13} /> {t("Escalate to Director")} </Button>
               </div>
             </Card>
           </div>
@@ -317,20 +316,20 @@ export default function RetentionInterventions() {
       </div>
 
       <div className="mt-4"><AIAdvisoryBanner /></div>
-      <ConfirmationDialog open={confirmResolve} title="Hoàn tất hành động giữ chân?" description={resolutionNote} confirmLabel="Đánh dấu Resolved" onCancel={() => setConfirmResolve(false)} onConfirm={() => { if (selected && resolutionNote.trim()) updateSelected('Resolved', `${selected.notes}\nResolution: ${resolutionNote.trim()}`); setResolutionNote(''); setConfirmResolve(false); }} />
+      <ConfirmationDialog open={confirmResolve} title={t("Hoàn tất hành động giữ chân?")} description={t(resolutionNote)} confirmLabel={t("Đánh dấu Resolved")} onCancel={() => setConfirmResolve(false)} onConfirm={() => { if (selected && resolutionNote.trim()) updateSelected('Resolved', `${selected.notes}\nResolution: ${resolutionNote.trim()}`); setResolutionNote(''); setConfirmResolve(false); }} />
       {modal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/35 p-4">
           <Card className="w-full max-w-lg overflow-hidden">
             <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
               <div>
                 <div className="text-[16px] font-semibold text-slate-900">
-                  {modal === 'new' ? 'New Intervention' : modal === 'schedule' ? 'Schedule 1-on-1' : modal === 'plan' ? 'Update Action Plan' : 'Escalate to Director'}
+                  {t(modal === 'new' ? 'New Intervention' : modal === 'schedule' ? 'Schedule 1-on-1' : modal === 'plan' ? 'Update Action Plan' : 'Escalate to Director')}
                 </div>
                 <div className="text-[12px] text-slate-500">
-                  {modal === 'escalate' ? 'Send this case to a leader with reason, priority, and response deadline.' : 'Create a concrete follow-up action for a high-risk employee.'}
+                  {t(modal === 'escalate' ? 'Send this case to a leader with reason, priority, and response deadline.' : 'Create a concrete follow-up action for a high-risk employee.')}
                 </div>
               </div>
-              <button type="button" onClick={() => setModal(null)} className="flex h-9 w-9 items-center justify-center rounded-md text-slate-400 hover:bg-slate-100" aria-label="Close intervention dialog">
+              <button type="button" onClick={() => setModal(null)} className="flex h-9 w-9 items-center justify-center rounded-md text-slate-400 hover:bg-slate-100" aria-label={t("Close intervention dialog")}>
                 <X size={16} />
               </button>
             </div>
@@ -339,8 +338,8 @@ export default function RetentionInterventions() {
                 <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5">
                   <div className="flex items-center justify-between gap-3">
                     <div className="min-w-0">
-                      <div className="truncate text-[13px] font-semibold text-slate-900">{selected.empName}</div>
-                      <div className="text-[12px] text-slate-600">{selected.dept} - {selected.type}</div>
+                      <div className="truncate text-[13px] font-semibold text-slate-900">{t(selected.empName)}</div>
+                      <div className="text-[12px] text-slate-600">{t(selected.dept)} - {t(selected.type)}</div>
                     </div>
                     <RiskBadge level={selected.riskLevel} score={selected.riskScore} />
                   </div>
@@ -349,7 +348,7 @@ export default function RetentionInterventions() {
               {modal === 'new' && (
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <div>
-                    <label className="mb-1 block text-[13px] font-medium text-slate-700">Employee</label>
+                    <label className="mb-1 block text-[13px] font-medium text-slate-700">{t("Employee")}</label>
                     <div className="relative">
                       <input
                         value={form.empName}
@@ -360,7 +359,7 @@ export default function RetentionInterventions() {
                         onFocus={() => setEmployeeFocused(Boolean(form.empName.trim()))}
                         onBlur={() => window.setTimeout(() => setEmployeeFocused(false), 120)}
                         className="h-10 w-full rounded border border-slate-300 px-3 text-[13px] focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-100"
-                        placeholder="Search employee by name, id, email..."
+                        placeholder={t("Search employee by name, id, email...")}
                       />
                       {employeeFocused && employeeQuery.length > 0 && (
                         <div className="absolute left-0 right-0 top-[calc(100%+4px)] z-20 max-h-64 overflow-y-auto rounded-lg border border-slate-200 bg-white shadow-lg">
@@ -376,85 +375,85 @@ export default function RetentionInterventions() {
                             >
                               <span className="min-w-0">
                                 <span className="block truncate text-[13px] font-medium text-slate-800">{emp.name}</span>
-                                <span className="block truncate text-[11px] text-slate-400">{emp.employeeId} - {emp.department} - {emp.email}</span>
+                                <span className="block truncate text-[11px] text-slate-400">{emp.employeeId} - {t(emp.department)} - {emp.email}</span>
                               </span>
                               <RiskBadge level={emp.riskLevel} score={emp.riskScore} />
                             </button>
                           )) : (
-                            <div className="px-3 py-3 text-[13px] text-slate-400">No matching employees</div>
+                            <div className="px-3 py-3 text-[13px] text-slate-400">{t("No matching employees")}</div>
                           )}
                         </div>
                       )}
                     </div>
                   </div>
                   <div>
-                    <label className="mb-1 block text-[13px] font-medium text-slate-700">Department</label>
+                    <label className="mb-1 block text-[13px] font-medium text-slate-700">{t("Department")}</label>
                     <select value={form.dept} onChange={e => setForm({ ...form, dept: e.target.value })} className="h-10 w-full rounded border border-slate-300 px-3 text-[13px] focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-100">
-                      {departments.map(dept => <option key={dept}>{dept}</option>)}
+                      {departments.map(dept => <option key={dept} value={dept}>{t(dept)}</option>)}
                     </select>
                   </div>
                 </div>
               )}
               {modal !== 'escalate' ? <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div>
-                  <label className="mb-1 block text-[13px] font-medium text-slate-700">Intervention type</label>
+                  <label className="mb-1 block text-[13px] font-medium text-slate-700">{t("Intervention type")}</label>
                   <select value={form.type} onChange={e => setForm({ ...form, type: e.target.value })} className="h-10 w-full rounded border border-slate-300 px-3 text-[13px] focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-100">
-                    {['1-on-1 Meeting', 'Action Plan', 'Salary Review', 'Workload Review', 'Career Path Discussion'].map(type => <option key={type}>{type}</option>)}
+                    {['1-on-1 Meeting', 'Action Plan', 'Salary Review', 'Workload Review', 'Career Path Discussion'].map(type => <option key={type} value={type}>{t(type)}</option>)}
                   </select>
                 </div>
                 <div>
-                  <label className="mb-1 block text-[13px] font-medium text-slate-700">Next action date</label>
+                  <label className="mb-1 block text-[13px] font-medium text-slate-700">{t("Next action date")}</label>
                   <input type="date" value={form.nextAction} onChange={e => setForm({ ...form, nextAction: e.target.value })} className="h-10 w-full rounded border border-slate-300 px-3 text-[13px] focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-100" />
                 </div>
               </div> : (
                 <>
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <div>
-                      <label className="mb-1 block text-[13px] font-medium text-slate-700">Escalate to</label>
+                      <label className="mb-1 block text-[13px] font-medium text-slate-700">{t("Escalate to")}</label>
                       <select value={escalation.owner} onChange={e => setEscalation({ ...escalation, owner: e.target.value })} className="h-10 w-full rounded border border-slate-300 px-3 text-[13px] focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-100">
-                        {['Director of People Operations', 'Engineering Director', 'Sales Director', 'Department Head', 'CHRO'].map(owner => <option key={owner}>{owner}</option>)}
+                        {['Director of People Operations', 'Engineering Director', 'Sales Director', 'Department Head', 'CHRO'].map(owner => <option key={owner} value={owner}>{t(owner)}</option>)}
                       </select>
                     </div>
                     <div>
-                      <label className="mb-1 block text-[13px] font-medium text-slate-700">Priority</label>
+                      <label className="mb-1 block text-[13px] font-medium text-slate-700">{t("Priority")}</label>
                       <select value={escalation.priority} onChange={e => setEscalation({ ...escalation, priority: e.target.value })} className="h-10 w-full rounded border border-slate-300 px-3 text-[13px] focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-100">
-                        {['High', 'Critical'].map(priority => <option key={priority}>{priority}</option>)}
+                        {['High', 'Critical'].map(priority => <option key={priority} value={priority}>{t(priority)}</option>)}
                       </select>
                     </div>
                   </div>
                   <div>
-                    <label className="mb-1 block text-[13px] font-medium text-slate-700">Response deadline</label>
+                    <label className="mb-1 block text-[13px] font-medium text-slate-700">{t("Response deadline")}</label>
                     <input type="date" value={escalation.deadline} onChange={e => setEscalation({ ...escalation, deadline: e.target.value })} className="h-10 w-full rounded border border-slate-300 px-3 text-[13px] focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-100" />
                   </div>
                   <div>
-                    <label className="mb-1 block text-[13px] font-medium text-slate-700">Escalation reason</label>
-                    <textarea value={escalation.reason} onChange={e => setEscalation({ ...escalation, reason: e.target.value })} rows={4} className="w-full rounded border border-slate-300 px-3 py-2 text-[13px] focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-100" placeholder="Explain why this case requires leadership approval..." />
+                    <label className="mb-1 block text-[13px] font-medium text-slate-700">{t("Escalation reason")}</label>
+                    <textarea value={escalation.reason} onChange={e => setEscalation({ ...escalation, reason: e.target.value })} rows={4} className="w-full rounded border border-slate-300 px-3 py-2 text-[13px] focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-100" placeholder={t("Explain why this case requires leadership approval...")} />
                   </div>
                 </>
               )}
               {modal !== 'escalate' && (
                 <>
                   <div>
-                    <label className="mb-1 block text-[13px] font-medium text-slate-700">Assigned to</label>
+                    <label className="mb-1 block text-[13px] font-medium text-slate-700">{t("Assigned to")}</label>
                     <input value={form.assignedTo} onChange={e => setForm({ ...form, assignedTo: e.target.value })} className="h-10 w-full rounded border border-slate-300 px-3 text-[13px] focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-100" />
                   </div>
                   <div>
-                    <label className="mb-1 block text-[13px] font-medium text-slate-700">Notes</label>
-                    <textarea value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} rows={4} className="w-full rounded border border-slate-300 px-3 py-2 text-[13px] focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-100" placeholder="Add context, agreed action, or follow-up requirement..." />
+                    <label className="mb-1 block text-[13px] font-medium text-slate-700">{t("Notes")}</label>
+                    <textarea value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} rows={4} className="w-full rounded border border-slate-300 px-3 py-2 text-[13px] focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-100" placeholder={t("Add context, agreed action, or follow-up requirement...")} />
                   </div>
                 </>
               )}
             </div>
             <div className="flex justify-end gap-2 border-t border-slate-200 px-5 py-4">
-              <Button variant="secondary" onClick={() => setModal(null)}>Cancel</Button>
+              <Button variant="secondary" onClick={() => setModal(null)}>{t("Cancel")}</Button>
               {modal === 'new' ? (
-                <Button variant="primary" disabled={!form.empId || !form.empName.trim() || !form.dept.trim() || !form.assignedTo.trim() || !form.nextAction} onClick={newIntervention}>Create Intervention</Button>
+                <Button variant="primary" disabled={!form.empId || !form.empName.trim() || !form.dept.trim() || !form.assignedTo.trim() || !form.nextAction} onClick={newIntervention}>{t("Create Intervention")}</Button>
               ) : modal === 'schedule' ? (
-                <Button variant="primary" disabled={!form.nextAction} onClick={() => updateSelected('In Progress', `${form.notes || selected?.notes || ''} 1-on-1 scheduled for ${formatDate(form.nextAction)}.`)}>Save Schedule</Button>
+                <Button variant="primary" disabled={!form.nextAction} onClick={() => updateSelected('In Progress', `${form.notes || selected?.notes || ''} 1-on-1 scheduled for ${formatDate(form.nextAction)}.`)}>{t("Save Schedule")}</Button>
               ) : modal === 'escalate' ? (
-                <Button variant="danger" disabled={!escalation.owner || !escalation.deadline || !escalation.reason.trim()} onClick={() => setConfirmEscalation(true)}>Submit Escalation</Button>
+                <Button variant="danger" disabled={!escalation.owner || !escalation.deadline || !escalation.reason.trim()} onClick={() => setConfirmEscalation(true)}>{t("Submit Escalation")}</Button>
               ) : (
-                <Button variant="primary" onClick={() => updateSelected('In Progress', form.notes || `${selected?.notes} Action plan updated.`)}>Save Action Plan</Button>
+                <Button variant="primary" onClick={() => updateSelected('In Progress', form.notes || `${selected?.notes} Action plan updated.`)}>{t("Save Action Plan")}</Button>
               )}
             </div>
           </Card>
@@ -462,9 +461,9 @@ export default function RetentionInterventions() {
       )}
       <ConfirmationDialog
         open={confirmEscalation}
-        title="Submit escalation?"
-        description="This will mark the intervention as action required and assign the case to a director-level owner."
-        confirmLabel="Submit Escalation"
+        title={t("Submit escalation?")}
+        description={t("This will mark the intervention as action required and assign the case to a director-level owner.")}
+        confirmLabel={t("Submit Escalation")}
         tone="danger"
         onCancel={() => setConfirmEscalation(false)}
         onConfirm={() => {

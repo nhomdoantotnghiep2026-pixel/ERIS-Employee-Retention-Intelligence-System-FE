@@ -15,12 +15,13 @@ test('public navigation does not replace protected role routes and documents the
 });
 
 test('every public menu destination resolves to a rendered section with detail content', async () => {
-  const server = await createServer({ root: process.cwd(), configFile: false, appType: 'custom', server: { middlewareMode: true }, esbuild: { jsx: 'automatic' } });
+  const server = await createServer({ root: process.cwd(), configFile: false, appType: 'custom', server: { middlewareMode: true, hmr: false, ws: false }, esbuild: { jsx: 'automatic' } });
   try {
+    const { LanguageProvider } = await server.ssrLoadModule('/src/context/LanguageContext.tsx');
     const { default: PublicDetail } = await server.ssrLoadModule('/src/screens/PublicDetail.tsx');
     for (const topic of Object.values(PUBLIC_TOPICS)) {
       assert.equal(new Set(topic.sections.map(section => section.id)).size, topic.sections.length);
-      const html = renderToStaticMarkup(React.createElement(MemoryRouter, { initialEntries: [topic.path] }, React.createElement(PublicDetail, { topicId: topic.id })));
+      const html = renderToStaticMarkup(React.createElement(MemoryRouter, { initialEntries: [topic.path] }, React.createElement(LanguageProvider, { initialLanguage: 'vi' }, React.createElement(PublicDetail, { topicId: topic.id }))));
       assert.ok(html.includes(topic.title));
       assert.ok(html.includes('href="/login"'));
       for (const section of topic.sections) {

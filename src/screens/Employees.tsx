@@ -68,7 +68,7 @@ export default function Employees() {
 
   return (
     <AppShell breadcrumb={['Employees']}>
-      <SectionHeader title="Employees" description="Search and review employee information used for retention analysis.">
+      <SectionHeader title={t("Employees")} description={t("Search and review employee information used for retention analysis.")}>
         {hasRoutePermission(user.role, '/reports') && <Button variant="secondary" size="sm" onClick={() => navigate('/reports')}><FileText size={15} /> {t('Open reports')}</Button>}
         {hasRoutePermission(user.role, '/employees/new') && <Button size="sm" onClick={() => navigate('/employees/new')}>{t('Add Employee')}</Button>}
       </SectionHeader>
@@ -78,7 +78,7 @@ export default function Employees() {
         <Input ariaLabel={t('Search employees by name or ID')} placeholder={t('Search employees...')} value={search} onChange={v => { setSearch(v); setPage(1); }} icon={<Search size={15} />} className="w-full sm:w-64" />
         <Select ariaLabel={t('Filter by department')} value={dept} onChange={v => { setDept(v); setPage(1); }} options={depts} placeholder={t('All departments')} className="min-w-0 flex-1 sm:flex-none" />
         {canReadRisk && <Select ariaLabel={t('Filter by risk level')} value={riskFilter} onChange={v => { setRiskFilter(v); setPage(1); }} options={['High', 'Medium', 'Low']} placeholder={t('All risk levels')} className="min-w-0 flex-1 sm:flex-none" />}
-        <Button variant="secondary" size="sm" aria-expanded={advancedOpen} aria-controls="advanced-filters" onClick={() => setAdvancedOpen(open => !open)}><SlidersHorizontal size={15} /> {advancedOpen ? t('Fewer filters') : t('More filters')}</Button>
+        <Button variant="secondary" size="sm" aria-expanded={advancedOpen} aria-controls="advanced-filters" onClick={() => setAdvancedOpen(open => !open)}><SlidersHorizontal size={15} /> {t(advancedOpen ? t('Fewer filters') : t('More filters'))}</Button>
         <div className="flex-1" />
         {hasFilters && (
           <div className="flex flex-wrap items-center gap-1.5">
@@ -89,7 +89,7 @@ export default function Employees() {
             )}
             {riskFilter && (
               <button onClick={() => setRiskFilter('')} className="inline-flex items-center gap-1 px-2 h-[24px] bg-blue-50 text-blue-700 border border-blue-200 text-[12px] font-medium" style={{ borderRadius: '4px' }}>
-                {t(`${riskFilter} Risk Label`)} <X size={10} />
+                {t(riskFilter === 'High' ? 'High risk' : riskFilter === 'Medium' ? 'Medium risk' : 'Low risk')} <X size={10} />
               </button>
             )}
             <button onClick={clearFilters} className="min-h-10 px-2 text-[13px] font-medium text-orange-600 hover:text-orange-800 focus-visible:outline-2 focus-visible:outline-orange-500">{t('Clear all')}</button>
@@ -121,7 +121,7 @@ export default function Employees() {
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-sm font-semibold text-slate-900">{emp.name}</span>
                 <span className="mt-0.5 block truncate text-[12px] text-slate-500">{t(emp.role)} · {t(emp.department)}</span>
-                {canReadRisk && <span className="mt-2 flex items-center gap-2">{emp.lastAnalysis === 'Not analyzed' ? <span>Chưa có dự đoán</span> : <><RiskBadge level={emp.riskLevel} /><span className="font-mono text-[12px] font-semibold text-slate-700">{emp.riskScore}%</span></>}</span>}
+                {canReadRisk && <span className="mt-2 flex items-center gap-2">{emp.lastAnalysis === 'Not analyzed' ? <span>{t("Chưa có dự đoán")}</span> : <><RiskBadge level={emp.riskLevel} /><span className="font-mono text-[12px] font-semibold text-slate-700">{emp.riskScore}%</span></>}</span>}
               </span>
               <ChevronRight size={18} className="shrink-0 text-slate-400" />
             </button>
@@ -132,7 +132,7 @@ export default function Employees() {
           <table className="w-full">
             <thead>
               <tr className="border-b border-gray-200">
-                <Th><button onClick={() => setSortAsc(value => !value)} aria-label={`${t('Sort employees by name')} ${sortAsc ? t('descending') : t('ascending')}`} className="flex min-h-10 items-center gap-1 rounded px-1 focus-visible:outline-2 focus-visible:outline-orange-500">{t('Employee')} <ArrowUpDown size={12} className="text-slate-400" /></button></Th>
+                <Th><button onClick={() => setSortAsc(value => !value)} aria-label={t(`${t('Sort employees by name')} ${sortAsc ? t('descending') : t('ascending')}`)} className="flex min-h-10 items-center gap-1 rounded px-1 focus-visible:outline-2 focus-visible:outline-orange-500">{t('Employee')} <ArrowUpDown size={12} className="text-slate-400" /></button></Th>
                 <Th>{t('ID')}</Th>
                 <Th>{t('Department')}</Th>
                 <Th>{t('Role')}</Th>
@@ -148,7 +148,7 @@ export default function Employees() {
                   key={emp.id}
                   className="hover:bg-gray-50/60 transition-colors cursor-pointer"
                   tabIndex={0}
-                  aria-label={`${t('Open profile for')} ${emp.name}`}
+                  aria-label={t(`${t('Open profile for')} ${emp.name}`)}
                   onClick={() => openEmployee(emp.id)}
                   onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); openEmployee(emp.id); } }}
                 >
@@ -170,15 +170,15 @@ export default function Employees() {
                       <span className="text-[11px] text-gray-400 ml-1">{emp.jobSatisfaction}/5</span>
                     </div>
                   </Td>
-                  {canReadRisk && <><Td>{emp.lastAnalysis === 'Not analyzed' ? 'Chưa có dự đoán' : <RiskBadge level={emp.riskLevel} />}</Td>
+                  {canReadRisk && <><Td>{emp.lastAnalysis === 'Not analyzed' ? t('Chưa có dự đoán') : <RiskBadge level={emp.riskLevel} />}</Td>
                   <Td>
                     <span className={`text-[13px] font-semibold ${emp.riskLevel === 'High' ? 'text-red-600' : emp.riskLevel === 'Medium' ? 'text-amber-600' : 'text-green-600'}`}>
-                      {emp.lastAnalysis === 'Not analyzed' ? '—' : `${emp.riskScore}%`}
+                      {t(emp.lastAnalysis === 'Not analyzed' ? '—' : `${emp.riskScore}%`)}
                     </span>
                   </Td>
-                  <Td className="text-[12px] text-gray-400">{emp.lastAnalysis}</Td></>}
+                  <Td className="text-[12px] text-gray-400">{t(emp.lastAnalysis)}</Td></>}
                   <Td>
-                    <button aria-label={`${t('View')} ${emp.name}`} className="min-h-10 px-2 text-[13px] font-semibold text-[#F97316] hover:underline focus-visible:outline-2 focus-visible:outline-orange-500" onClick={e => { e.stopPropagation(); openEmployee(emp.id); }}>
+                    <button aria-label={t(`${t('View')} ${emp.name}`)} className="min-h-10 px-2 text-[13px] font-semibold text-[#F97316] hover:underline focus-visible:outline-2 focus-visible:outline-orange-500" onClick={e => { e.stopPropagation(); openEmployee(emp.id); }}>
                       {t('View')}
                     </button>
                   </Td>

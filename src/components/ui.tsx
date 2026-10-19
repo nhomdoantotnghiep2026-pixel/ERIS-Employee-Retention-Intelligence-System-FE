@@ -15,7 +15,7 @@ export function RiskBadge({ level, score }: { level: string; score?: number }) {
   return (
     <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-semibold leading-none h-[22px] ${styles[level] || styles.Low}`}>
       <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${dots[level] || dots.Low}`} />
-      {t(`${level} Risk Label`)}{score !== undefined && <span className="ml-0.5 font-mono font-semibold tabular-nums">{score}%</span>}
+      {t(level === 'High' ? 'High risk' : level === 'Medium' ? 'Medium risk' : 'Low risk')}{score !== undefined && <span className="ml-0.5 font-mono font-semibold tabular-nums">{score}%</span>}
     </span>
   );
 }
@@ -43,12 +43,13 @@ export function StatusBadge({ status }: { status: string }) {
 
 // Avatar
 export function Avatar({ initials, size = 'sm', color }: { initials: string; size?: 'xs' | 'sm' | 'md' | 'lg'; color?: string }) {
+  const { t } = useLanguage();
   const sizes = { xs: 'w-6 h-6 text-[10px]', sm: 'w-7 h-7 text-xs', md: 'w-8 h-8 text-xs', lg: 'w-9 h-9 text-sm' };
   const colors = ['bg-blue-100 text-blue-700', 'bg-emerald-100 text-emerald-700', 'bg-violet-100 text-violet-700', 'bg-amber-100 text-amber-700', 'bg-pink-100 text-pink-700', 'bg-cyan-100 text-cyan-700'];
   const colorClass = color || colors[(initials.charCodeAt(0) + (initials.charCodeAt(1) || 0)) % colors.length];
   return (
     <span className={`${sizes[size]} ${colorClass} rounded-full flex items-center justify-center font-medium flex-shrink-0`}>
-      {initials}
+      {t(initials)}
     </span>
   );
 }
@@ -208,7 +209,7 @@ export function Pagination({ page, total, perPage, onChange }: { page: number; t
       <div className="flex flex-wrap gap-1">
         <button aria-label={t('Previous page')} disabled={page === 1} onClick={() => onChange(page - 1)} className="min-h-10 min-w-10 border border-gray-200 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed text-xs focus-visible:outline-2 focus-visible:outline-orange-500" style={{ borderRadius: '6px' }}>‹</button>
         {Array.from({ length: Math.min(pages, 5) }, (_, i) => i + 1).map(p => (
-          <button aria-label={`${t('Page')} ${p}`} aria-current={p === page ? 'page' : undefined} key={p} onClick={() => onChange(p)} className={`min-h-10 min-w-10 border text-xs focus-visible:outline-2 focus-visible:outline-orange-500 ${p === page ? 'bg-[#F97316] text-white border-[#F97316]' : 'border-slate-200 hover:bg-slate-50'}`} style={{ borderRadius: '6px' }}>{p}</button>
+          <button aria-label={t(`${t('Page')} ${p}`)} aria-current={p === page ? 'page' : undefined} key={p} onClick={() => onChange(p)} className={`min-h-10 min-w-10 border text-xs focus-visible:outline-2 focus-visible:outline-orange-500 ${p === page ? 'bg-[#F97316] text-white border-[#F97316]' : 'border-slate-200 hover:bg-slate-50'}`} style={{ borderRadius: '6px' }}>{p}</button>
         ))}
         <button aria-label={t('Next page')} disabled={page === pages} onClick={() => onChange(page + 1)} className="min-h-10 min-w-10 border border-gray-200 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed text-xs focus-visible:outline-2 focus-visible:outline-orange-500" style={{ borderRadius: '6px' }}>›</button>
       </div>
@@ -218,13 +219,14 @@ export function Pagination({ page, total, perPage, onChange }: { page: number; t
 
 // Input
 export function Input({ placeholder, value, onChange, icon, className = '', ariaLabel }: { placeholder?: string; value: string; onChange: (v: string) => void; icon?: ReactNode; className?: string; ariaLabel?: string }) {
+  const { t } = useLanguage();
   return (
     <div className={`relative ${className}`}>
       {icon && <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400">{icon}</span>}
       <input
         type="text"
-        aria-label={ariaLabel || placeholder || 'Text input'}
-        placeholder={placeholder}
+        aria-label={t(ariaLabel || placeholder || 'Text input')}
+        placeholder={t(placeholder)}
         value={value}
         onChange={e => onChange(e.target.value)}
         className={`h-11 border border-slate-300 bg-white text-base text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-orange-100 focus:border-[#F97316] w-full sm:h-10 sm:text-[13px] ${icon ? 'pl-9 pr-3' : 'px-3'}`}
@@ -236,16 +238,17 @@ export function Input({ placeholder, value, onChange, icon, className = '', aria
 
 // Select
 export function Select({ value, onChange, options, placeholder, className = '', ariaLabel }: { value: string; onChange: (v: string) => void; options: string[]; placeholder?: string; className?: string; ariaLabel?: string }) {
+  const { t } = useLanguage();
   return (
     <select
       value={value}
-      aria-label={ariaLabel || placeholder || 'Select option'}
+      aria-label={t(ariaLabel || placeholder || 'Select option')}
       onChange={e => onChange(e.target.value)}
       className={`h-11 border border-slate-300 bg-white px-3 text-base text-slate-700 focus:outline-none focus:ring-2 focus:ring-orange-100 focus:border-[#F97316] cursor-pointer sm:h-10 sm:text-[13px] ${className}`}
       style={{ borderRadius: '10px' }}
     >
-      {placeholder && <option value="">{placeholder}</option>}
-      {options.map(o => <option key={o}>{o}</option>)}
+      {placeholder && <option value="">{t(placeholder)}</option>}
+      {options.map(o => <option key={o} value={o}>{t(o)}</option>)}
     </select>
   );
 }
@@ -273,11 +276,12 @@ export function TrendIcon({ trend }: { trend: string }) {
 
 // Divider
 export function Divider({ label }: { label?: string }) {
+  const { t } = useLanguage();
   if (label) {
     return (
       <div className="flex items-center gap-2 my-3">
         <div className="flex-1 h-px bg-gray-100" />
-        <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-widest">{label}</span>
+        <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-widest">{t(label)}</span>
         <div className="flex-1 h-px bg-gray-100" />
       </div>
     );

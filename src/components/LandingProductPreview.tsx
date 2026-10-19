@@ -1,3 +1,4 @@
+import { useLanguage } from '../context/LanguageContext';
 import { motion } from 'motion/react';
 
 const screens = [
@@ -34,9 +35,10 @@ const screens = [
 ];
 
 export function LandingProductPreview() {
+  const { t } = useLanguage();
   return (
     <motion.section
-      aria-label="Ba giao diện HR, quản trị và nhân viên của ERIS"
+      aria-label={t("Ba giao diện HR, quản trị và nhân viên của ERIS")}
       initial="folded"
       whileInView="spread"
       viewport={{ once: true, amount: 0.2 }}
@@ -48,14 +50,14 @@ export function LandingProductPreview() {
           href={screen.image}
           target="_blank"
           rel="noreferrer"
-          aria-label={`Xem giao diện ${screen.label} đầy đủ (mở tab mới)`}
+          aria-label={`${t('Xem giao diện đầy đủ')}: ${t(screen.label)} (${t('mở tab mới')})`}
           variants={{ folded: screen.folded, spread: screen.spread }}
           transition={{ type: 'spring', stiffness: 85, damping: 22, delay: screen.delay }}
           whileHover={{ ...screen.hover, transition: { type: 'spring', stiffness: 180, damping: 24, delay: 0 } }}
           whileFocus={{ ...screen.hover, transition: { duration: 0.2, delay: 0 } }}
           className={`absolute block origin-[50%_90%] overflow-hidden rounded-xl border-[3px] border-white bg-white shadow-[0_22px_65px_rgba(71,52,42,0.18)] ring-1 ring-slate-200/60 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-orange-500 sm:rounded-[22px] sm:border-[5px] ${screen.position}`}
         >
-          <img src={screen.image} alt={screen.alt} width={screen.width} height={screen.height} className="block h-auto w-full" decoding="async" />
+          <img src={screen.image} alt={t(screen.alt)} width={screen.width} height={screen.height} className="block h-auto w-full" decoding="async" />
         </motion.a>
       ))}
     </motion.section>

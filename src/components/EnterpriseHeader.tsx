@@ -87,7 +87,7 @@ export function EnterpriseHeader({ breadcrumb, sidebarOpen, toggleSidebar, links
                   className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-all ${selected ? 'bg-orange-50 text-orange-700' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'}`}
                 >
                   <span className={`grid h-9 w-9 place-items-center rounded-full text-[11px] font-bold ${selected ? 'bg-orange-600 text-white' : 'bg-slate-100 text-slate-600'}`}>{option.short}</span>
-                  <span className="min-w-0 flex-1"><b className="block text-sm">{option.label}</b><span className="block text-[11px] text-slate-400">{option.detail}</span></span>
+                  <span className="min-w-0 flex-1"><b className="block text-sm">{option.label}</b><span className="block text-[11px] text-slate-400">{t(option.detail)}</span></span>
                   <span className={`grid h-6 w-6 place-items-center rounded-full ${selected ? 'bg-orange-100 text-orange-600' : 'text-transparent'}`}><Check size={14} strokeWidth={3} /></span>
                 </button>
               );
@@ -96,7 +96,7 @@ export function EnterpriseHeader({ breadcrumb, sidebarOpen, toggleSidebar, links
         )}
       </div>
       <div className="relative">
-        <button className={iconButton} aria-label={`${t('Notifications')}, ${unread} unread`} onClick={() => setPanel(panel === 'notifications' ? null : 'notifications')}><Bell size={20} />{unread > 0 && <span className="absolute right-1 top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-white px-1 text-[9px] font-bold text-orange-600">{unread}</span>}</button>
+        <button className={iconButton} aria-label={`${t('Notifications')}, ${unread} ${t('unread')}`} onClick={() => setPanel(panel === 'notifications' ? null : 'notifications')}><Bell size={20} />{unread > 0 && <span className="absolute right-1 top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-white px-1 text-[9px] font-bold text-orange-600">{unread}</span>}</button>
         {panel === 'notifications' && <section className={popover}><div className="flex items-center justify-between border-b border-slate-100 p-4"><div><h2 className="font-bold">{t('Notifications')}</h2><p className="text-xs text-slate-500">{t('Your latest updates')}</p></div><button onClick={() => markRead(notificationItems.map((_, i) => key(i)))} className="flex h-9 w-9 items-center justify-center rounded-full text-orange-600 hover:bg-orange-50" aria-label={t('Mark all as read')}><CheckCheck size={18} /></button></div>{notificationItems.map((notice, i) => <button key={notice.to} onClick={() => { markRead([key(i)]); go(notice.to); }} className="flex w-full gap-3 border-b border-slate-100 p-4 text-left hover:bg-orange-50"><span className={`mt-1 h-2 w-2 shrink-0 rounded-full ${read.includes(key(i)) ? 'bg-slate-200' : 'bg-orange-500'}`} /><span><b className="block text-sm">{t(notice.title)}</b><span className="mt-1 block text-xs leading-5 text-slate-500">{t(notice.detail)}</span></span></button>)}</section>}
       </div>
       <div className="relative">
