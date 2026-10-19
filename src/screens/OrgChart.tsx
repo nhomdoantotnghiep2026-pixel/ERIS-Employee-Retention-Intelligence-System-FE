@@ -1,3 +1,4 @@
+import { useLanguage } from '../context/LanguageContext';
 import { AppShell } from '../components/AppShell';
 import { Card, SectionHeader, RiskBadge, Button } from '../components/ui';
 import { useState } from 'react';
@@ -95,6 +96,7 @@ const departmentSummary = departments.map(dept => {
 });
 
 function OrgCard({ node, depth = 0 }: { node: OrgNode; depth?: number }) {
+  const { t } = useLanguage();
   const [expanded, setExpanded] = useState(depth < 2);
   const hasChildren = node.children && node.children.length > 0;
 
@@ -113,7 +115,7 @@ function OrgCard({ node, depth = 0 }: { node: OrgNode; depth?: number }) {
           </div>
           <div className="flex-1 min-w-0">
             <div className="text-[13px] font-medium text-slate-800">{node.name}</div>
-            <div className="text-[11px] text-slate-400">{node.title}</div>
+            <div className="text-[11px] text-slate-400">{t(node.title)}</div>
           </div>
           <div className="flex items-center gap-1.5">
             {node.headcount && (
@@ -137,10 +139,11 @@ function OrgCard({ node, depth = 0 }: { node: OrgNode; depth?: number }) {
 }
 
 export default function OrgChart() {
+  const { t } = useLanguage();
   return (
     <AppShell breadcrumb={['Workforce', 'Org Chart']}>
-      <SectionHeader title="Org Chart" description="Interactive organizational hierarchy with risk indicators">
-        <Button variant="secondary" size="sm" onClick={() => downloadTextFile('org-chart.pdf', demoPdfContent('Org Chart', 'Organizational hierarchy with risk indicators exported from ERIS demo workspace.'))}>Export PDF</Button>
+      <SectionHeader title={t("Org Chart")} description={t("Interactive organizational hierarchy with risk indicators")}>
+        <Button variant="secondary" size="sm" onClick={() => downloadTextFile('org-chart.pdf', demoPdfContent('Org Chart', 'Organizational hierarchy with risk indicators exported from ERIS demo workspace.'))}>{t("Export PDF")}</Button>
       </SectionHeader>
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_380px]">
@@ -152,42 +155,42 @@ export default function OrgChart() {
 
         <div className="space-y-4">
           <Card className="p-4">
-            <div className="mb-3 text-[14px] font-semibold text-slate-800">Organization Summary</div>
+            <div className="mb-3 text-[14px] font-semibold text-slate-800">{t("Organization Summary")}</div>
             <div className="grid grid-cols-2 gap-3">
               <div className="rounded-md border border-slate-200 bg-slate-50 p-3">
-                <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-400">Departments</div>
+                <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-400">{t("Departments")}</div>
                 <div className="mt-1 text-[24px] font-semibold leading-none text-slate-900">{departments.length}</div>
               </div>
               <div className="rounded-md border border-slate-200 bg-slate-50 p-3">
-                <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-400">Headcount</div>
+                <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-400">{t("Headcount")}</div>
                 <div className="mt-1 text-[24px] font-semibold leading-none text-slate-900">{totalHeadcount}</div>
               </div>
               <div className="rounded-md border border-red-200 bg-red-50 p-3">
-                <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-red-500"><AlertTriangle size={12} /> High Risk</div>
+                <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-red-500"><AlertTriangle size={12} /> {t("High Risk")}</div>
                 <div className="mt-1 text-[24px] font-semibold leading-none text-red-600">{totalHighRisk}</div>
               </div>
               <div className="rounded-md border border-amber-200 bg-amber-50 p-3">
-                <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-amber-600"><TrendingUp size={12} /> Watchlist</div>
+                <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-amber-600"><TrendingUp size={12} /> {t("Watchlist")}</div>
                 <div className="mt-1 text-[24px] font-semibold leading-none text-amber-600">3</div>
               </div>
             </div>
           </Card>
 
           <Card className="p-4">
-            <div className="mb-3 text-[14px] font-semibold text-slate-800">Department Risk Focus</div>
+            <div className="mb-3 text-[14px] font-semibold text-slate-800">{t("Department Risk Focus")}</div>
             <div className="space-y-2">
               {departmentSummary.map(dept => (
                 <div key={dept.id} className="rounded-md border border-slate-200 bg-white p-3">
                   <div className="mb-2 flex items-center justify-between gap-3">
                     <div className="min-w-0">
-                      <div className="truncate text-[13px] font-semibold text-slate-800">{dept.dept}</div>
-                      <div className="text-[11px] text-slate-400">{dept.visibleTeam} visible employees · {dept.headcount} total</div>
+                      <div className="truncate text-[13px] font-semibold text-slate-800">{t(dept.dept)}</div>
+                      <div className="text-[11px] text-slate-400">{dept.visibleTeam} {t("visible employees ·")} {dept.headcount} {t("total")}</div>
                     </div>
                     <RiskBadge level={dept.riskLevel} />
                   </div>
                   <div className="grid grid-cols-2 gap-2 text-[12px]">
-                    <div className="rounded bg-red-50 px-2 py-1 text-red-600">{dept.highRisk} high risk</div>
-                    <div className="rounded bg-amber-50 px-2 py-1 text-amber-600">{dept.mediumRisk} medium risk</div>
+                    <div className="rounded bg-red-50 px-2 py-1 text-red-600">{dept.highRisk} {t("high risk")}</div>
+                    <div className="rounded bg-amber-50 px-2 py-1 text-amber-600">{dept.mediumRisk} {t("medium risk")}</div>
                   </div>
                 </div>
               ))}

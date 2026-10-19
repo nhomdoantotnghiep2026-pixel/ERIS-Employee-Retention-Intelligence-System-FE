@@ -1,3 +1,4 @@
+import { useLanguage } from '../context/LanguageContext';
 import { AppShell } from '../components/AppShell';
 import { Card, SectionHeader, Button } from '../components/ui';
 import { MonitorCheck, RefreshCw, CheckCircle, AlertCircle, Clock } from 'lucide-react';
@@ -40,6 +41,7 @@ const statusConfig: Record<HealthStatus, { icon: typeof CheckCircle; text: strin
 const categories = Array.from(new Set(services.map(s => s.category)));
 
 function ServiceRow({ service: svc }: { service: ServiceStatus }) {
+  const { t, language } = useLanguage();
   const cfg = statusConfig[svc.status];
   const Icon = cfg.icon;
 
@@ -47,33 +49,34 @@ function ServiceRow({ service: svc }: { service: ServiceStatus }) {
     <div className={`grid min-h-[48px] grid-cols-1 gap-2 border-t px-4 py-3 text-[13px] transition-colors first:border-t-0 md:grid-cols-[minmax(220px,1.65fr)_156px_172px_164px_92px] md:items-center md:gap-5 md:py-0 ${svc.status === 'Operational' ? 'border-slate-100 hover:bg-slate-50/70' : svc.status === 'Degraded' ? 'border-amber-200 bg-amber-50 hover:bg-amber-100/70' : 'border-red-200 bg-red-50 hover:bg-red-100/70'}`}>
       <div className="flex min-w-0 items-center gap-2">
         <span className={`h-1.5 w-1.5 flex-shrink-0 rounded-full ${cfg.dot} ${svc.status === 'Operational' ? 'shadow-[0_0_4px_rgba(34,197,94,0.5)]' : ''}`} />
-        <span className="truncate font-medium text-slate-900">{svc.service}</span>
+        <span className="truncate font-medium text-slate-900">{t(svc.service)}</span>
       </div>
 
       <span className={`inline-flex w-fit items-center gap-1 rounded border px-2 py-1 font-bold md:w-[132px] ${svc.status === 'Operational' ? 'border-emerald-200 bg-emerald-50' : svc.status === 'Degraded' ? 'border-amber-300 bg-amber-100' : 'border-red-300 bg-red-100'} ${cfg.text}`}>
         <Icon size={14} className="shrink-0" />
-        {svc.status}
+        {t(svc.status)}
       </span>
 
       <div className="grid grid-cols-[64px_minmax(0,1fr)] items-baseline gap-1 text-[12px] text-slate-500 md:grid-cols-[auto_minmax(0,1fr)]">
-        <span className="font-medium text-slate-700">Uptime:</span>
-        <span className="font-mono tabular-nums">{svc.uptime}</span>
+        <span className="font-medium text-slate-700">{t("Uptime:")}</span>
+        <span className="font-mono tabular-nums">{t(svc.uptime)}</span>
       </div>
 
       <div className="grid grid-cols-[64px_minmax(0,1fr)] items-baseline gap-1 text-[12px] text-slate-500 md:grid-cols-[auto_minmax(0,1fr)]">
-        <span className="font-medium text-slate-700">Latency:</span>
-        <span className="font-mono tabular-nums">{svc.latency}</span>
+        <span className="font-medium text-slate-700">{t("Latency:")}</span>
+        <span className="font-mono tabular-nums">{t(svc.latency)}</span>
       </div>
 
       <div className="inline-flex items-center gap-1 text-[11px] text-slate-400 md:justify-end">
         <Clock size={12} className="shrink-0" />
-        <span className="whitespace-nowrap">{svc.lastChecked}</span>
+        <span className="whitespace-nowrap">{t(svc.lastChecked)}</span>
       </div>
     </div>
   );
 }
 
 export default function SystemHealth() {
+  const { t, language } = useLanguage();
   const [serviceRows, setServiceRows] = useState(services);
   const [updatedAt, setUpdatedAt] = useState('just now');
   const operational = serviceRows.filter(s => s.status === 'Operational').length;
@@ -82,14 +85,14 @@ export default function SystemHealth() {
   const overallCfg = statusConfig[overall];
 
   const refreshHealth = () => {
-    setUpdatedAt(new Date().toLocaleTimeString());
+    setUpdatedAt(new Date().toLocaleTimeString(language === 'vi' ? 'vi-VN' : 'en-US'));
     setServiceRows(rows => rows.map(row => ({ ...row, lastChecked: 'now' })));
   };
 
   return (
     <AppShell breadcrumb={['System Operations', 'System Health Monitor']}>
-      <SectionHeader title="System Health Monitor" description="Real-time status of all ERIS services and integrations">
-        <Button variant="secondary" size="sm" onClick={refreshHealth}><RefreshCw size={13} /> Refresh</Button>
+      <SectionHeader title={t("System Health Monitor")} description={t("Real-time status of all ERIS services and integrations")}>
+        <Button variant="secondary" size="sm" onClick={refreshHealth}><RefreshCw size={13} /> {t("Refresh")}</Button>
       </SectionHeader>
 
       {/* Overall status banner */}
@@ -99,10 +102,10 @@ export default function SystemHealth() {
         </div>
         <div className="flex-1">
           <div className={`text-[15px] font-semibold ${overallCfg.text}`}>
-            {overall === 'Operational' ? 'All Systems Operational' : 'Partial Service Degradation'}
+            {t(overall === 'Operational' ? 'All Systems Operational' : 'Partial Service Degradation')}
           </div>
           <div className="text-[12px] text-slate-500 mt-0.5">
-            {operational}/{serviceRows.length} services nominal · Last updated {updatedAt}
+            {operational}/{serviceRows.length} {t("services nominal · Last updated")} {t(updatedAt)}
           </div>
         </div>
         <div className="grid grid-cols-3 gap-4 text-center flex-shrink-0">
@@ -113,7 +116,7 @@ export default function SystemHealth() {
           ].map(s => (
             <div key={s.label}>
               <div className={`text-[22px] font-bold leading-none ${s.color}`}>{s.value}</div>
-              <div className="text-[10px] font-semibold text-slate-600 mt-0.5">{s.label}</div>
+              <div className="text-[10px] font-semibold text-slate-600 mt-0.5">{t(s.label)}</div>
             </div>
           ))}
         </div>
@@ -126,7 +129,7 @@ export default function SystemHealth() {
           return (
             <Card key={cat} className="overflow-hidden">
               <div className="border-b border-slate-100 px-4 py-2.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-400">
-                {cat}
+                {t(cat)}
               </div>
               <div>
                 {catServices.map(svc => <ServiceRow key={svc.service} service={svc} />)}
@@ -137,26 +140,26 @@ export default function SystemHealth() {
       </div>
 
       {/* Incident log */}
-      <div className="text-[12px] font-semibold text-slate-400 uppercase tracking-[0.08em] mb-2">Recent Incidents</div>
+      <div className="text-[12px] font-semibold text-slate-400 uppercase tracking-[0.08em] mb-2">{t("Recent Incidents")}</div>
       <Card>
         <table className="w-full">
           <thead>
             <tr className="border-b border-slate-200 bg-slate-50">
               {['Incident', 'Time', 'Severity', 'Status'].map(h => (
-                <th key={h} className="px-4 py-2.5 text-left text-[12px] font-semibold text-slate-700 uppercase tracking-wide">{h}</th>
+                <th key={h} className="px-4 py-2.5 text-left text-[12px] font-semibold text-slate-700 uppercase tracking-wide">{t(h)}</th>
               ))}
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-50">
             {incidents.map(inc => (
               <tr key={inc.title} className="hover:bg-slate-50/60">
-                <td className="px-4 h-[48px] text-[13px] font-medium text-slate-800">{inc.title}</td>
-                <td className="px-4 h-[48px] text-[12px] text-slate-500">{inc.time}</td>
+                <td className="px-4 h-[48px] text-[13px] font-medium text-slate-800">{t(inc.title)}</td>
+                <td className="px-4 h-[48px] text-[12px] text-slate-500">{t(inc.time)}</td>
                 <td className="px-4 h-[48px]">
-                  <span className={`rounded border px-1.5 py-0.5 text-[12px] font-bold ${inc.severity === 'Medium' ? 'border-amber-300 bg-amber-100 text-amber-800' : 'border-slate-300 bg-slate-100 text-slate-700'}`}>{inc.severity}</span>
+                  <span className={`rounded border px-1.5 py-0.5 text-[12px] font-bold ${inc.severity === 'Medium' ? 'border-amber-300 bg-amber-100 text-amber-800' : 'border-slate-300 bg-slate-100 text-slate-700'}`}>{t(inc.severity)}</span>
                 </td>
                 <td className="px-4 h-[48px]">
-                  <span className={`rounded border px-1.5 py-0.5 text-[12px] font-bold ${inc.status === 'Resolved' ? 'border-emerald-300 bg-emerald-100 text-emerald-800' : 'border-amber-300 bg-amber-100 text-amber-800'}`}>{inc.status}</span>
+                  <span className={`rounded border px-1.5 py-0.5 text-[12px] font-bold ${inc.status === 'Resolved' ? 'border-emerald-300 bg-emerald-100 text-emerald-800' : 'border-amber-300 bg-amber-100 text-amber-800'}`}>{t(inc.status)}</span>
                 </td>
               </tr>
             ))}

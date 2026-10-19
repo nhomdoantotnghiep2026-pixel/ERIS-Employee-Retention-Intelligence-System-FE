@@ -1,3 +1,4 @@
+import { useLanguage } from '../context/LanguageContext';
 import { AppShell } from '../components/AppShell';
 import { Card, SectionHeader, StatusBadge, Button, Tabs } from '../components/ui';
 import { useState } from 'react';
@@ -70,6 +71,7 @@ const emptyHire = {
 };
 
 export default function Onboarding() {
+  const { t } = useLanguage();
   const [tab, setTab] = useState('Onboarding');
   const [onboarding, setOnboarding] = useState(onboardingList);
   const [checklist, setChecklist] = useState(checklistItems);
@@ -110,8 +112,8 @@ export default function Onboarding() {
 
   return (
     <AppShell breadcrumb={['Workforce', 'Onboarding & Offboarding']}>
-      <SectionHeader title="Onboarding & Offboarding" description="Manage new hire onboarding and departure workflows">
-        <Button variant="primary" size="sm" onClick={openHireModal}><UserPlus size={13} /> Add New Hire</Button>
+      <SectionHeader title={t("Onboarding & Offboarding")} description={t("Manage new hire onboarding and departure workflows")}>
+        <Button variant="primary" size="sm" onClick={openHireModal}><UserPlus size={13} /> {t("Add New Hire")}</Button>
       </SectionHeader>
 
       <div className="grid grid-cols-3 gap-4 mb-5">
@@ -126,7 +128,7 @@ export default function Onboarding() {
             </div>
             <div>
               <div className="text-[24px] font-semibold text-slate-900 leading-none">{s.value}</div>
-              <div className="text-[12px] text-slate-500 mt-0.5">{s.label}</div>
+              <div className="text-[12px] text-slate-500 mt-0.5">{t(s.label)}</div>
             </div>
           </Card>
         ))}
@@ -141,26 +143,26 @@ export default function Onboarding() {
               <div className="flex items-start justify-between gap-4">
                 <div className="flex items-center gap-3">
                   <div className="w-9 h-9 bg-orange-100 text-orange-700 rounded-full flex items-center justify-center text-[12px] font-semibold flex-shrink-0">
-                    {emp.name.split(' ').map(n => n[0]).slice(0, 2).join('')}
+                    {t(emp.name.split(' ').map(n => n[0]).slice(0, 2).join(''))}
                   </div>
                   <div>
                     <div className="text-[14px] font-semibold text-slate-800">{emp.name}</div>
-                    <div className="text-[12px] text-slate-500">{emp.role} · {emp.dept}</div>
+                    <div className="text-[12px] text-slate-500">{t(emp.role)} · {t(emp.dept)}</div>
                   </div>
                 </div>
                 <StatusBadge status={emp.status} />
               </div>
               <div className="mt-3 grid grid-cols-3 gap-4 text-[12px]">
                 <div>
-                  <span className="text-slate-400">Start Date</span>
-                  <div className="font-medium text-slate-700 mt-0.5">{emp.startDate}</div>
+                  <span className="text-slate-400">{t("Start Date")}</span>
+                  <div className="font-medium text-slate-700 mt-0.5">{t(emp.startDate)}</div>
                 </div>
                 <div>
-                  <span className="text-slate-400">Buddy</span>
-                  <div className="font-medium text-slate-700 mt-0.5">{emp.buddy}</div>
+                  <span className="text-slate-400">{t("Buddy")}</span>
+                  <div className="font-medium text-slate-700 mt-0.5">{t(emp.buddy)}</div>
                 </div>
                 <div>
-                  <span className="text-slate-400">Onboarding Progress</span>
+                  <span className="text-slate-400">{t("Onboarding Progress")}</span>
                   <div className="flex items-center gap-2 mt-1">
                     <div className="flex-1 bg-slate-100 rounded-full h-1.5">
                       <div className="bg-orange-500 h-full rounded-full" style={{ width: `${emp.progress}%` }} />
@@ -181,30 +183,30 @@ export default function Onboarding() {
               <div className="flex items-start justify-between gap-4">
                 <div className="flex items-center gap-3">
                   <div className="w-9 h-9 bg-red-100 text-red-700 rounded-full flex items-center justify-center text-[12px] font-semibold flex-shrink-0">
-                    {emp.name.split(' ').map(n => n[0]).slice(0, 2).join('')}
+                    {t(emp.name.split(' ').map(n => n[0]).slice(0, 2).join(''))}
                   </div>
                   <div>
                     <div className="text-[14px] font-semibold text-slate-800">{emp.name}</div>
-                    <div className="text-[12px] text-slate-500">{emp.role} · {emp.dept}</div>
+                    <div className="text-[12px] text-slate-500">{t(emp.role)} · {t(emp.dept)}</div>
                   </div>
                 </div>
                 <StatusBadge status={emp.status} />
               </div>
               <div className="mt-3 grid grid-cols-3 gap-4 text-[12px]">
                 <div>
-                  <span className="text-slate-400">Last Day</span>
-                  <div className="font-medium text-slate-700 mt-0.5">{emp.lastDay}</div>
+                  <span className="text-slate-400">{t("Last Day")}</span>
+                  <div className="font-medium text-slate-700 mt-0.5">{t(emp.lastDay)}</div>
                 </div>
                 <div>
-                  <span className="text-slate-400">Reason</span>
-                  <div className="font-medium text-slate-700 mt-0.5">{emp.reason}</div>
+                  <span className="text-slate-400">{t("Reason")}</span>
+                  <div className="font-medium text-slate-700 mt-0.5">{t(emp.reason)}</div>
                 </div>
                 <div>
-                  <span className="text-slate-400">Exit Survey</span>
+                  <span className="text-slate-400">{t("Exit Survey")}</span>
                   <div className="mt-0.5">
                     {emp.exitSurvey === 'Completed'
-                      ? <span className="flex items-center gap-1 text-green-600 font-medium"><CheckCircle size={12} /> Completed</span>
-                      : <span className="flex items-center gap-1 text-amber-600 font-medium"><Clock size={12} /> Pending</span>
+                      ? <span className="flex items-center gap-1 text-green-600 font-medium"><CheckCircle size={12} /> {t("Completed")}</span>
+                      : <span className="flex items-center gap-1 text-amber-600 font-medium"><Clock size={12} /> {t("Pending")}</span>
                     }
                   </div>
                 </div>
@@ -218,12 +220,11 @@ export default function Onboarding() {
         <Card className="p-4">
           <div className="mb-3 flex items-center justify-between gap-3">
             <div>
-              <div className="text-[14px] font-semibold text-slate-800">Standard Onboarding Checklist</div>
-              <div className="text-[12px] text-slate-500">Baseline tasks HR tracks for every new hire</div>
+              <div className="text-[14px] font-semibold text-slate-800">{t("Standard Onboarding Checklist")}</div>
+              <div className="text-[12px] text-slate-500">{t("Baseline tasks HR tracks for every new hire")}</div>
             </div>
             <div className="rounded-md bg-slate-50 px-3 py-1.5 text-[12px] font-medium text-slate-600">
-              {checklist.filter(item => item.done).length}/{checklist.length} completed
-            </div>
+              {checklist.filter(item => item.done).length}/{checklist.length} {t("completed")} </div>
           </div>
           <div className="grid grid-cols-1 gap-2 lg:grid-cols-2">
             {checklist.map((item, index) => (
@@ -242,11 +243,11 @@ export default function Onboarding() {
                   {item.done ? <CheckCircle size={15} /> : index + 1}
                 </span>
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate text-[13px] font-medium text-slate-800">{item.step}</span>
+                  <span className="block truncate text-[13px] font-medium text-slate-800">{t(item.step)}</span>
                   <span className={`mt-0.5 inline-flex rounded px-1.5 py-0.5 text-[11px] font-medium ${
                     item.done ? 'bg-white text-green-700' : 'bg-amber-50 text-amber-700'
                   }`}>
-                    {item.done ? 'Completed' : 'Pending'}
+                    {t(item.done ? 'Completed' : 'Pending')}
                   </span>
                 </span>
                 {!item.done && <AlertCircle size={15} className="flex-shrink-0 text-amber-500" />}
@@ -261,16 +262,16 @@ export default function Onboarding() {
           <Card className="w-full max-w-2xl overflow-hidden">
             <div className="flex items-start justify-between gap-4 border-b border-slate-200 px-5 py-4">
               <div>
-                <div className="text-[16px] font-semibold text-slate-900">Add New Hire</div>
-                <div className="mt-1 text-[13px] text-slate-500">Create an onboarding record and assign the first HR buddy.</div>
+                <div className="text-[16px] font-semibold text-slate-900">{t("Add New Hire")}</div>
+                <div className="mt-1 text-[13px] text-slate-500">{t("Create an onboarding record and assign the first HR buddy.")}</div>
               </div>
-              <button onClick={() => setHireModalOpen(false)} className="rounded-md p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600" aria-label="Close add new hire modal">
+              <button onClick={() => setHireModalOpen(false)} className="rounded-md p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600" aria-label={t("Close add new hire modal")}>
                 <X size={17} />
               </button>
             </div>
 
             <div className="border-b border-slate-100 px-5 py-4">
-              <div className="mb-2 text-[13px] font-semibold text-slate-800">Candidate shortlist</div>
+              <div className="mb-2 text-[13px] font-semibold text-slate-800">{t("Candidate shortlist")}</div>
               <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                 {candidateShortlist.map(candidate => (
                   <button
@@ -280,18 +281,16 @@ export default function Onboarding() {
                       newHire.name === candidate.name ? 'border-orange-300 bg-orange-50' : 'border-slate-200 bg-white'
                     }`}
                   >
-                    <div className="text-[13px] font-semibold text-slate-800">{candidate.name}</div>
-                    <div className="mt-0.5 text-[12px] text-slate-500">{candidate.role} · {candidate.dept}</div>
-                    <div className="mt-1 text-[11px] text-slate-400">Starts {displayDate(candidate.startDate)} · Buddy {candidate.buddy}</div>
+                    <div className="text-[13px] font-semibold text-slate-800">{t(candidate.name)}</div>
+                    <div className="mt-0.5 text-[12px] text-slate-500">{t(candidate.role)} · {t(candidate.dept)}</div>
+                    <div className="mt-1 text-[11px] text-slate-400">{t("Starts")} {t(displayDate(candidate.startDate))} {t("· Buddy")} {t(candidate.buddy)}</div>
                   </button>
                 ))}
               </div>
             </div>
 
             <div className="grid grid-cols-1 gap-4 px-5 py-4 sm:grid-cols-2">
-              <label className="relative text-[13px] font-medium text-slate-700">
-                Employee name
-                <input
+              <label className="relative text-[13px] font-medium text-slate-700"> {t("Employee name")} <input
                   value={newHire.name}
                   onFocus={() => setNameFocused(true)}
                   onBlur={() => window.setTimeout(() => setNameFocused(false), 120)}
@@ -299,7 +298,7 @@ export default function Onboarding() {
                     setNewHire(hire => ({ ...hire, name: e.target.value }));
                     setNameFocused(true);
                   }}
-                  placeholder="Search candidate by name..."
+                  placeholder={t("Search candidate by name...")}
                   className="mt-1 h-10 w-full rounded-[5px] border border-slate-300 px-3 text-[13px] outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-100"
                 />
                 {nameFocused && matchingCandidates.length > 0 && (
@@ -316,39 +315,33 @@ export default function Onboarding() {
                         className="flex w-full items-center justify-between gap-3 border-b border-slate-100 px-3 py-2 text-left last:border-0 hover:bg-orange-50"
                       >
                         <span className="min-w-0">
-                          <span className="block truncate text-[13px] font-semibold text-slate-800">{candidate.name}</span>
-                          <span className="block truncate text-[11px] text-slate-500">{candidate.role} · {candidate.dept}</span>
+                          <span className="block truncate text-[13px] font-semibold text-slate-800">{t(candidate.name)}</span>
+                          <span className="block truncate text-[11px] text-slate-500">{t(candidate.role)} · {t(candidate.dept)}</span>
                         </span>
-                        <span className="flex-shrink-0 rounded bg-slate-100 px-1.5 py-0.5 text-[11px] text-slate-500">{displayDate(candidate.startDate)}</span>
+                        <span className="flex-shrink-0 rounded bg-slate-100 px-1.5 py-0.5 text-[11px] text-slate-500">{t(displayDate(candidate.startDate))}</span>
                       </button>
                     ))}
                   </div>
                 )}
               </label>
-              <label className="text-[13px] font-medium text-slate-700">
-                Job role
-                <select
+              <label className="text-[13px] font-medium text-slate-700"> {t("Job role")} <select
                   value={newHire.role}
                   onChange={e => setNewHire(hire => ({ ...hire, role: e.target.value }))}
                   className="mt-1 h-10 w-full rounded-[5px] border border-slate-300 bg-white px-3 text-[13px] outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-100"
                 >
-                  <option value="">Select job role</option>
-                  {(roleOptionsByDept[newHire.dept] || []).map(role => <option key={role}>{role}</option>)}
+                  <option value="">{t("Select job role")}</option>
+                  {(roleOptionsByDept[newHire.dept] || []).map(role => <option key={role} value={role}>{t(role)}</option>)}
                 </select>
               </label>
-              <label className="text-[13px] font-medium text-slate-700">
-                Department
-                <select
+              <label className="text-[13px] font-medium text-slate-700"> {t("Department")} <select
                   value={newHire.dept}
                   onChange={e => setDepartment(e.target.value)}
                   className="mt-1 h-10 w-full rounded-[5px] border border-slate-300 bg-white px-3 text-[13px] outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-100"
                 >
-                  {departments.map(dept => <option key={dept}>{dept}</option>)}
+                  {departments.map(dept => <option key={dept} value={dept}>{t(dept)}</option>)}
                 </select>
               </label>
-              <label className="text-[13px] font-medium text-slate-700">
-                Start date
-                <input
+              <label className="text-[13px] font-medium text-slate-700"> {t("Start date")} <input
                   type="date"
                   min={futureDateInput(0)}
                   value={newHire.startDate}
@@ -356,35 +349,30 @@ export default function Onboarding() {
                   className="mt-1 h-10 w-full rounded-[5px] border border-slate-300 px-3 text-[13px] outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-100"
                 />
               </label>
-              <label className="text-[13px] font-medium text-slate-700">
-                Buddy
-                <select
+              <label className="text-[13px] font-medium text-slate-700"> {t("Buddy")} <select
                   value={newHire.buddy}
                   onChange={e => setNewHire(hire => ({ ...hire, buddy: e.target.value }))}
                   className="mt-1 h-10 w-full rounded-[5px] border border-slate-300 bg-white px-3 text-[13px] outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-100"
                 >
-                  {(buddyOptionsByDept[newHire.dept] || []).map(buddy => <option key={buddy}>{buddy}</option>)}
+                  {(buddyOptionsByDept[newHire.dept] || []).map(buddy => <option key={buddy} value={buddy}>{t(buddy)}</option>)}
                 </select>
               </label>
-              <label className="text-[13px] font-medium text-slate-700">
-                Status
-                <select
+              <label className="text-[13px] font-medium text-slate-700"> {t("Status")} <select
                   value={newHire.status}
                   onChange={e => setNewHire(hire => ({ ...hire, status: e.target.value }))}
                   className="mt-1 h-10 w-full rounded-[5px] border border-slate-300 bg-white px-3 text-[13px] outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-100"
                 >
-                  {['Pending', 'Active'].map(status => <option key={status}>{status}</option>)}
+                  {['Pending', 'Active'].map(status => <option key={status} value={status}>{t(status)}</option>)}
                 </select>
               </label>
             </div>
 
             <div className="flex items-center justify-between gap-3 border-t border-slate-200 bg-slate-50 px-5 py-4">
-              <div className="text-[12px] text-slate-500">Required fields: employee name and job role.</div>
+              <div className="text-[12px] text-slate-500">{t("Required fields: employee name and job role.")}</div>
               <div className="flex items-center gap-2">
-                <Button variant="secondary" size="sm" onClick={() => setHireModalOpen(false)}>Cancel</Button>
+                <Button variant="secondary" size="sm" onClick={() => setHireModalOpen(false)}>{t("Cancel")}</Button>
                 <Button variant="primary" size="sm" onClick={addHire} disabled={!newHire.name.trim() || !newHire.role.trim() || !newHire.startDate || newHire.startDate < futureDateInput(0)}>
-                  <UserPlus size={13} /> Create onboarding
-                </Button>
+                  <UserPlus size={13} /> {t("Create onboarding")} </Button>
               </div>
             </div>
           </Card>

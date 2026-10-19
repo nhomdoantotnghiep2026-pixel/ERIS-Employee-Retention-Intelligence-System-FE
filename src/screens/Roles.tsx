@@ -1,3 +1,4 @@
+import { useLanguage } from '../context/LanguageContext';
 import { useEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { AppShell } from '../components/AppShell';
@@ -12,6 +13,7 @@ const roles = [
 ];
 
 export default function Roles() {
+  const { t } = useLanguage();
   const location = useLocation();
   const tabFromUrl = new URLSearchParams(location.search).get('tab') === 'matrix' ? 'Permission Matrix' : 'Role Overview';
   const [activeTab, setActiveTab] = useState(tabFromUrl);
@@ -24,7 +26,7 @@ export default function Roles() {
 
   return (
     <AppShell breadcrumb={['Roles & Permissions']}>
-      <SectionHeader title="Roles & Permissions" description="Manage role definitions and the RBAC permission matrix from one place." />
+      <SectionHeader title={t("Roles & Permissions")} description={t("Manage role definitions and the RBAC permission matrix from one place.")} />
 
       <Tabs tabs={['Role Overview', 'Permission Matrix']} active={activeTab} onChange={setActiveTab} />
 
@@ -41,21 +43,21 @@ export default function Roles() {
                     : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50'
                 }`}
               >
-                <span className={`inline-flex rounded px-2 py-0.5 text-[11px] font-semibold ${r.color}`}>{r.name}</span>
-                <span className="mt-2 block text-[12px] leading-5 text-slate-500">{r.description}</span>
+                <span className={`inline-flex rounded px-2 py-0.5 text-[11px] font-semibold ${r.color}`}>{t(r.name)}</span>
+                <span className="mt-2 block text-[12px] leading-5 text-slate-500">{t(r.description)}</span>
               </button>
             ))}
           </div>
 
           <Card>
             <div className="flex flex-col gap-1 border-b border-slate-200 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-              <span className="text-[13px] font-semibold text-slate-800">Permissions - {selectedRole}</span>
-              <span className="text-[12px] text-slate-500">Read-only role summary. Use Permission Matrix to edit grants.</span>
+              <span className="text-[13px] font-semibold text-slate-800">{t("Permissions -")} {t(selectedRole)}</span>
+              <span className="text-[12px] text-slate-500">{t("Read-only role summary. Use Permission Matrix to edit grants.")}</span>
             </div>
             <div className="divide-y divide-slate-100">
               {overviewMatrix.map(group => (
                 <div key={group.category} className="grid gap-3 px-4 py-3 lg:grid-cols-[180px_minmax(0,1fr)]">
-                  <div className="text-[11px] font-semibold uppercase tracking-widest text-slate-400">{group.category}</div>
+                  <div className="text-[11px] font-semibold uppercase tracking-widest text-slate-400">{t(group.category)}</div>
                   <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3">
                     {group.items.map(permission => {
                       const checked = permission.access[selectedRole] ?? false;
@@ -66,7 +68,7 @@ export default function Roles() {
                               <path strokeLinecap="round" strokeLinejoin="round" d="M2 6l3 3 5-5" />
                             </svg>}
                           </div>
-                          <span className={`text-[13px] ${checked ? 'text-slate-700' : 'text-slate-400'}`}>{permission.label}</span>
+                          <span className={`text-[13px] ${checked ? 'text-slate-700' : 'text-slate-400'}`}>{t(permission.label)}</span>
                         </div>
                       );
                     })}

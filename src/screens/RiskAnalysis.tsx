@@ -1,3 +1,4 @@
+import { useLanguage } from '../context/LanguageContext';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { AppShell } from '../components/AppShell';
 import { Card, RiskBadge, AIAdvisoryBanner, Avatar, Button } from '../components/ui';
@@ -8,15 +9,17 @@ import { useState } from 'react';
 import { ArrowLeft, BrainCircuit, ClipboardList, MessageSquare, Sparkles } from 'lucide-react';
 
 function InfoRow({ label, value, highlight }: { label: string; value: string; highlight?: boolean }) {
+  const { t, language } = useLanguage();
   return (
     <div className="flex items-center justify-between py-1.5 border-b border-gray-100 last:border-0">
-      <span className="text-[12px] text-gray-400">{label}</span>
-      <span className={`text-[13px] font-medium ${highlight ? 'text-amber-600' : 'text-gray-700'}`}>{value}</span>
+      <span className="text-[12px] text-gray-400">{t(label)}</span>
+      <span className={`text-[13px] font-medium ${highlight ? 'text-amber-600' : 'text-gray-700'}`}>{t(value)}</span>
     </div>
   );
 }
 
 export default function RiskAnalysis() {
+  const { t, language } = useLanguage();
   const { id } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
@@ -33,10 +36,10 @@ export default function RiskAnalysis() {
       : 'Back to Employee Profile';
 
   if (!emp) {
-    return <AppShell breadcrumb={['Employees', 'Risk Analysis', 'Not found']}><Card className="mx-auto max-w-xl p-8 text-center"><h1 className="text-xl font-bold text-slate-900">Employee not found</h1><p className="mt-2 text-sm text-slate-500">Risk analysis cannot be opened because this employee record is unavailable.</p><Button className="mt-6" onClick={() => navigate('/employees')}>Back to employee directory</Button></Card></AppShell>;
+    return <AppShell breadcrumb={['Employees', 'Risk Analysis', 'Not found']}><Card className="mx-auto max-w-xl p-8 text-center"><h1 className="text-xl font-bold text-slate-900">{t("Employee not found")}</h1><p className="mt-2 text-sm text-slate-500">{t("Risk analysis cannot be opened because this employee record is unavailable.")}</p><Button className="mt-6" onClick={() => navigate('/employees')}>{t("Back to employee directory")}</Button></Card></AppShell>;
   }
 
-  if (emp.lastAnalysis === 'Not analyzed') return <AppShell breadcrumb={['Employees', emp.name, 'Risk Analysis']}><Card className="p-8"><h1 className="text-xl font-bold text-slate-900">Chưa có dự đoán cho nhân viên này</h1><p className="my-4 text-sm text-slate-600">Hoàn thiện đầu vào và chuyển Data / AI Analyst chạy phân tích. Không có điểm hoặc giải thích AI để hiển thị.</p><Button onClick={() => navigate(`/employees/${emp.id}`)}>Về hồ sơ nhân viên</Button></Card></AppShell>;
+  if (emp.lastAnalysis === 'Not analyzed') return <AppShell breadcrumb={['Employees', emp.name, 'Risk Analysis']}><Card className="p-8"><h1 className="text-xl font-bold text-slate-900">{t("Chưa có dự đoán cho nhân viên này")}</h1><p className="my-4 text-sm text-slate-600">{t("Hoàn thiện đầu vào và chuyển Data / AI Analyst chạy phân tích. Không có điểm hoặc giải thích AI để hiển thị.")}</p><Button onClick={() => navigate(`/employees/${emp.id}`)}>{t("Về hồ sơ nhân viên")}</Button></Card></AppShell>;
 
   const maxFactor = Math.max(...contributingFactors.map(f => f.value));
   const localExplanations = [
@@ -55,7 +58,7 @@ export default function RiskAnalysis() {
   return (
     <AppShell breadcrumb={['Employees', emp.name, 'Risk Analysis']}>
       <button type="button" onClick={() => navigate(returnTo, { state: parentReturnTo ? { returnTo: parentReturnTo } : undefined })} className="mb-3 inline-flex min-h-10 items-center gap-2 rounded-full px-3 text-sm font-semibold text-slate-500 transition-colors hover:bg-white hover:text-orange-700 focus-visible:outline-2 focus-visible:outline-orange-500">
-        <ArrowLeft size={17} /> {returnLabel}
+        <ArrowLeft size={17} /> {t(returnLabel)}
       </button>
       <EmployeePrediction employeeId={emp.id} />
       {/* Header */}
@@ -68,12 +71,12 @@ export default function RiskAnalysis() {
                 <span className="text-[18px] font-semibold text-gray-900">{emp.name}</span>
                 <RiskBadge level={emp.riskLevel} score={emp.riskScore} />
               </div>
-              <div className="text-[13px] text-gray-500">{emp.role} · {emp.department}</div>
+              <div className="text-[13px] text-gray-500">{t(emp.role)} · {t(emp.department)}</div>
             </div>
           </div>
           <div className="text-right">
-            <div className="text-[11px] text-gray-400 uppercase tracking-wide">Last analyzed</div>
-            <div className="text-[13px] font-medium text-gray-700">{emp.lastAnalysis}</div>
+            <div className="text-[11px] text-gray-400 uppercase tracking-wide">{t("Last analyzed")}</div>
+            <div className="text-[13px] font-medium text-gray-700">{t(emp.lastAnalysis)}</div>
           </div>
         </div>
       </Card>
@@ -83,7 +86,7 @@ export default function RiskAnalysis() {
         <div className="col-span-2 space-y-4">
           {/* Risk Score */}
           <Card className="p-4">
-            <div className="text-[14px] font-semibold text-gray-800 mb-3">Predicted Attrition Risk</div>
+            <div className="text-[14px] font-semibold text-gray-800 mb-3">{t("Predicted Attrition Risk")}</div>
             <div className="flex items-start gap-5">
               <div className="flex-shrink-0">
                 <div className={`text-[40px] font-bold leading-none ${emp.riskLevel === 'High' ? 'text-red-600' : emp.riskLevel === 'Medium' ? 'text-amber-600' : 'text-green-600'}`}>
@@ -105,19 +108,17 @@ export default function RiskAnalysis() {
                   />
                 </div>
                 <div className="flex justify-between text-[11px] text-gray-400 mb-3">
-                  <span>Low</span><span>Medium</span><span>High</span>
+                  <span>{t("Low")}</span><span>{t("Medium")}</span><span>{t("High")}</span>
                 </div>
-                <p className="text-[13px] text-gray-600 leading-relaxed">
-                  The model indicates an elevated attrition risk. Overtime, job satisfaction, and years at the company are among the strongest factors associated with this prediction.
-                </p>
+                <p className="text-[13px] text-gray-600 leading-relaxed"> {t("The model indicates an elevated attrition risk. Overtime, job satisfaction, and years at the company are among the strongest factors associated with this prediction.")} </p>
                 <div className="flex gap-5 mt-2">
                   <div>
-                    <div className="text-[11px] text-gray-400">Model Version</div>
-                    <div className="text-[12px] font-medium text-gray-700">Attrition Model v2.3</div>
+                    <div className="text-[11px] text-gray-400">{t("Model Version")}</div>
+                    <div className="text-[12px] font-medium text-gray-700">{t("Attrition Model v2.3")}</div>
                   </div>
                   <div>
-                    <div className="text-[11px] text-gray-400">Data Status</div>
-                    <div className="text-[12px] font-medium text-green-600">Validated</div>
+                    <div className="text-[11px] text-gray-400">{t("Data Status")}</div>
+                    <div className="text-[12px] font-medium text-green-600">{t("Validated")}</div>
                   </div>
                 </div>
               </div>
@@ -128,21 +129,20 @@ export default function RiskAnalysis() {
           <Card className="p-4">
             <div className="flex items-start justify-between gap-3 mb-3">
               <div>
-                <div className="text-[14px] font-semibold text-gray-800 mb-1">Key Contributing Factors</div>
-                <div className="text-[12px] text-gray-400">Global factors influencing attrition predictions</div>
+                <div className="text-[14px] font-semibold text-gray-800 mb-1">{t("Key Contributing Factors")}</div>
+                <div className="text-[12px] text-gray-400">{t("Global factors influencing attrition predictions")}</div>
               </div>
               <span className="inline-flex items-center gap-1 rounded bg-orange-50 px-2 py-1 text-[11px] font-medium text-orange-700">
-                <BrainCircuit size={12} /> SHAP explainability
-              </span>
+                <BrainCircuit size={12} /> {t("SHAP explainability")} </span>
             </div>
             <div className="flex items-center gap-3 mb-3 text-[12px] text-gray-500">
-              <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded bg-red-300" /> Increasing predicted risk</div>
-              <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded bg-green-300" /> Reducing predicted risk</div>
+              <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded bg-red-300" /> {t("Increasing predicted risk")}</div>
+              <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded bg-green-300" /> {t("Reducing predicted risk")}</div>
             </div>
             <div className="space-y-2.5">
               {contributingFactors.map(f => (
                 <div key={f.factor} className="flex items-center gap-2.5">
-                  <span className="w-44 text-[13px] text-gray-700 flex-shrink-0">{f.factor}</span>
+                  <span className="w-44 text-[13px] text-gray-700 flex-shrink-0">{t(f.factor)}</span>
                   <div className="flex-1 bg-gray-100 rounded h-2 overflow-hidden">
                     <div
                       className={`h-full rounded ${f.direction === 'increase' ? 'bg-red-400' : 'bg-green-400'}`}
@@ -150,52 +150,49 @@ export default function RiskAnalysis() {
                     />
                   </div>
                   <span className={`text-[12px] font-semibold w-10 text-right flex-shrink-0 ${f.direction === 'increase' ? 'text-red-600' : 'text-green-600'}`}>
-                    {f.direction === 'increase' ? '+' : '-'}{f.value}%
+                    {t(f.direction === 'increase' ? '+' : '-')}{f.value}%
                   </span>
                 </div>
               ))}
             </div>
-            <div className="mt-3 pt-2 border-t border-gray-100 text-[11px] text-gray-400">
-              Factor contributions represent relative associations derived from explainability analysis, not causal relationships.
-            </div>
+            <div className="mt-3 pt-2 border-t border-gray-100 text-[11px] text-gray-400"> {t("Factor contributions represent relative associations derived from explainability analysis, not causal relationships.")} </div>
           </Card>
 
           <Card className="p-4">
             <div className="mb-3 flex items-center justify-between">
               <div>
-                <div className="text-[14px] font-semibold text-gray-800">Local SHAP Explanation</div>
-                <div className="text-[12px] text-gray-400">Employee-specific drivers behind this risk score</div>
+                <div className="text-[14px] font-semibold text-gray-800">{t("Local SHAP Explanation")}</div>
+                <div className="text-[12px] text-gray-400">{t("Employee-specific drivers behind this risk score")}</div>
               </div>
               <Button variant="secondary" size="sm" onClick={() => setCopilotOpen(open => !open)}>
-                <Sparkles size={13} /> {copilotOpen ? 'Hide Copilot' : 'Suggest Intervention'}
+                <Sparkles size={13} /> {t(copilotOpen ? 'Hide Copilot' : 'Suggest Intervention')}
               </Button>
             </div>
             <div className="space-y-2.5">
               {localExplanations.map(item => (
                 <div key={item.factor} className="grid grid-cols-[150px_minmax(0,1fr)_120px] items-center gap-3">
-                  <div className="text-[13px] font-medium text-slate-700">{item.factor}</div>
+                  <div className="text-[13px] font-medium text-slate-700">{t(item.factor)}</div>
                   <div className="h-2 overflow-hidden rounded-full bg-slate-100">
                     <div className={`h-full rounded-full ${item.impact === 'Protective' ? 'bg-emerald-500' : item.impact === 'Low impact' ? 'bg-slate-300' : 'bg-red-400'}`} style={{ width: `${Math.min(100, item.value * 420)}%` }} />
                   </div>
-                  <div className={`text-right text-[12px] font-semibold ${item.impact === 'Protective' ? 'text-emerald-600' : item.impact === 'Low impact' ? 'text-slate-500' : 'text-red-600'}`}>{item.impact}</div>
-                  <div className="col-span-3 -mt-1 text-[11px] text-slate-400">{item.note}</div>
+                  <div className={`text-right text-[12px] font-semibold ${item.impact === 'Protective' ? 'text-emerald-600' : item.impact === 'Low impact' ? 'text-slate-500' : 'text-red-600'}`}>{t(item.impact)}</div>
+                  <div className="col-span-3 -mt-1 text-[11px] text-slate-400">{t(item.note)}</div>
                 </div>
               ))}
             </div>
             {copilotOpen && (
               <div className="mt-4 rounded-lg border border-orange-100 bg-orange-50/70 p-3">
                 <div className="mb-2 flex items-center gap-2 text-[13px] font-semibold text-orange-800">
-                  <MessageSquare size={14} /> HR Copilot Intervention Draft
-                </div>
+                  <MessageSquare size={14} /> {t("HR Copilot Intervention Draft")} </div>
                 <div className="space-y-2">
                   {copilotSuggestions.map(suggestion => (
                     <div key={suggestion} className="flex gap-2 text-[13px] leading-5 text-slate-700">
                       <ClipboardList size={13} className="mt-1 flex-shrink-0 text-orange-500" />
-                      <span>{suggestion}</span>
+                      <span>{t(suggestion)}</span>
                     </div>
                   ))}
                 </div>
-                <div className="mt-3 text-[11px] text-slate-500">Copilot output is advisory. HR must review before creating an intervention.</div>
+                <div className="mt-3 text-[11px] text-slate-500">{t("Copilot output is advisory. HR must review before creating an intervention.")}</div>
               </div>
             )}
           </Card>
@@ -204,24 +201,24 @@ export default function RiskAnalysis() {
         {/* RIGHT */}
         <div className="space-y-4">
           <Card className="p-4">
-            <div className="text-[14px] font-semibold text-gray-800 mb-3">Employee Snapshot</div>
-            <InfoRow label="Department" value={emp.department} />
-            <InfoRow label="Role" value={emp.role} />
-            <InfoRow label="Tenure" value={`${emp.tenure} years`} />
-            <InfoRow label="Overtime" value={emp.overtime ? 'Yes' : 'No'} highlight={emp.overtime} />
-            <InfoRow label="Job Satisfaction" value={`${emp.jobSatisfaction} / 5`} highlight={emp.jobSatisfaction <= 2} />
-            <InfoRow label="Work-Life Balance" value={`${emp.workLifeBalance} / 4`} highlight={emp.workLifeBalance <= 2} />
-            <InfoRow label="Monthly Income" value={`$${emp.monthlyIncome.toLocaleString()}`} />
-            <InfoRow label="Business Travel" value={emp.businessTravel} />
+            <div className="text-[14px] font-semibold text-gray-800 mb-3">{t("Employee Snapshot")}</div>
+            <InfoRow label={t("Department")} value={emp.department} />
+            <InfoRow label={t("Role")} value={emp.role} />
+            <InfoRow label={t("Tenure")} value={`${emp.tenure} years`} />
+            <InfoRow label={t("Overtime")} value={emp.overtime ? 'Yes' : 'No'} highlight={emp.overtime} />
+            <InfoRow label={t("Job Satisfaction")} value={`${emp.jobSatisfaction} / 5`} highlight={emp.jobSatisfaction <= 2} />
+            <InfoRow label={t("Work-Life Balance")} value={`${emp.workLifeBalance} / 4`} highlight={emp.workLifeBalance <= 2} />
+            <InfoRow label={t("Monthly Income")} value={`$${emp.monthlyIncome.toLocaleString(language === 'vi' ? 'vi-VN' : 'en-US')}`} />
+            <InfoRow label={t("Business Travel")} value={emp.businessTravel} />
           </Card>
           <Card className="p-4">
-            <div className="text-[14px] font-semibold text-gray-800 mb-3">Analysis Information</div>
-            <InfoRow label="Model Version" value="Attrition Model v2.3" />
-            <InfoRow label="Analysis Date" value={emp.lastAnalysis} />
-            <InfoRow label="Data Status" value="Validated" />
-            <InfoRow label="Dataset" value="2026-Q3" />
-            <InfoRow label="Human Review" value="Required" highlight />
-            <InfoRow label="Decision Mode" value="Advisory only" />
+            <div className="text-[14px] font-semibold text-gray-800 mb-3">{t("Analysis Information")}</div>
+            <InfoRow label={t("Model Version")} value="Attrition Model v2.3" />
+            <InfoRow label={t("Analysis Date")} value={emp.lastAnalysis} />
+            <InfoRow label={t("Data Status")} value="Validated" />
+            <InfoRow label={t("Dataset")} value="2026-Q3" />
+            <InfoRow label={t("Human Review")} value="Required" highlight />
+            <InfoRow label={t("Decision Mode")} value="Advisory only" />
           </Card>
         </div>
       </div>

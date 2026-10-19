@@ -1,0 +1,67 @@
+.login-ambience {
+  -webkit-mask-image: radial-gradient(ellipse at 52% 48%, rgba(0, 0, 0, 0.23) 12%, rgba(0, 0, 0, 0.85) 54%, #000 85%);
+  mask-image: radial-gradient(ellipse at 52% 48%, rgba(0, 0, 0, 0.23) 12%, rgba(0, 0, 0, 0.85) 54%, #000 85%);
+}
+
+.login-ambient-orb {
+  position: absolute;
+  border: 1px solid rgba(249, 115, 22, 0.24);
+  border-radius: 50%;
+  background: radial-gradient(circle at 30% 27%, rgba(255, 255, 255, 0.9), rgba(255, 184, 112, 0.28) 54%, rgba(249, 115, 22, 0.20));
+  box-shadow: inset 0 -8px 22px rgba(251, 146, 60, 0.07), 0 8px 35px rgba(251, 146, 60, 0.055);
+  animation: login-bubble-float var(--float-duration, 22s) ease-in-out infinite;
+}
+
+.login-ambient-orb--one {
+  left: -3%; top: 8%; width: clamp(125px, 14vw, 220px); aspect-ratio: 1;
+  --float-x: 44px; --float-y: 34px; --float-duration: 23s;
+  animation-delay: -8s;
+}
+
+.login-ambient-orb--two {
+  right: 9%; top: 10%; width: clamp(45px, 5.5vw, 88px); aspect-ratio: 1;
+  --float-x: -36px; --float-y: 44px; --float-duration: 20s;
+  animation-delay: -14s;
+}
+
+.login-ambient-orb--three {
+  left: 12%; top: 51%; width: clamp(30px, 3.5vw, 54px); aspect-ratio: 1;
+  --float-x: 30px; --float-y: -38px; --float-duration: 18s;
+  animation-delay: -5s;
+}
+
+.login-ambient-orb--four {
+  right: 8%; bottom: 14%; width: clamp(70px, 8vw, 124px); aspect-ratio: 1;
+  --float-x: -40px; --float-y: -30px; --float-duration: 22s;
+  animation-delay: -17s;
+}
+
+.login-ambient-orb--five {
+  left: 2%; bottom: -9%; width: clamp(150px, 18vw, 280px); aspect-ratio: 1;
+  --float-x: 36px; --float-y: -42px; --float-duration: 26s;
+  animation-delay: -12s;
+}
+
+.login-ambient-glow {
+  position: absolute; left: -12%; bottom: -15%; width: 64%; aspect-ratio: 1;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 178, 103, 0.19), transparent 67%);
+}
+
+@keyframes login-bubble-float {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+  50% { transform: translate3d(var(--float-x), var(--float-y), 0) scale(1.06); }
+}
+
+@media (max-width: 640px) {
+  .login-ambient-orb { opacity: 0.78; }
+  .login-ambient-orb--three { left: -5%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .login-ambient-orb { animation: none; }
+}
+
+@media (forced-colors: active) {
+  .login-ambience { display: none; }
+}
