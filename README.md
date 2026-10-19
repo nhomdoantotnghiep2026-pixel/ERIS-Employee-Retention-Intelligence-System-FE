@@ -43,3 +43,5 @@ Landing dùng ba ảnh chụp dashboard HR, System Admin và Employee / ESS do n
 ## Hướng dẫn sử dụng
 
 Nút ? trên thanh đầu trang mở hướng dẫn tương ứng với role đang đăng nhập ở mọi trang làm việc. Mỗi bước có liên kết đến chức năng được cấp quyền. Chọn bước sẽ đóng hướng dẫn; có thể đóng bằng nút X, Escape hoặc bấm ra ngoài. Hướng dẫn không còn hiển thị thành khối trên dashboard.
+
+Sidebar ghi nhớ các nhóm menu đang mở riêng cho từng role trong cùng tab trình duyệt. Chuyển trang hoặc tải lại không tự thu gọn nhóm; bấm tên nhóm để chủ động đóng/mở.

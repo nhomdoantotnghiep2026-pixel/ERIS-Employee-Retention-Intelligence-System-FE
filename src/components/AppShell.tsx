@@ -1,4 +1,5 @@
 import { EnterpriseHeader } from './EnterpriseHeader';
+import { readSidebarGroups, saveSidebarGroups } from '../utils/sidebarGroups';
 import { type ReactNode, useEffect, useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import {
@@ -167,7 +168,6 @@ function Sidebar({ onNavigate, collapsed, onToggle }: { onNavigate?: () => void;
   const { t } = useLanguage();
   const { pathname } = useLocation();
   const [navQuery, setNavQuery] = useState('');
-  const [openGroups, setOpenGroups] = useState<string[]>([]);
   const [, setPermissionRevision] = useState(0);
   const navGroups = NAV_BY_ROLE[user.role].map(group => ({
     ...group,
@@ -177,9 +177,11 @@ function Sidebar({ onNavigate, collapsed, onToggle }: { onNavigate?: () => void;
   const visibleItems = visibleGroups.flatMap(group => group.items);
   const activeGroup = navGroups.find(group => group.items.some(item => pathname === item.to || pathname.startsWith(item.to + '/')))?.group;
 
-  useEffect(() => {
-    if (activeGroup) setOpenGroups(groups => groups.includes(activeGroup) ? groups : [...groups, activeGroup]);
-  }, [activeGroup]);
+  const [openGroups, setOpenGroups] = useState<string[]>(() => readSidebarGroups(user.role, navGroups.flatMap(group => group.group ? [group.group] : []), activeGroup));
+  const updateOpenGroups = (groups: string[]) => {
+    saveSidebarGroups(user.role, groups);
+    setOpenGroups(groups);
+  };
 
   useEffect(() => {
     const refresh = () => setPermissionRevision(value => value + 1);
@@ -224,7 +226,7 @@ function Sidebar({ onNavigate, collapsed, onToggle }: { onNavigate?: () => void;
           if (!group.group || group.items.length === 1) return group.items.map(item => <SidebarLink key={item.to} {...item} collapsed onNavigate={onNavigate} />);
           const GroupIcon = group.items[0].icon;
           const groupActive = activeGroup === group.group;
-          return <button key={groupKey} type="button" title={t(group.group)} aria-label={t(group.group)} onClick={() => { setOpenGroups(groups => groups.includes(groupKey) ? groups : [...groups, groupKey]); onToggle(); }} className={`mx-auto flex h-12 w-12 items-center justify-center rounded-2xl transition-all duration-200 ${groupActive ? 'bg-[#f47721] text-white shadow-[0_7px_18px_rgba(244,119,33,0.24)]' : 'text-[#71809d] hover:bg-orange-50 hover:text-orange-700'}`}><GroupIcon size={23} strokeWidth={1.8} /></button>;
+          return <button key={groupKey} type="button" title={t(group.group)} aria-label={t(group.group)} onClick={() => { updateOpenGroups(openGroups.includes(groupKey) ? openGroups : [...openGroups, groupKey]); onToggle(); }} className={`mx-auto flex h-12 w-12 items-center justify-center rounded-2xl transition-all duration-200 ${groupActive ? 'bg-[#f47721] text-white shadow-[0_7px_18px_rgba(244,119,33,0.24)]' : 'text-[#71809d] hover:bg-orange-50 hover:text-orange-700'}`}><GroupIcon size={23} strokeWidth={1.8} /></button>;
         }) : visibleGroups.map((group, index) => {
           const groupKey = group.group || `group-${index}`;
           const expanded = Boolean(navQuery) || openGroups.includes(groupKey);
@@ -232,7 +234,7 @@ function Sidebar({ onNavigate, collapsed, onToggle }: { onNavigate?: () => void;
           const GroupIcon = group.items[0].icon;
           const groupActive = activeGroup === group.group;
           return <div key={groupKey} className="py-0.5">
-            <button type="button" onClick={() => setOpenGroups(groups => groups.includes(groupKey) ? groups.filter(key => key !== groupKey) : [...groups, groupKey])} aria-expanded={expanded} className={`flex min-h-12 w-full items-center gap-4 rounded-r-full px-5 text-left text-[15px] transition-colors ${groupActive ? 'font-bold text-orange-700' : 'text-[#64748b] hover:bg-orange-50 hover:text-orange-700'}`}>
+            <button type="button" onClick={() => updateOpenGroups(openGroups.includes(groupKey) ? openGroups.filter(key => key !== groupKey) : [...openGroups, groupKey])} aria-expanded={expanded} className={`flex min-h-12 w-full items-center gap-4 rounded-r-full px-5 text-left text-[15px] transition-colors ${groupActive ? 'font-bold text-orange-700' : 'text-[#64748b] hover:bg-orange-50 hover:text-orange-700'}`}>
               <GroupIcon size={23} strokeWidth={1.8} className={groupActive ? 'text-orange-600' : 'text-[#71809d]'} />
               <span className="min-w-0 flex-1 truncate">{t(group.group)}</span>
               <ChevronDown size={16} className={`transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`} />
@@ -251,6 +253,7 @@ function Sidebar({ onNavigate, collapsed, onToggle }: { onNavigate?: () => void;
 
 export function AppShell({ children, breadcrumb }: { children: ReactNode; breadcrumb?: string[] }) {
   const { t } = useLanguage();
+  const { user } = useRole();
   const [sidebarOpen, setSidebarOpen] = useState(() => window.innerWidth >= 1024 && sessionStorage.getItem('eris-sidebar') !== 'closed');
   const toggleSidebar = () => setSidebarOpen(open => { sessionStorage.setItem('eris-sidebar', open ? 'closed' : 'open'); return !open; });
   const closeMobileSidebar = () => {
@@ -269,7 +272,7 @@ export function AppShell({ children, breadcrumb }: { children: ReactNode; breadc
     <div className="flex h-screen overflow-hidden bg-[#F4F3F9]">
       <a href="#main-content" className="fixed left-4 top-4 z-[70] -translate-y-24 rounded-lg bg-orange-600 px-4 py-3 font-semibold text-white shadow-lg transition focus:translate-y-0">{t('Skip to main content')}</a>
       {sidebarOpen && <button type="button" aria-label={t('Close navigation')} onClick={closeMobileSidebar} className="fixed inset-0 z-40 bg-slate-950/45 backdrop-blur-[1px] lg:hidden" />}
-      <Sidebar onNavigate={closeMobileSidebar} collapsed={!sidebarOpen} onToggle={toggleSidebar} />
+      <Sidebar key={user.role} onNavigate={closeMobileSidebar} collapsed={!sidebarOpen} onToggle={toggleSidebar} />
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         <EnterpriseHeader breadcrumb={breadcrumb} sidebarOpen={sidebarOpen} toggleSidebar={toggleSidebar} links={NAV_BY_ROLE} />
         <main id="main-content" tabIndex={-1} className="flex-1 overflow-y-auto bg-[radial-gradient(circle_at_top_right,rgba(249,115,22,0.07),transparent_28rem)] outline-none">
