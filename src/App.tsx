@@ -24,6 +24,7 @@ import ErdSchema from './screens/ErdSchema';
 import ErdEmployeeDetails from './screens/ErdEmployeeDetails';
 import Landing from './screens/Landing';
 import Login from './screens/Login';
+import ForgotPassword from './screens/ForgotPassword';
 
 // HR
 import Dashboard from './screens/Dashboard';
@@ -83,6 +84,7 @@ export default function App() {
           <Routes>
           <Route path="/" element={<Landing />} />
           <Route path="/login" element={<Login />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
 
           {/* HR */}
           <Route path="/dashboard" element={<RoleGuard><Dashboard /></RoleGuard>} />

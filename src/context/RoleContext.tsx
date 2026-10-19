@@ -1,4 +1,5 @@
-import { createContext, useContext, useState, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
+import { refreshSession } from '../services/api';
 
 export type UserRole = 'HR' | 'Data / AI Analyst' | 'System Administrator' | 'Employee / ESS';
 
@@ -7,13 +8,14 @@ interface RoleUser {
   initials: string;
   role: UserRole;
   email: string;
+  available?: boolean;
 }
 
 export const ROLE_USERS: RoleUser[] = [
-  { name: 'Le Thi HR', initials: 'LH', role: 'HR', email: 'hr@eris.com' },
-  { name: 'Nguyen Data', initials: 'ND', role: 'Data / AI Analyst', email: 'analyst@eris.com' },
-  { name: 'Admin System', initials: 'AS', role: 'System Administrator', email: 'admin@eris.com' },
-  { name: 'Nguyen Van A', initials: 'NA', role: 'Employee / ESS', email: 'employee@eris.com' },
+  { name: 'ERIS Administrator', initials: 'EA', role: 'System Administrator', email: 'nhomdoantotnghiep2026@gmail.com' },
+  { name: 'HR Account 1', initials: 'H1', role: 'HR', email: 'kn1234444@gmail.com' },
+  { name: 'Data Analyst (chưa có tài khoản)', initials: 'DA', role: 'Data / AI Analyst', email: 'analyst@eris.com', available: false },
+  { name: 'Employee (chưa có tài khoản)', initials: 'EE', role: 'Employee / ESS', email: 'employee@eris.com', available: false },
 ];
 
 interface RoleContextValue {
@@ -30,13 +32,24 @@ export function RoleProvider({ children }: { children: ReactNode }) {
     try {
       const stored = sessionStorage.getItem('eris-user');
       const parsed = stored ? JSON.parse(stored) as RoleUser : null;
-      return ROLE_USERS.find(candidate => candidate.email === parsed?.email) || null;
+      if (!parsed?.email || !parsed.role || !parsed.name) return null;
+      return parsed;
     } catch {
       return null;
     }
   })();
   const [user, setUserState] = useState<RoleUser>(storedUser || ROLE_USERS[0]);
   const [isAuthenticated, setIsAuthenticated] = useState(Boolean(storedUser));
+  useEffect(() => {
+    if (!storedUser || !sessionStorage.getItem('eris-access-token')) return;
+    void refreshSession()
+      .then(result => sessionStorage.setItem('eris-access-token', result.accessToken))
+      .catch(() => {
+        sessionStorage.removeItem('eris-user');
+        sessionStorage.removeItem('eris-access-token');
+        setIsAuthenticated(false);
+      });
+  }, [storedUser]);
   const setUser = (next: RoleUser) => {
     sessionStorage.setItem('eris-user', JSON.stringify(next));
     setUserState(next);
@@ -44,6 +57,7 @@ export function RoleProvider({ children }: { children: ReactNode }) {
   };
   const signOut = () => {
     sessionStorage.removeItem('eris-user');
+    sessionStorage.removeItem('eris-access-token');
     setIsAuthenticated(false);
   };
   return <RoleContext.Provider value={{ user, isAuthenticated, setUser, signOut }}>{children}</RoleContext.Provider>;

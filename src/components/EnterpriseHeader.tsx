@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { Bell, Check, CheckCheck, ChevronDown, HelpCircle, Languages, LogOut, PanelLeft } from 'lucide-react';
 import { useRole, type UserRole } from '../context/RoleContext';
 import { useLanguage } from '../context/LanguageContext';
+import { logout } from '../services/api';
 
 type Link = { label: string; to: string };
 type Props = { breadcrumb?: string[]; sidebarOpen: boolean; toggleSidebar: () => void; links: Record<UserRole, { items: Link[] }[]> };
@@ -29,10 +30,14 @@ export function EnterpriseHeader({ breadcrumb, sidebarOpen, toggleSidebar, links
   const title = t((breadcrumb?.length ? breadcrumb[breadcrumb.length - 1] : pages.find(page => pathname.startsWith(page.to))?.label) || 'Workspace');
   const markRead = (ids: string[]) => setRead(old => { const next = [...new Set([...old, ...ids])]; sessionStorage.setItem('eris-notifications-read', JSON.stringify(next)); return next; });
   const go = (to: string) => { setPanel(null); navigate(to); };
-  const handleSignOut = () => {
-    signOut();
-    setPanel(null);
-    navigate('/login', { replace: true });
+  const handleSignOut = async () => {
+    try {
+      await logout();
+    } finally {
+      signOut();
+      setPanel(null);
+      navigate('/login', { replace: true });
+    }
   };
 
   useEffect(() => { setPanel(null); }, [pathname, user.role]);

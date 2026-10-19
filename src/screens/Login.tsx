@@ -11,6 +11,7 @@ import {
   UserRound,
 } from 'lucide-react';
 import { useRole, ROLE_USERS, type UserRole } from '../context/RoleContext';
+import { changePassword, getApiErrorMessage, getCurrentUser, login } from '../services/api';
 
 const ROLE_HOME: Record<UserRole, string> = {
   HR: '/dashboard',
@@ -47,6 +48,8 @@ const LOGIN_SLIDES = [
   },
 ] as const;
 
+const SUGGESTED_ROLE_USERS = ROLE_USERS;
+
 function ErisMark({ compact = false }: { compact?: boolean }) {
   return (
     <div className="relative shrink-0" aria-hidden="true">
@@ -68,12 +71,23 @@ export default function Login() {
   const navigate = useNavigate();
   const { user, isAuthenticated, setUser } = useRole();
   const [showPass, setShowPass] = useState(false);
+  const [showNewPass, setShowNewPass] = useState(false);
+  const [showConfirmPass, setShowConfirmPass] = useState(false);
   const [selectedUserIdx, setSelectedUserIdx] = useState(0);
-  const [password, setPassword] = useState('password');
+  const [loginEmail, setLoginEmail] = useState(SUGGESTED_ROLE_USERS[0].email);
+  const [password, setPassword] = useState('');
+  const [passwordChangeToken, setPasswordChangeToken] = useState('');
+  const [otp, setOtp] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [activeSlide, setActiveSlide] = useState(0);
 
-  const selectedUser = ROLE_USERS[selectedUserIdx];
+  const selectedUser = SUGGESTED_ROLE_USERS[selectedUserIdx] || SUGGESTED_ROLE_USERS[0];
+  const isSuggestedEmail = SUGGESTED_ROLE_USERS.some(
+    (roleUser) => roleUser.email.toLowerCase() === loginEmail.trim().toLowerCase(),
+  );
 
   useEffect(() => {
     if (isAuthenticated) navigate(ROLE_HOME[user.role], { replace: true });
@@ -90,16 +104,71 @@ export default function Login() {
     return () => window.clearInterval(timer);
   }, []);
 
-  function handleSignIn(e: React.FormEvent) {
+  function mapApiRole(role?: string | { name: string }, roleId?: number): UserRole {
+    const normalized = (typeof role === 'string' ? role : role?.name)?.trim().toUpperCase();
+    if (normalized === 'ADMIN' || normalized === 'SYSTEM ADMINISTRATOR') return 'System Administrator';
+    if (normalized === 'HR') return 'HR';
+    if (normalized === 'ANALYST' || normalized === 'DATA / AI ANALYST' || normalized === 'DATA_ANALYST') return 'Data / AI Analyst';
+    if (roleId === 1) return 'System Administrator';
+    if (roleId === 2) return 'HR';
+    return 'Employee / ESS';
+  }
+
+  async function handleSignIn(e: React.FormEvent) {
     e.preventDefault();
-    if (password !== 'password') {
-      setError('Mật khẩu demo chưa đúng. Hãy dùng “password”.');
+    setError('');
+    setIsSubmitting(true);
+    try {
+      const loginResult = await login(loginEmail.trim(), password);
+      if (loginResult.passwordChangeToken) {
+        setPasswordChangeToken(loginResult.passwordChangeToken);
+        setError('Mã OTP đổi mật khẩu đã được gửi tới email của tài khoản.');
+        return;
+      }
+      const apiUser = await getCurrentUser();
+      const nextUser = {
+        ...selectedUser,
+        name: apiUser.fullName || selectedUser.name,
+        email: apiUser.email,
+        role: mapApiRole(apiUser.role, apiUser.roleId),
+        initials: (apiUser.fullName || selectedUser.name)
+          .split(/\s+/)
+          .map((part) => part[0])
+          .join('')
+          .slice(-2)
+          .toUpperCase(),
+      };
+      setUser(nextUser);
+      navigate(ROLE_HOME[nextUser.role]);
+    } catch (loginError) {
+      sessionStorage.removeItem('eris-access-token');
+      setError(getApiErrorMessage(loginError, 'Đăng nhập thất bại. Vui lòng kiểm tra thông tin và thử lại.'));
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  async function handlePasswordChange(e: React.FormEvent) {
+    e.preventDefault();
+    setError('');
+    if (newPassword !== confirmPassword) {
+      setError('Mật khẩu mới và xác nhận mật khẩu không khớp.');
       return;
     }
-
-    setError('');
-    setUser(selectedUser);
-    navigate(ROLE_HOME[selectedUser.role]);
+    setIsSubmitting(true);
+    try {
+      await changePassword(passwordChangeToken, password, otp, newPassword);
+      setPasswordChangeToken('');
+      setOtp('');
+      setPassword(newPassword);
+      setNewPassword('');
+      setConfirmPassword('');
+      setError('Đổi mật khẩu thành công. Bấm Đăng nhập để tiếp tục.');
+    } catch (changeError) {
+      setError(getApiErrorMessage(changeError, 'Đổi mật khẩu thất bại. Vui lòng kiểm tra OTP và thử lại.'));
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
   return (
@@ -184,32 +253,35 @@ export default function Login() {
             <div className="mb-5 flex items-start gap-3 rounded-[22px] bg-[#eef0f5] px-5 py-4 text-sm text-slate-600">
               <ShieldCheck className="mt-0.5 shrink-0 text-[#ef7628]" size={19} />
               <div>
-                <p className="font-semibold text-slate-700">Tài khoản dùng thử</p>
+                <p className="font-semibold text-slate-700">Tài khoản trong hệ thống</p>
                 <p className="mt-1 leading-5">
-                  Chọn một vai trò bên dưới và dùng mật khẩu <span className="font-semibold text-slate-800">password</span>.
+                  Chọn tài khoản đã được cấp và nhập mật khẩu tương ứng.
                 </p>
               </div>
             </div>
 
-            <form onSubmit={handleSignIn} className="space-y-4" noValidate>
+            <form onSubmit={handleSignIn} className="space-y-4" noValidate hidden={Boolean(passwordChangeToken)}>
               <div>
-                <label htmlFor="demo-account" className="mb-1.5 flex items-center gap-2 text-[13px] font-medium text-slate-600">
+                  <label htmlFor="demo-account" className="mb-1.5 flex items-center gap-2 text-[13px] font-medium text-slate-600">
                   <UserRound size={15} />
-                  Tài khoản
+                  Tài khoản gợi ý
                 </label>
                 <div className="relative">
                   <select
                     id="demo-account"
                     value={selectedUserIdx}
                     onChange={(event) => {
-                      setSelectedUserIdx(Number(event.target.value));
+                      const nextIndex = Number(event.target.value);
+                      setSelectedUserIdx(nextIndex);
+                      setLoginEmail(SUGGESTED_ROLE_USERS[nextIndex].email);
                       setError('');
                     }}
                     className="h-12 w-full appearance-none rounded-xl border border-slate-200 bg-white px-4 pr-11 text-sm font-medium text-slate-700 outline-none transition focus:border-[#f47b20] focus:ring-4 focus:ring-orange-100"
                   >
-                    {ROLE_USERS.map((roleUser, index) => (
+                    {SUGGESTED_ROLE_USERS.map((roleUser, index) => (
                       <option key={roleUser.email} value={index}>
                         {roleUser.name} — {roleUser.role}
+                        {roleUser.available === false ? ' (chưa có tài khoản backend)' : ''}
                       </option>
                     ))}
                   </select>
@@ -220,11 +292,26 @@ export default function Login() {
                   />
                 </div>
                 <div className="mt-2 flex flex-wrap items-center gap-2 px-1">
-                  <span className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold ${roleColors[selectedUser.role]}`}>
-                    {selectedUser.role}
+                  <span className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold ${isSuggestedEmail ? roleColors[selectedUser.role] : 'border-slate-200 bg-slate-50 text-slate-500'}`}>
+                    {isSuggestedEmail ? selectedUser.role : 'Tài khoản tự nhập'}
                   </span>
-                  <span className="text-xs text-slate-400">{selectedUser.email}</span>
+                  <span className="text-xs text-slate-400">{loginEmail || 'Chưa nhập email'}</span>
                 </div>
+                <p className="mt-2 px-1 text-xs leading-5 text-slate-400">
+                  Chọn tài khoản gợi ý để điền email nhanh, hoặc tự nhập email khác. Mật khẩu luôn cần nhập riêng để bảo mật.
+                </p>
+                <input
+                  id="login-email"
+                  type="email"
+                  value={loginEmail}
+                  onChange={(event) => {
+                    setLoginEmail(event.target.value);
+                    setError('');
+                  }}
+                  placeholder="Hoặc tự nhập email tài khoản"
+                  autoComplete="username"
+                  className="mt-3 h-11 w-full rounded-xl border border-slate-200 bg-white px-4 text-sm text-slate-700 outline-none transition focus:border-[#f47b20] focus:ring-4 focus:ring-orange-100"
+                />
               </div>
 
               <div>
@@ -264,15 +351,52 @@ export default function Login() {
 
               <button
                 type="submit"
+                disabled={isSubmitting}
                 className="mt-1 h-12 w-full rounded-full bg-gradient-to-r from-[#fa8b2e] to-[#ef6827] text-sm font-semibold text-white shadow-[0_12px_28px_rgba(239,104,39,0.28)] transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_16px_32px_rgba(239,104,39,0.34)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-orange-200 active:translate-y-0"
               >
-                Đăng nhập
+                {isSubmitting ? 'Đang đăng nhập...' : 'Đăng nhập'}
               </button>
             </form>
+
+            {passwordChangeToken && (
+              <form onSubmit={handlePasswordChange} className="space-y-4" noValidate>
+                <p className="rounded-xl bg-orange-50 p-4 text-sm leading-5 text-orange-800">
+                  Tài khoản mới cần đổi mật khẩu trước khi sử dụng. Nhập OTP trong email và đặt mật khẩu mới.
+                </p>
+                <div>
+                  <label htmlFor="password-change-otp" className="mb-1.5 block text-[13px] font-medium text-slate-600">Mã OTP</label>
+                  <input id="password-change-otp" inputMode="numeric" maxLength={6} required value={otp} onChange={event => setOtp(event.target.value)} className="h-12 w-full rounded-xl border border-slate-200 bg-white px-4 text-base outline-none focus:border-[#f47b20] focus:ring-4 focus:ring-orange-100" />
+                </div>
+                <div>
+                  <label htmlFor="new-password" className="mb-1.5 block text-[13px] font-medium text-slate-600">Mật khẩu mới</label>
+                  <div className="relative">
+                    <input id="new-password" type={showNewPass ? 'text' : 'password'} required value={newPassword} onChange={event => setNewPassword(event.target.value)} className="h-12 w-full rounded-xl border border-slate-200 bg-white px-4 pr-12 text-base outline-none focus:border-[#f47b20] focus:ring-4 focus:ring-orange-100" />
+                    <button type="button" aria-label={showNewPass ? 'Ẩn mật khẩu mới' : 'Hiện mật khẩu mới'} onClick={() => setShowNewPass(value => !value)} className="absolute right-1 top-1/2 grid h-10 w-10 -translate-y-1/2 place-items-center rounded-lg text-slate-400 hover:bg-orange-50 hover:text-orange-600">
+                      {showNewPass ? <EyeOff size={17} /> : <Eye size={17} />}
+                    </button>
+                  </div>
+                  <p className="mt-1 text-xs text-slate-400">Ít nhất 12 ký tự, có chữ hoa, chữ thường, số và ký tự đặc biệt.</p>
+                </div>
+                <div>
+                  <label htmlFor="confirm-password" className="mb-1.5 block text-[13px] font-medium text-slate-600">Xác nhận mật khẩu mới</label>
+                  <div className="relative">
+                    <input id="confirm-password" type={showConfirmPass ? 'text' : 'password'} required value={confirmPassword} onChange={event => setConfirmPassword(event.target.value)} className="h-12 w-full rounded-xl border border-slate-200 bg-white px-4 pr-12 text-base outline-none focus:border-[#f47b20] focus:ring-4 focus:ring-orange-100" />
+                    <button type="button" aria-label={showConfirmPass ? 'Ẩn xác nhận mật khẩu' : 'Hiện xác nhận mật khẩu'} onClick={() => setShowConfirmPass(value => !value)} className="absolute right-1 top-1/2 grid h-10 w-10 -translate-y-1/2 place-items-center rounded-lg text-slate-400 hover:bg-orange-50 hover:text-orange-600">
+                      {showConfirmPass ? <EyeOff size={17} /> : <Eye size={17} />}
+                    </button>
+                  </div>
+                </div>
+                {error && <p role="alert" className="text-xs font-semibold text-red-600">{error}</p>}
+                <button type="submit" disabled={isSubmitting} className="h-12 w-full rounded-full bg-gradient-to-r from-[#fa8b2e] to-[#ef6827] text-sm font-semibold text-white shadow-[0_12px_28px_rgba(239,104,39,0.28)]">
+                  {isSubmitting ? 'Đang đổi mật khẩu...' : 'Đổi mật khẩu'}
+                </button>
+              </form>
+            )}
 
             <p className="mt-5 text-center text-xs leading-5 text-slate-400">
               Tài khoản do doanh nghiệp cấp và quản lý. Liên hệ quản trị viên nếu bạn không thể đăng nhập.
             </p>
+            <Link to="/forgot-password" className="mt-3 block text-center text-sm font-semibold text-orange-700 hover:underline">Quên mật khẩu?</Link>
           </div>
 
           <footer className="mt-6 text-center text-[11px] text-slate-400">© 2026 ERIS · Graduation Capstone Project</footer>

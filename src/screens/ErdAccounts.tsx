@@ -1,31 +1,81 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { AppShell } from '../components/AppShell';
 import { Button, Card, SectionHeader } from '../components/ui';
-import { useErd } from '../erd/useErd';
-import { makeRow, transactDatabase } from '../erd/database';
-import { recordAudit } from '../workflows/audit';
-import { ROLE_USERS } from '../context/RoleContext';
+import { createUser, getApiErrorMessage, getUserById, listEmployees, listUsers, updateUserRole, updateUserStatus, type ApiEmployee, type ApiUser } from '../services/api';
+
+const ROLE_OPTIONS = [{ id: 2, name: 'HR' }, { id: 3, name: 'EMPLOYEE' }];
+const control = 'mt-2 w-full rounded-xl border border-slate-300 bg-white p-3 text-sm';
+
 export default function ErdAccounts() {
-  const db = useErd();
-  const [editing,setEditing] = useState<string | null>(null);
-  const [draft,setDraft] = useState({ email:'',role_id:db.role[0].id,employee_id:'',status:'Active' });
-  const [error,setError] = useState('');
-  const [query,setQuery] = useState('');
-  const fixed = editing && ROLE_USERS.some(user => user.email === db.users.find(row => row.id === editing)?.email);
-  const control = 'mt-2 w-full rounded-xl border border-slate-300 bg-white p-3 text-sm';
-  const save = () => {
-    try {
-      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(draft.email)) throw new Error('Email is invalid.');
-      const before = db.users.find(row => row.id === editing);
-      if (fixed && (draft.email !== before?.email || draft.role_id !== before?.role_id)) throw new Error('The four login actors are fixed.');
-      const row = makeRow('users',{ ...before,...draft,employee_id:draft.employee_id || null,...(editing ? { id:editing } : {}) });
-      transactDatabase(next => { if (editing) next.users=next.users.map(item => item.id === editing ? row:item);else next.users.push(row); });
-      recordAudit('USERS',row.id,editing ? 'Update account record':'Create account record',before,row);
-      setEditing(null);setDraft({ email:'',role_id:db.role[0].id,employee_id:'',status:'Active' });setError('');
-    } catch (cause) { setError((cause as Error).message); }
-  };
-  return <AppShell breadcrumb={['Access Control','Users']}><SectionHeader title="Tài khoản và liên kết nhân viên" description="Tài khoản tham chiếu ROLE và có thể liên kết EMPLOYEES. Giữ nguyên bốn actor login; không nhập hoặc lưu mật khẩu trong frontend." />
-    <Card className="mb-5 p-6"><form onSubmit={event => { event.preventDefault();save(); }}><div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4"><label className="text-sm text-slate-600">Email<input required type="email" disabled={Boolean(fixed)} className={control} value={draft.email} onChange={event => setDraft({ ...draft,email:event.target.value })} /></label><label className="text-sm text-slate-600">Vai trò<select disabled={Boolean(fixed)} className={control} value={draft.role_id} onChange={event => setDraft({ ...draft,role_id:event.target.value })}>{db.role.map(row => <option key={row.id} value={row.id}>{String(row.name)}</option>)}</select></label><label className="text-sm text-slate-600">Nhân viên liên kết<select className={control} value={draft.employee_id} onChange={event => setDraft({ ...draft,employee_id:event.target.value })}><option value="">Không liên kết</option>{db.employees.map(row => <option key={row.id} value={row.id}>{String(row.employee_code)} · {String(row.full_name)}</option>)}</select></label><label className="text-sm text-slate-600">Trạng thái<select className={control} value={draft.status} onChange={event => setDraft({ ...draft,status:event.target.value })}>{['Active','Inactive','Deleted'].filter(value => !fixed || value !== 'Deleted').map(value => <option key={value}>{value}</option>)}</select></label></div>{error && <p role="alert" className="mt-4 text-sm text-red-700">{error}</p>}<div className="mt-4 flex gap-3"><Button type="submit">{editing ? 'Lưu thay đổi':'Thêm tài khoản'}</Button>{editing && <Button type="button" variant="secondary" onClick={() => { setEditing(null);setDraft({ email:'',role_id:db.role[0].id,employee_id:'',status:'Active' }); }}>Hủy</Button>}</div><p className="mt-4 text-xs text-slate-500">Đây là bản ghi quản trị trong môi trường local. Đăng nhập thật vẫn cần backend xác thực và phân quyền.</p></form></Card>
-    <Card className="overflow-x-auto p-5"><label className="text-sm text-slate-600">Tìm tài khoản<input className={control} value={query} onChange={event => setQuery(event.target.value)} /></label><table className="mt-5 w-full text-left text-sm"><thead><tr className="border-b text-slate-500">{['Email','Role','Nhân viên','Trạng thái','Thao tác'].map(label => <th key={label} className="p-3">{label}</th>)}</tr></thead><tbody>{db.users.filter(row => String(row.email).toLowerCase().includes(query.toLowerCase())).map(row => <tr key={row.id} className="border-b border-slate-100"><td className="p-3">{String(row.email)}</td><td className="p-3">{String(db.role.find(role => role.id === row.role_id)?.name)}</td><td className="p-3">{String(db.employees.find(employee => employee.id === row.employee_id)?.full_name || '—')}</td><td className="p-3">{String(row.status)}</td><td className="p-3"><Button size="sm" variant="secondary" onClick={() => { setEditing(row.id);setDraft({ email:String(row.email),role_id:String(row.role_id),employee_id:String(row.employee_id || ''),status:String(row.status) }); }}>Xem / sửa</Button></td></tr>)}</tbody></table></Card>
+  const [users, setUsers] = useState<ApiUser[]>([]);
+  const [employees, setEmployees] = useState<ApiEmployee[]>([]);
+  const [query, setQuery] = useState('');
+  const [email, setEmail] = useState('');
+  const [roleId, setRoleId] = useState(2);
+  const [employeeId, setEmployeeId] = useState<number | null>(null);
+  const [editing, setEditing] = useState<ApiUser | null>(null);
+  const [details, setDetails] = useState<ApiUser | null>(null);
+  const [editRoleId, setEditRoleId] = useState(2);
+  const [editStatus, setEditStatus] = useState('ACTIVE');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [message, setMessage] = useState('');
+
+  async function refreshUsers() {
+    setLoading(true);
+    try { const result = await listUsers(); setUsers(result.data); }
+    catch (cause) { setError(getApiErrorMessage(cause, 'Không tải được danh sách tài khoản. Vui lòng thử tải lại.')); }
+    finally { setLoading(false); }
+  }
+
+  async function refreshEmployees() {
+    try { const result = await listEmployees(); setEmployees(result.data); }
+    catch (cause) { setError(getApiErrorMessage(cause, 'Không tải được danh sách nhân viên để liên kết.')); }
+  }
+
+  useEffect(() => { void Promise.all([refreshUsers(), refreshEmployees()]); }, []);
+
+  async function handleCreate(event: React.FormEvent) {
+    event.preventDefault(); setError(''); setMessage('');
+    if (roleId === 3 && !employeeId) { setError('Vui lòng chọn nhân viên liên kết khi tạo tài khoản Employee.'); return; }
+    try { await createUser({ email: email.trim(), employeeId: roleId === 3 ? employeeId : null, roleId }); setEmail(''); setEmployeeId(null); setMessage('Đã tạo tài khoản.'); await refreshUsers(); }
+    catch (cause) { setError(getApiErrorMessage(cause, 'Tạo tài khoản thất bại. Vui lòng kiểm tra thông tin và thử lại.')); }
+  }
+
+  function openEdit(user: ApiUser) { setEditing(user); setEditRoleId(user.roleId || 2); setEditStatus(user.status); setError(''); setMessage(''); }
+
+  async function viewDetails(user: ApiUser) {
+    setError(''); setMessage('');
+    try { setDetails(await getUserById(user.id)); }
+    catch (cause) { setError(getApiErrorMessage(cause, 'Không tải được chi tiết tài khoản. Vui lòng thử lại.')); }
+  }
+
+  async function handleEdit(event: React.FormEvent) {
+    event.preventDefault(); if (!editing) return; setError(''); setMessage('');
+    if (editRoleId === 3 && editRoleId !== editing.roleId && !editing.employeeId) {
+      setError('Không thể đổi sang EMPLOYEE vì tài khoản chưa có nhân viên liên kết. Hãy tạo tài khoản Employee mới và chọn nhân viên liên kết.');
+      return;
+    }
+    try { if (editRoleId !== editing.roleId) await updateUserRole(editing.id, editRoleId); if (editStatus !== editing.status) await updateUserStatus(editing.id, editStatus); setEditing(null); setMessage('Đã cập nhật tài khoản.'); await refreshUsers(); }
+    catch (cause) { setError(getApiErrorMessage(cause, 'Cập nhật tài khoản thất bại. Vui lòng thử lại.')); }
+  }
+
+  async function deactivate(user: ApiUser) {
+    if (!window.confirm(`Khóa tài khoản ${user.email}?`)) return; setError(''); setMessage('');
+    try { await updateUserStatus(user.id, 'INACTIVE'); setMessage('Đã khóa tài khoản.'); await refreshUsers(); }
+    catch (cause) { setError(getApiErrorMessage(cause, 'Không thể khóa tài khoản. Vui lòng thử lại.')); }
+  }
+
+  const filteredUsers = users.filter(user => user.email.toLowerCase().includes(query.toLowerCase()));
+  return <AppShell breadcrumb={['Access Control', 'Users']}>
+    <SectionHeader title="Tài khoản và liên kết nhân viên" description="Quản lý tài khoản thật từ Backend. Không lưu mật khẩu trong frontend." />
+    <Card className="mb-5 p-6"><div className="flex items-center justify-between gap-3"><div><h2 className="font-bold text-slate-900">Tài khoản trong Backend</h2><p className="mt-1 text-xs text-slate-500">GET /api/users · dữ liệu PostgreSQL</p></div><span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">{users.length} tài khoản</span></div>
+      <input className={control} value={query} onChange={event => setQuery(event.target.value)} placeholder="Tìm theo email..." />
+      {loading && <p className="mt-4 text-sm text-slate-500">Đang tải...</p>}{error && <p role="alert" className="mt-4 rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</p>}{message && <p className="mt-4 rounded-lg bg-emerald-50 p-3 text-sm text-emerald-700">{message}</p>}
+      {!loading && <div className="mt-4 overflow-x-auto"><table className="w-full text-left text-sm"><thead><tr className="border-b text-slate-500"><th className="p-3">Email</th><th className="p-3">Role</th><th className="p-3">Trạng thái</th><th className="p-3">Thao tác</th></tr></thead><tbody>{filteredUsers.map(user => <tr key={user.id} className="border-b border-slate-100"><td className="p-3">{user.email}</td><td className="p-3">{typeof user.role === 'string' ? user.role : user.role?.name || `Role #${user.roleId ?? '—'}`}</td><td className="p-3">{user.status}</td><td className="flex flex-wrap gap-2 p-3"><Button size="sm" variant="secondary" onClick={() => void viewDetails(user)}>Xem chi tiết</Button><Button size="sm" variant="secondary" onClick={() => openEdit(user)}>Chỉnh sửa</Button><Button size="sm" variant="secondary" onClick={() => void deactivate(user)}>Khóa</Button></td></tr>)}</tbody></table>{!filteredUsers.length && <p className="py-5 text-sm text-slate-500">Không tìm thấy tài khoản.</p>}</div>}
+    </Card>
+    {details && <Card className="mb-5 border border-orange-100 p-6"><div className="flex items-start justify-between gap-4"><div><h2 className="font-bold text-slate-900">Chi tiết tài khoản</h2><p className="mt-1 text-sm text-slate-500">Dữ liệu lấy từ API UM-02</p></div><Button size="sm" variant="secondary" onClick={() => setDetails(null)}>Đóng</Button></div><dl className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-4"><div><dt className="text-xs text-slate-500">ID</dt><dd className="mt-1 font-semibold text-slate-800">{details.id}</dd></div><div><dt className="text-xs text-slate-500">Email</dt><dd className="mt-1 break-all font-semibold text-slate-800">{details.email}</dd></div><div><dt className="text-xs text-slate-500">Role</dt><dd className="mt-1 font-semibold text-slate-800">{typeof details.role === 'string' ? details.role : details.role?.name || `Role #${details.roleId ?? '—'}`}</dd></div><div><dt className="text-xs text-slate-500">Trạng thái</dt><dd className="mt-1 font-semibold text-slate-800">{details.status}</dd></div></dl></Card>}
+    <Card className="mb-5 p-6"><h2 className="font-bold text-slate-900">Thêm tài khoản</h2><form onSubmit={handleCreate} className="mt-4 grid gap-4 sm:grid-cols-4"><label className="text-sm text-slate-600">Email<input required type="email" className={control} value={email} onChange={event => setEmail(event.target.value)} /></label><label className="text-sm text-slate-600">Vai trò<select className={control} value={roleId} onChange={event => { const nextRoleId = Number(event.target.value); setRoleId(nextRoleId); if (nextRoleId !== 3) setEmployeeId(null); }}>{ROLE_OPTIONS.map(role => <option key={role.id} value={role.id}>{role.name}</option>)}</select></label>{roleId === 3 && <label className="text-sm text-slate-600">Nhân viên liên kết<select required className={control} value={employeeId ?? ''} onChange={event => setEmployeeId(event.target.value ? Number(event.target.value) : null)}><option value="">Chọn nhân viên</option>{employees.map(employee => <option key={employee.id} value={employee.id}>{employee.employee_code || `#${employee.id}`} — {employee.full_name || employee.email || 'Chưa có tên'}</option>)}</select></label>}<div className="flex items-end"><Button type="submit">Thêm tài khoản</Button></div></form><p className="mt-3 text-xs text-slate-500">Tài khoản mới bắt đầu ở trạng thái IN_PROCESS và nhận mật khẩu tạm qua email. Role Employee bắt buộc liên kết một nhân viên.</p></Card>
+    {editing && <Card className="p-6"><h2 className="font-bold text-slate-900">Chỉnh sửa: {editing.email}</h2><form onSubmit={handleEdit} className="mt-4 grid gap-4 sm:grid-cols-3"><label className="text-sm text-slate-600">Vai trò<select className={control} value={editRoleId} onChange={event => setEditRoleId(Number(event.target.value))}>{ROLE_OPTIONS.map(role => <option key={role.id} value={role.id} disabled={role.id === 3 && editing.roleId !== 3 && !editing.employeeId}>{role.name}{role.id === 3 && editing.roleId !== 3 && !editing.employeeId ? ' — cần nhân viên liên kết' : ''}</option>)}</select><span className="mt-1 block text-xs text-slate-500">Tài khoản Employee phải có employeeId. Muốn gán nhân viên, hãy tạo tài khoản Employee mới ở biểu mẫu phía trên.</span></label><label className="text-sm text-slate-600">Trạng thái<select className={control} value={editStatus} onChange={event => setEditStatus(event.target.value)}><option value={editing.status}>{editing.status}</option>{editing.status !== 'INACTIVE' && <option value="INACTIVE">INACTIVE — Khóa tài khoản</option>}</select><span className="mt-1 block text-xs text-slate-500">Theo API UM-04, chỉ hỗ trợ khóa tài khoản sang INACTIVE; không hỗ trợ unlock.</span></label><div className="flex items-end gap-2"><Button type="submit">Lưu</Button><Button type="button" variant="secondary" onClick={() => setEditing(null)}>Hủy</Button></div></form></Card>}
   </AppShell>;
 }
