@@ -30,7 +30,7 @@ export interface EmployeeProfile {
 export interface EmployeeInput {
   fullName: string; email: string; hireDate: string; departmentId: number; positionId: number;
   phone?: string | null; dateOfBirth?: string | null; gender?: string | null;
-  address?: string | null; employmentType?: string | null; currentSalary?: number | null;
+  address?: string | null; addressRefId?: string | null; employmentType?: string | null; currentSalary?: number | null;
 }
 export type EmployeeChanges = Partial<Omit<EmployeeInput, 'email' | 'hireDate' | 'dateOfBirth'>>;
 export function listEmployeeProfiles(options: { page?: number; limit?: number; search?: string; departmentId?: number; positionId?: number; employmentStatus?: string } = {}, signal?: AbortSignal) {
@@ -104,7 +104,7 @@ export interface ApiUserListResponse {
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const token = sessionStorage.getItem('eris-access-token');
   const headers = new Headers(init?.headers);
-  headers.set('Content-Type', 'application/json');
+  if (!(init?.body instanceof FormData)) headers.set('Content-Type', 'application/json');
   if (token) headers.set('Authorization', `Bearer ${token}`);
 
   const response = await fetch(`${API_BASE_URL}${path}`, {
@@ -198,49 +198,18 @@ export function listUsers(params: { page?: number; limit?: number; search?: stri
 
 export function listEmployees(search = '') {
   const query = search ? `?page=1&limit=100&q=${encodeURIComponent(search)}` : '?page=1&limit=100';
-  return request<{ data: ApiEmployee[]; pagination: { page: number; limit: number; has_more: boolean } }>(`/v1/employees${query}`);
-}
-
-export function listDepartments(params: { page?: number; limit?: number; search?: string } = {}) {
-  const query = new URLSearchParams({
-    page: String(params.page ?? 1),
-    limit: String(params.limit ?? 10),
-  });
-  if (params.search?.trim()) query.set('q', params.search.trim());
-  return request<ApiDepartmentListResponse>(`/departments?${query.toString()}`);
-}
-
-export function getDepartmentById(id: number) {
-  return request<{ data: ApiDepartment }>(`/departments/${id}`);
-}
-
-export function createDepartment(input: { code?: string; name: string; description?: string }) {
-  return request<{ data: ApiDepartment }>('/departments', {
-    method: 'POST',
-    body: JSON.stringify(input),
-  });
-}
-
-export function updateDepartment(id: number, input: { code?: string; name?: string; description?: string | null }) {
-  return request<{ data: ApiDepartment }>(`/departments/${id}`, {
-    method: 'PATCH',
-    body: JSON.stringify(input),
-  });
-}
-
-export function deleteDepartment(id: number) {
-  return request<void>(`/departments/${id}`, { method: 'DELETE' });
+  return request<{ data: ApiEmployee[]; pagination: { page: number; limit: number; total: number; totalPages: number } }>(`/employees${query}`);
 }
 
 export function getUserById(id: number) {
   return request<ApiUser>(`/users/${id}`);
 }
 
-export function createUser(input: { email: string; fullName: string; roleId: number }) {
-  return request<ApiUser>('/auth/user_register', {
+export function createUser(input: { email: string; roleId: number }) {
+  return request<{ message: string; data: ApiUser & { emailDelivery?: string } }>('/auth/user_register', {
     method: 'POST',
-    body: JSON.stringify(input),
-  });
+    body: JSON.stringify({ email: input.email, roleId: input.roleId }),
+  }).then(result => result.data);
 }
 
 export interface ApiRole { id: number; name: string; description?: string | null }
@@ -273,8 +242,8 @@ export interface ApiDepartmentListResponse {
 }
 
 export async function listDepartments(signal?: AbortSignal, options: { page?: number; limit?: number; search?: string } = {}) {
-  // The team BE returns the whole directory; it does not implement query paging.
-  const result = await request<{ data: ApiDepartment[] }>('/departments/listDepartments', { signal });
+  // The current BE returns the whole department directory; paging/search are applied client-side.
+  const result = await request<{ data: ApiDepartment[] }>('/departments', { signal });
   const page = options.page ?? 1;
   const limit = options.limit ?? 100;
   const search = options.search?.trim().toLocaleLowerCase() || '';
@@ -285,17 +254,17 @@ export async function listDepartments(signal?: AbortSignal, options: { page?: nu
 }
 
 export async function createDepartment(input: Pick<ApiDepartment, 'name' | 'description'>) {
-  const result = await request<{ data: ApiDepartment }>('/departments/createDepartments', { method: 'POST', body: JSON.stringify(input) });
+  const result = await request<{ data: ApiDepartment }>('/departments', { method: 'POST', body: JSON.stringify(input) });
   return result.data;
 }
 
 export async function updateDepartment(id: number, input: Pick<ApiDepartment, 'name' | 'description'>) {
-  const result = await request<{ data: ApiDepartment }>(`/departments/updateDepartments/${id}`, { method: 'PATCH', body: JSON.stringify(input) });
+  const result = await request<{ data: ApiDepartment }>(`/departments/${id}`, { method: 'PATCH', body: JSON.stringify(input) });
   return result.data;
 }
 
 export async function deactivateDepartment(id: number) {
-  const result = await request<{ data: ApiDepartment }>(`/departments/deleteDepartments/${id}`, { method: 'DELETE' });
+  const result = await request<{ data: ApiDepartment }>(`/departments/${id}`, { method: 'DELETE' });
   return result.data;
 }
 
@@ -346,4 +315,43 @@ export async function updatePosition(id: number, input: Partial<PositionInput>) 
 export async function deactivatePosition(id: number) {
   // Team BE exposes DELETE /:id; the spreadsheet's /:id/status is not implemented upstream.
   return (await request<{ data: ApiPosition }>(`/positions/${id}`, { method: 'DELETE' })).data;
+}
+
+export interface PlaceSuggestion {
+  refId: string;
+  name: string;
+  address: string;
+  display: string;
+  resolvedAddress: string;
+  isCompleteAddress: boolean;
+  latitude: number;
+  longitude: number;
+}
+
+export function searchPlaces(query: string, signal?: AbortSignal) {
+  return request<{ places: PlaceSuggestion[] }>(`/distance/places?query=${encodeURIComponent(query.trim())}`, { signal });
+}
+
+export interface EmployeeImportResult {
+  row: number;
+  status: 'CREATED' | 'FAILED';
+  statusCode?: number;
+  message?: string;
+  data?: EmployeeProfile;
+}
+
+export interface EmployeeImportResponse {
+  total: number;
+  created: number;
+  failed: number;
+  results: EmployeeImportResult[];
+}
+
+export function importEmployees(file: File) {
+  const body = new FormData();
+  body.append('file', file);
+  return request<EmployeeImportResponse>('/employees/import', {
+    method: 'POST',
+    body,
+  });
 }

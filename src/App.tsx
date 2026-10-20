@@ -19,7 +19,6 @@ import DataWorkspace from './screens/DataWorkspace';
 import RiskWorkspace from './screens/RiskWorkspace';
 import ErdSurveys from './screens/ErdSurveys';
 import ErdAccounts from './screens/ErdAccounts';
-import ErdDepartments from './screens/ErdDepartments';
 import ErdOwnProfile from './screens/ErdOwnProfile';
 import ErdSchema from './screens/ErdSchema';
 import ErdEmployeeDetails from './screens/ErdEmployeeDetails';
@@ -113,7 +112,6 @@ export default function App() {
           <Route path="/interventions" element={<RoleGuard><RetentionInterventions /></RoleGuard>} />
           <Route path="/outcomes" element={<RoleGuard><EmployeeOutcomes /></RoleGuard>} />
           <Route path="/engagement" element={<RoleGuard><ErdSurveys /></RoleGuard>} />
-          <Route path="/departments" element={<RoleGuard><ErdDepartments /></RoleGuard>} />
           <Route path="/executive-reports" element={<RoleGuard><RiskWorkspace reports /></RoleGuard>} />
 
           {/* Shared HR */}

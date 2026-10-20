@@ -4,18 +4,19 @@ import { AppShell } from '../components/AppShell';
 import { Button, Card } from '../components/ui';
 import { useLanguage } from '../context/LanguageContext';
 import { createEmployeeProfile, deactivateEmployeeProfile, getEmployeeProfile, listEmployeeProfiles, updateEmployeeProfile,
-  listDepartments, listPositions, getApiErrorMessage, type EmployeeProfile, type EmployeeInput, type EmployeeChanges } from '../services/api';
+  listDepartments, listPositions, searchPlaces, getApiErrorMessage, type EmployeeProfile, type EmployeeInput, type EmployeeChanges, type PlaceSuggestion } from '../services/api';
 
 const control = 'mt-1 w-full rounded-xl border border-slate-300 bg-white p-3 text-sm focus:outline-orange-500 disabled:bg-slate-100';
+const EMPLOYEE_DRAFT_KEY = 'eris.employee-create-draft.v1';
 type Form = { fullName: string; email: string; hireDate: string; departmentId: string; positionId: string;
-  phone: string; dateOfBirth: string; gender: string; address: string; employmentType: string; currentSalary: string };
-const empty: Form = { fullName: '', email: '', hireDate: '', departmentId: '', positionId: '', phone: '', dateOfBirth: '', gender: '', address: '', employmentType: '', currentSalary: '' };
+  phone: string; dateOfBirth: string; gender: string; address: string; addressRefId: string; employmentType: string; currentSalary: string };
+const empty: Form = { fullName: '', email: '', hireDate: '', departmentId: '', positionId: '', phone: '', dateOfBirth: '', gender: '', address: '', addressRefId: '', employmentType: '', currentSalary: '' };
 const dateOnly = (value: string | null) => value?.slice(0, 10) || '';
 const toForm = (value: EmployeeProfile): Form => ({
   fullName: value.fullName, email: value.email, hireDate: dateOnly(value.hireDate),
   departmentId: String(value.departmentId), positionId: String(value.positionId), phone: value.phone || '',
   dateOfBirth: dateOnly(value.dateOfBirth), gender: value.gender || '', address: value.address || '',
-  employmentType: value.employmentType || '', currentSalary: value.currentSalary == null ? '' : String(value.currentSalary),
+  employmentType: value.employmentType || '', currentSalary: value.currentSalary == null ? '' : String(value.currentSalary), addressRefId: '',
 });
 
 export default function HrEmployees() {
@@ -27,6 +28,9 @@ export default function HrEmployees() {
   const [rows, setRows] = useState<EmployeeProfile[]>([]);
   const [detail, setDetail] = useState<EmployeeProfile | null>(null);
   const [form, setForm] = useState<Form>(empty);
+  const [addressSuggestions, setAddressSuggestions] = useState<PlaceSuggestion[]>([]);
+  const [showAddressSuggestions, setShowAddressSuggestions] = useState(false);
+  const [addressLoading, setAddressLoading] = useState(false);
   const [positionQuery, setPositionQuery] = useState<string | null>(null);
   const [positionFilterQuery, setPositionFilterQuery] = useState('');
   const [departments, setDepartments] = useState<Array<{ id: number; name: string }>>([]);
@@ -51,7 +55,15 @@ export default function HrEmployees() {
   useEffect(() => {
     const controller = new AbortController();
     setError(''); setLoading(true); setDetail(null);
-    if (creating) { setForm(empty); setPositionQuery(null); setLoading(false); return () => controller.abort(); }
+    if (creating) {
+      try {
+        const savedDraft = window.localStorage.getItem(EMPLOYEE_DRAFT_KEY);
+        setForm(savedDraft ? { ...empty, ...JSON.parse(savedDraft) } : empty);
+      } catch {
+        setForm(empty);
+      }
+      setPositionQuery(null); setLoading(false); return () => controller.abort();
+    }
     if (showingRecord) {
       if (!Number.isSafeInteger(employeeId) || employeeId < 1) { setError('Invalid employee ID.'); setLoading(false); return; }
       void getEmployeeProfile(employeeId, controller.signal).then(value => {
@@ -80,7 +92,9 @@ export default function HrEmployees() {
         fullName: form.fullName.trim(), email: form.email.trim(), hireDate: form.hireDate,
         departmentId: Number(form.departmentId), positionId: Number(form.positionId),
         phone: form.phone.trim() || null, dateOfBirth: form.dateOfBirth || null, gender: form.gender || null,
-        address: form.address.trim() || null, employmentType: form.employmentType.trim() || null,
+        address: form.address.trim() || null,
+        ...(form.addressRefId ? { addressRefId: form.addressRefId } : {}),
+        employmentType: form.employmentType.trim() || null,
         currentSalary: form.currentSalary === '' ? null : Number(form.currentSalary),
       };
       let saved: EmployeeProfile;
@@ -92,6 +106,7 @@ export default function HrEmployees() {
         if (!Object.keys(changes).length) { setMessage(text('Chưa có thay đổi để lưu.', 'No changes to save.')); return; }
         saved = await updateEmployeeProfile(detail.id, changes);
       } else saved = await createEmployeeProfile(input);
+      if (creating) window.localStorage.removeItem(EMPLOYEE_DRAFT_KEY);
       setMessage(saved.emailDelivery === 'FAILED'
         ? text('Đã lưu hồ sơ và tài khoản nhưng gửi email thất bại. Không tạo lại; liên hệ quản trị viên để cấp mật khẩu tạm an toàn.', 'Profile and account saved, but email delivery failed. Do not create again; contact your administrator.')
         : text(editing ? 'Đã cập nhật nhân viên.' : 'Đã tạo nhân viên và tài khoản đăng nhập. Mật khẩu tạm được gửi qua email.', editing ? 'Employee updated.' : 'Employee and login account created. The temporary password is sent by email.'));
@@ -124,6 +139,32 @@ export default function HrEmployees() {
     </select></label>;
   const active = (value: string) => value === 'ACTIVE' ? text('Đang hoạt động', 'Active') : value === 'INACTIVE' ? text('Ngừng hoạt động', 'Inactive') : value;
   const display = (label: string, value: unknown) => <div><dt className="text-sm text-slate-500">{label}</dt><dd className="mt-1 whitespace-pre-wrap break-words font-medium">{value == null || value === '' ? '—' : String(value)}</dd></div>;
+  useEffect(() => {
+    const query = form.address.trim();
+    if (form.addressRefId || query.length < 3 || (showingRecord && !editing)) {
+      setAddressSuggestions([]); setAddressLoading(false); return;
+    }
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => {
+      setAddressLoading(true);
+      void searchPlaces(query, controller.signal)
+        .then(result => { if (!controller.signal.aborted) { setAddressSuggestions(result.places); setShowAddressSuggestions(true); } })
+        .catch(() => { if (!controller.signal.aborted) setAddressSuggestions([]); })
+        .finally(() => { if (!controller.signal.aborted) setAddressLoading(false); });
+    }, 350);
+    return () => { window.clearTimeout(timer); controller.abort(); };
+  }, [form.address, form.addressRefId, showingRecord, editing]);
+  useEffect(() => {
+    if (!creating) return;
+    const timer = window.setTimeout(() => {
+      try {
+        const hasDraft = Object.values(form).some(value => value.trim().length > 0);
+        if (hasDraft) window.localStorage.setItem(EMPLOYEE_DRAFT_KEY, JSON.stringify(form));
+        else window.localStorage.removeItem(EMPLOYEE_DRAFT_KEY);
+      } catch { /* Storage may be unavailable in private browsing. */ }
+    }, 300);
+    return () => window.clearTimeout(timer);
+  }, [creating, form]);
   return <AppShell breadcrumb={['Workforce', 'Employees']}>
     <Card className="mb-5 p-6"><div className="flex flex-wrap items-center justify-between gap-3">
       <h1 className="text-2xl font-bold">{text(creating ? 'Thêm nhân viên' : editing ? 'Chỉnh sửa nhân viên' : showingRecord ? 'Chi tiết nhân viên' : 'Danh bạ nhân viên', creating ? 'Add employee' : editing ? 'Edit employee' : showingRecord ? 'Employee details' : 'Employee directory')}</h1>
@@ -135,11 +176,12 @@ export default function HrEmployees() {
     {error && <p role="alert" className="mb-5 rounded-xl bg-red-50 p-4 text-red-800">{error}<Button variant="secondary" onClick={() => setRevision(v => v + 1)}>{text('Thử lại', 'Retry')}</Button></p>}
     {loading ? <Card className="p-6"><p role="status">{text('Đang tải nhân viên...', 'Loading employees...')}</p></Card>
       : (creating || editing) && !error ? <Card className="p-6"><p className="mb-5 text-sm text-slate-500">{text('Mã nhân viên được hệ thống tự sinh. Các trường có * là bắt buộc.', 'Employee code is generated automatically. Fields marked * are required.')}</p>
+        <p className="mb-5 text-xs text-slate-500">{text('Thông tin đang nhập sẽ được lưu tạm trên trình duyệt để bạn không phải nhập lại khi tải lại trang.', 'Your progress is saved temporarily in this browser so you can continue after reloading the page.')}</p>
         <form onSubmit={save} className="grid gap-5 md:grid-cols-2">
           {field('fullName', text('Họ và tên *', 'Full name *'), 'text', true)}
           {field('email', 'Email *', 'email', true)}
           {field('hireDate', text('Ngày vào làm *', 'Hire date *'), 'date', true)}
-          {field('dateOfBirth', text('Ngày sinh', 'Date of birth'), 'date')}
+          {field('dateOfBirth', text('Ngày sinh *', 'Date of birth *'), 'date', creating)}
           {select(text('Phòng ban *', 'Department *'), form.departmentId, v => setForm(f => ({ ...f, departmentId: v })), departments, true)}
           <label className="text-sm font-medium text-slate-700">{text('Chức danh / Vị trí *', 'Position *')}<input className={control} list="employee-position-options" required disabled={pending}
             placeholder={text('Chọn hoặc nhập tên chức danh', 'Select or type a position')}
@@ -152,16 +194,23 @@ export default function HrEmployees() {
             }} />
             <datalist id="employee-position-options">{positions.map(item => <option key={item.id} value={item.name} />)}</datalist>
           </label>
-          {field('phone', text('Số điện thoại', 'Phone'), 'tel')}
-          <label className="text-sm font-medium text-slate-700">{text('Giới tính', 'Gender')}<select className={control} value={form.gender} disabled={pending} onChange={e => setForm(f => ({ ...f, gender: e.target.value }))}><option value="">{text('Chưa cung cấp', 'Not provided')}</option><option value="MALE">{text('Nam', 'Male')}</option><option value="FEMALE">{text('Nữ', 'Female')}</option><option value="OTHER">{text('Khác', 'Other')}</option></select></label>
-          <label className="text-sm font-medium text-slate-700">{text('Loại hợp đồng', 'Employment type')}<select aria-label={text('Loại hợp đồng', 'Employment type')} className={control} value={form.employmentType} disabled={pending} onChange={event => setForm(value => ({ ...value, employmentType: event.target.value }))}>
+          {field('phone', text('Số điện thoại *', 'Phone *'), 'tel', creating)}
+          <label className="text-sm font-medium text-slate-700">{text('Giới tính *', 'Gender *')}<select required={creating} className={control} value={form.gender} disabled={pending} onChange={e => setForm(f => ({ ...f, gender: e.target.value }))}><option value="">{text('Chọn giới tính', 'Select gender')}</option><option value="MALE">{text('Nam', 'Male')}</option><option value="FEMALE">{text('Nữ', 'Female')}</option><option value="OTHER">{text('Khác', 'Other')}</option></select></label>
+          <label className="text-sm font-medium text-slate-700">{text('Loại hợp đồng *', 'Employment type *')}<select aria-label={text('Loại hợp đồng *', 'Employment type *')} required={creating} className={control} value={form.employmentType} disabled={pending} onChange={event => setForm(value => ({ ...value, employmentType: event.target.value }))}>
             <option value="" disabled>{text('Chọn loại hợp đồng', 'Select employment type')}</option>
             <option value="FULL_TIME">FULL_TIME</option>
             <option value="PART_TIME">PART_TIME</option>
           </select></label>
-          {field('currentSalary', text('Lương hiện tại', 'Current salary'), 'number')}
-          <label className="flex min-w-0 flex-col items-start text-sm font-medium text-slate-700 md:col-span-2"><span>{text('Địa chỉ đầy đủ', 'Full address')}</span><textarea className={`${control} block min-h-20 max-w-full resize-none`} rows={3} value={form.address} disabled={pending} onChange={e => setForm(f => ({ ...f, address: e.target.value }))} />
-            <span className="mt-1 block text-xs text-slate-500">{text('Nhập số nhà, đường, phường/xã, quận/huyện và tỉnh/thành để hệ thống tính khoảng cách.', 'Include house number, street, ward, district and city to calculate distance.')}</span></label>
+          {field('currentSalary', text('Lương hiện tại *', 'Current salary *'), 'number', creating)}
+          <label className="relative flex min-w-0 flex-col items-start text-sm font-medium text-slate-700"><span>{text('Địa chỉ đầy đủ *', 'Full address *')}</span><textarea required={creating} className={`${control} block h-12 min-h-0 max-w-full resize-none`} rows={1} value={form.address} disabled={pending} onFocus={() => { if (addressSuggestions.length) setShowAddressSuggestions(true); }} onBlur={() => window.setTimeout(() => setShowAddressSuggestions(false), 150)} onChange={e => setForm(f => ({ ...f, address: e.target.value, addressRefId: '' }))} />
+            <span className="mt-1 block text-xs text-slate-500">{text('Nhập ít nhất 3 ký tự rồi chọn địa chỉ phù hợp trong danh sách gợi ý.', 'Type at least 3 characters and select a matching address from the suggestions.')}</span>
+            {showAddressSuggestions && (addressLoading || addressSuggestions.length > 0) && <div className="mt-2 max-h-64 w-full overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-lg">
+              {addressLoading && <p className="p-3 text-xs text-slate-500">{text('Đang tìm địa chỉ...', 'Searching addresses...')}</p>}
+              {!addressLoading && addressSuggestions.map(place => <button type="button" key={place.refId} className="block w-full border-b border-slate-100 px-4 py-3 text-left last:border-0 hover:bg-orange-50" onMouseDown={event => event.preventDefault()} onClick={() => { setForm(f => ({ ...f, address: place.resolvedAddress || place.display, addressRefId: place.refId })); setAddressSuggestions([]); setShowAddressSuggestions(false); }}>
+                <span className="block text-sm font-semibold text-slate-800">{place.name || place.display}</span><span className="mt-1 block text-xs text-slate-500">{place.resolvedAddress || place.address}</span>
+              </button>)}
+            </div>}
+          </label>
           <div className="flex gap-3 md:col-span-2"><Button disabled={pending || !!catalogError}>{text(pending ? 'Đang lưu...' : 'Lưu nhân viên', pending ? 'Saving...' : 'Save employee')}</Button><Button type="button" variant="secondary" onClick={() => navigate(showingRecord ? '/employees/' + id : '/employees')}>{text('Hủy', 'Cancel')}</Button></div>
         </form></Card>
       : showingRecord && detail ? <Card className="p-6"><div className="mb-5 flex flex-wrap gap-3">
