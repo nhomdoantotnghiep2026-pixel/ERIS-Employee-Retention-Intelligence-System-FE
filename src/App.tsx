@@ -19,6 +19,7 @@ import DataWorkspace from './screens/DataWorkspace';
 import RiskWorkspace from './screens/RiskWorkspace';
 import ErdSurveys from './screens/ErdSurveys';
 import ErdAccounts from './screens/ErdAccounts';
+import ErdDepartments from './screens/ErdDepartments';
 import ErdOwnProfile from './screens/ErdOwnProfile';
 import ErdSchema from './screens/ErdSchema';
 import ErdEmployeeDetails from './screens/ErdEmployeeDetails';
@@ -31,11 +32,14 @@ import ForgotPassword from './screens/ForgotPassword';
 // HR
 import Dashboard from './screens/Dashboard';
 import OrgChart from './screens/OrgChart';
+import Departments from './screens/Departments';
+import Positions from './screens/Positions';
 import Onboarding from './screens/Onboarding';
 import RetentionInterventions from './screens/RetentionInterventions';
 
 // Shared HR screens
 import Employees from './screens/Employees';
+import HrEmployees from './screens/HrEmployees';
 import RiskAnalysis from './screens/RiskAnalysis';
 import ReportDetail from './screens/ReportDetail';
 import EmployeeDataManagement from './screens/EmployeeDataManagement';
@@ -74,7 +78,14 @@ function RouteFallback() {
   return <Navigate to={isAuthenticated ? ROLE_HOME[user.role] : '/login'} replace />;
 }
 function EmployeeDetailRoute() {
-  return <ErdEmployeeDetails />;
+  const { user } = useRole();
+  return user.role === 'HR' ? <HrEmployees /> : <ErdEmployeeDetails />;
+}
+
+function EmployeeWorkspace({ mode }: { mode: 'list' | 'add' | 'edit' }) {
+  const { user } = useRole();
+  if (user.role === 'HR') return <HrEmployees />;
+  return mode === 'list' ? <Employees /> : mode === 'add' ? <EmployeeDataManagement mode="add" /> : <EmployeeRecord />;
 }
 
 export default function App() {
@@ -94,21 +105,24 @@ export default function App() {
           <Route path="/dashboard" element={<RoleGuard><Dashboard /></RoleGuard>} />
           <Route path="/org-overview" element={<RoleGuard><RiskWorkspace /></RoleGuard>} />
           <Route path="/org-chart" element={<RoleGuard><OrgChart /></RoleGuard>} />
+          <Route path="/departments" element={<RoleGuard><Departments /></RoleGuard>} />
+          <Route path="/positions" element={<RoleGuard><Positions /></RoleGuard>} />
           <Route path="/onboarding" element={<RoleGuard><Onboarding /></RoleGuard>} />
           <Route path="/workforce-risk" element={<RoleGuard><Navigate to="/org-overview" replace /></RoleGuard>} />
           <Route path="/attrition-risk" element={<RoleGuard><RiskWorkspace /></RoleGuard>} />
           <Route path="/interventions" element={<RoleGuard><RetentionInterventions /></RoleGuard>} />
           <Route path="/outcomes" element={<RoleGuard><EmployeeOutcomes /></RoleGuard>} />
           <Route path="/engagement" element={<RoleGuard><ErdSurveys /></RoleGuard>} />
+          <Route path="/departments" element={<RoleGuard><ErdDepartments /></RoleGuard>} />
           <Route path="/executive-reports" element={<RoleGuard><RiskWorkspace reports /></RoleGuard>} />
 
           {/* Shared HR */}
-          <Route path="/employees" element={<RoleGuard><Employees /></RoleGuard>} />
-          <Route path="/employees/new" element={<RoleGuard><EmployeeDataManagement mode="add" /></RoleGuard>} />
+          <Route path="/employees" element={<RoleGuard><EmployeeWorkspace mode="list" /></RoleGuard>} />
+          <Route path="/employees/new" element={<RoleGuard><EmployeeWorkspace mode="add" /></RoleGuard>} />
           <Route path="/employees/import" element={<RoleGuard><EmployeeImport /></RoleGuard>} />
           <Route path="/employees/bulk-update" element={<RoleGuard><EmployeeDataManagement mode="bulk" /></RoleGuard>} />
           <Route path="/employees/:id" element={<RoleGuard><EmployeeDetailRoute /></RoleGuard>} />
-          <Route path="/employees/:id/edit" element={<RoleGuard><EmployeeRecord /></RoleGuard>} />
+          <Route path="/employees/:id/edit" element={<RoleGuard><EmployeeWorkspace mode="edit" /></RoleGuard>} />
           <Route path="/employees/:id/risk" element={<RoleGuard><RiskAnalysis /></RoleGuard>} />
           <Route path="/employee-requests" element={<RoleGuard><EmployeeRequests /></RoleGuard>} />
           <Route path="/reports" element={<RoleGuard><RiskWorkspace reports /></RoleGuard>} />

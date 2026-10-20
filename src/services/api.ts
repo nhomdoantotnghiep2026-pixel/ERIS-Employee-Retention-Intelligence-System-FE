@@ -18,6 +18,27 @@ export interface ApiEmployee {
   employment_status?: string | null;
 }
 
+export interface ApiDepartment {
+  id: number;
+  code?: string | null;
+  name: string;
+  description?: string | null;
+  status?: string | null;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface ApiDepartmentListResponse {
+  data: ApiDepartment[];
+  pagination?: {
+    page: number;
+    limit: number;
+    total?: number;
+    hasMore?: boolean;
+    has_more?: boolean;
+  };
+}
+
 interface LoginResponse {
   accessToken?: string;
   user?: ApiUser;
@@ -48,6 +69,8 @@ export function getApiErrorMessage(error: unknown, fallback: string) {
     RATE_LIMITED: 'Bạn thao tác quá nhiều lần. Vui lòng chờ một lát rồi thử lại.',
     EMAIL_EXISTS: 'Email này đã tồn tại trong hệ thống.',
     USER_ALREADY_EXISTS: 'Tài khoản hoặc nhân viên này đã được liên kết.',
+    DEPARTMENT_EXISTS: 'Mã hoặc tên phòng ban đã tồn tại. Vui lòng kiểm tra lại.',
+    DEPARTMENT_NOT_FOUND: 'Không tìm thấy phòng ban. Danh sách có thể đã thay đổi.',
     FORBIDDEN: 'Bạn không có quyền thực hiện thao tác này.',
     EMAIL_NOT_CONFIGURED: 'Hệ thống email chưa được cấu hình. Vui lòng liên hệ quản trị viên.',
     EMAIL_DELIVERY_FAILED: 'Không gửi được email. Vui lòng kiểm tra địa chỉ email hoặc thử lại sau.',
@@ -134,14 +157,51 @@ export function resetPassword(email: string, otp: string, newPassword: string) {
   });
 }
 
-export function listUsers(search = '') {
-  const query = search ? `?page=1&limit=100&search=${encodeURIComponent(search)}` : '?page=1&limit=100';
-  return request<ApiUserListResponse>(`/users${query}`);
+export function listUsers(params: { page?: number; limit?: number; search?: string; roleId?: number; status?: string } = {}) {
+  const query = new URLSearchParams({
+    page: String(params.page ?? 1),
+    limit: String(params.limit ?? 10),
+  });
+  if (params.search?.trim()) query.set('search', params.search.trim());
+  if (params.roleId) query.set('roleId', String(params.roleId));
+  if (params.status) query.set('status', params.status);
+  return request<ApiUserListResponse>(`/users?${query.toString()}`);
 }
 
 export function listEmployees(search = '') {
   const query = search ? `?page=1&limit=100&q=${encodeURIComponent(search)}` : '?page=1&limit=100';
   return request<{ data: ApiEmployee[]; pagination: { page: number; limit: number; has_more: boolean } }>(`/v1/employees${query}`);
+}
+
+export function listDepartments(params: { page?: number; limit?: number; search?: string } = {}) {
+  const query = new URLSearchParams({
+    page: String(params.page ?? 1),
+    limit: String(params.limit ?? 10),
+  });
+  if (params.search?.trim()) query.set('q', params.search.trim());
+  return request<ApiDepartmentListResponse>(`/departments?${query.toString()}`);
+}
+
+export function getDepartmentById(id: number) {
+  return request<{ data: ApiDepartment }>(`/departments/${id}`);
+}
+
+export function createDepartment(input: { code?: string; name: string; description?: string }) {
+  return request<{ data: ApiDepartment }>('/departments', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
+export function updateDepartment(id: number, input: { code?: string; name?: string; description?: string | null }) {
+  return request<{ data: ApiDepartment }>(`/departments/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(input),
+  });
+}
+
+export function deleteDepartment(id: number) {
+  return request<void>(`/departments/${id}`, { method: 'DELETE' });
 }
 
 export function getUserById(id: number) {

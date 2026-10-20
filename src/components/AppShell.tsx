@@ -10,7 +10,7 @@ import {
   FileBarChart2, Workflow, Sliders, Table2, BrainCircuit,
   TrendingUp, History, ScrollText, Zap, ClipboardList,
   HeartPulse, Download, MonitorCheck, KeyRound, X, Leaf, ChevronLeft, Upload, RefreshCw,
-  CalendarClock, WalletCards, ClipboardCheck, DoorOpen
+  CalendarClock, WalletCards, ClipboardCheck, DoorOpen, Building2
 } from 'lucide-react';
 import { useRole, type UserRole } from '../context/RoleContext';
 import { useLanguage } from '../context/LanguageContext';
@@ -36,7 +36,10 @@ const NAV_BY_ROLE: Record<UserRole, NavGroup[]> = {
         { label: 'Import Employees', icon: Upload, to: '/employees/import' },
         { label: 'Bulk Update', icon: RefreshCw, to: '/employees/bulk-update' },
         { label: 'Workforce Snapshot', icon: Database, to: '/preparation' },
+        { label: 'Departments', icon: Network, to: '/departments' },
+        { label: 'Positions', icon: ClipboardList, to: '/positions' },
         { label: 'Employee Requests', icon: ClipboardList, to: '/employee-requests' },
+        { label: 'Departments', icon: Building2, to: '/departments' },
         { label: 'Org Chart', icon: Network, to: '/org-chart' },
         { label: 'Onboarding & Offboarding', icon: UserPlus, to: '/onboarding' },
       ],
