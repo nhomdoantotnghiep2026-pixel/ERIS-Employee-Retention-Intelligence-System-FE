@@ -144,3 +144,8 @@
 *.stl                filter=lfs diff=lfs merge=lfs -text
 *.nc                 filter=lfs diff=lfs merge=lfs -text
 *.mat                filter=lfs diff=lfs merge=lfs -text
+
+# Public website images must be available after clone/pull without Git LFS.
+# These small PNG assets are served directly by Vite and included in production builds.
+/public/product-previews/*.png -filter -diff -merge -text
+/public/login-slides/*.png -filter -diff -merge -text
