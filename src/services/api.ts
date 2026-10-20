@@ -18,25 +18,37 @@ export interface ApiEmployee {
   employment_status?: string | null;
 }
 
-export interface ApiDepartment {
-  id: number;
-  code?: string | null;
-  name: string;
-  description?: string | null;
-  status?: string | null;
-  created_at?: string;
-  updated_at?: string;
+export interface EmployeeProfile {
+  id: number; employeeCode: string; fullName: string; email: string;
+  phone: string | null; dateOfBirth: string | null; gender: string | null;
+  address: string | null; departmentId: number; positionId: number; hireDate: string;
+  employmentType: string | null; employmentStatus: string; currentSalary: string | number | null;
+  distanceFromHomeKm: number | null;
+  distanceCalculation: { status: string; reason?: string | null };
+  account?: { email: string; status: string }; emailDelivery?: string; warning?: string;
 }
-
-export interface ApiDepartmentListResponse {
-  data: ApiDepartment[];
-  pagination?: {
-    page: number;
-    limit: number;
-    total?: number;
-    hasMore?: boolean;
-    has_more?: boolean;
-  };
+export interface EmployeeInput {
+  fullName: string; email: string; hireDate: string; departmentId: number; positionId: number;
+  phone?: string | null; dateOfBirth?: string | null; gender?: string | null;
+  address?: string | null; employmentType?: string | null; currentSalary?: number | null;
+}
+export type EmployeeChanges = Partial<Omit<EmployeeInput, 'email' | 'hireDate' | 'dateOfBirth'>>;
+export function listEmployeeProfiles(options: { page?: number; limit?: number; search?: string; departmentId?: number; positionId?: number; employmentStatus?: string } = {}, signal?: AbortSignal) {
+  const query = new URLSearchParams({ page: String(options.page ?? 1), limit: String(options.limit ?? 20) });
+  for (const [key, value] of Object.entries(options)) if (value !== undefined && value !== '') query.set(key, String(value));
+  return request<{ data: EmployeeProfile[]; pagination: { page: number; limit: number; total: number; totalPages: number } }>(`/employees?${query}`, { signal });
+}
+export function getEmployeeProfile(id: number, signal?: AbortSignal) {
+  return request<EmployeeProfile>(`/employees/${id}`, { signal });
+}
+export async function createEmployeeProfile(input: EmployeeInput) {
+  return (await request<{ data: EmployeeProfile }>('/employees', { method: 'POST', body: JSON.stringify(input) })).data;
+}
+export async function updateEmployeeProfile(id: number, changes: EmployeeChanges) {
+  return (await request<{ data: EmployeeProfile }>(`/employees/${id}`, { method: 'PATCH', body: JSON.stringify(changes) })).data;
+}
+export function deactivateEmployeeProfile(id: number) {
+  return request<{ data: { id: number; employmentStatus: string } }>(`/employees/${id}`, { method: 'DELETE' });
 }
 
 interface LoginResponse {
@@ -131,6 +143,10 @@ export function changePassword(passwordChangeToken: string, currentPassword: str
   });
 }
 
+export function requestPasswordChangeOtp() {
+  return request<{ message: string }>('/auth/change-password/otp', { method: 'POST' });
+}
+
 export function getCurrentUser() {
   return request<ApiUser>('/auth/me');
 }
@@ -139,8 +155,20 @@ export function logout() {
   return request<{ message: string }>('/auth/logout', { method: 'POST' });
 }
 
-export function refreshSession() {
-  return request<{ accessToken: string }>('/auth/refresh', { method: 'POST' });
+export async function refreshSession() {
+  const result = await request<{ accessToken: string }>('/auth/refresh', { method: 'POST' });
+  sessionStorage.setItem('eris-access-token', result.accessToken);
+  return result;
+}
+
+export async function restoreSession() {
+  try {
+    return await getCurrentUser();
+  } catch (error) {
+    if (!(error instanceof ApiError) || error.status !== 401) throw error;
+    await refreshSession();
+    return getCurrentUser();
+  }
 }
 
 export function requestPasswordReset(email: string) {
@@ -208,11 +236,17 @@ export function getUserById(id: number) {
   return request<ApiUser>(`/users/${id}`);
 }
 
-export function createUser(input: { email: string; employeeId: number | null; roleId: number }) {
+export function createUser(input: { email: string; fullName: string; roleId: number }) {
   return request<ApiUser>('/auth/user_register', {
     method: 'POST',
     body: JSON.stringify(input),
   });
+}
+
+export interface ApiRole { id: number; name: string; description?: string | null }
+
+export function listRoles() {
+  return request<{ data: ApiRole[] }>('/roles');
 }
 
 export function updateUserStatus(id: number, status: string) {
@@ -221,4 +255,95 @@ export function updateUserStatus(id: number, status: string) {
 
 export function updateUserRole(id: number, roleId: number) {
   return request<ApiUser>(`/users/${id}/role`, { method: 'PATCH', body: JSON.stringify({ roleId }) });
+}
+
+export interface ApiDepartment {
+  id: number;
+  code?: string;
+  name: string;
+  description: string | null;
+  status?: 'ACTIVE' | 'INACTIVE';
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface ApiDepartmentListResponse {
+  data: ApiDepartment[];
+  pagination?: { page: number; limit: number; has_more: boolean };
+}
+
+export async function listDepartments(signal?: AbortSignal, options: { page?: number; limit?: number; search?: string } = {}) {
+  // The team BE returns the whole directory; it does not implement query paging.
+  const result = await request<{ data: ApiDepartment[] }>('/departments/listDepartments', { signal });
+  const page = options.page ?? 1;
+  const limit = options.limit ?? 100;
+  const search = options.search?.trim().toLocaleLowerCase() || '';
+  const filtered = result.data.filter(item => item.status !== 'INACTIVE'
+    && (!search || `${item.code || ''} ${item.name}`.toLocaleLowerCase().includes(search)));
+  const offset = (page - 1) * limit;
+  return { data: filtered.slice(offset, offset + limit), pagination: { page, limit, has_more: offset + limit < filtered.length } };
+}
+
+export async function createDepartment(input: Pick<ApiDepartment, 'name' | 'description'>) {
+  const result = await request<{ data: ApiDepartment }>('/departments/createDepartments', { method: 'POST', body: JSON.stringify(input) });
+  return result.data;
+}
+
+export async function updateDepartment(id: number, input: Pick<ApiDepartment, 'name' | 'description'>) {
+  const result = await request<{ data: ApiDepartment }>(`/departments/updateDepartments/${id}`, { method: 'PATCH', body: JSON.stringify(input) });
+  return result.data;
+}
+
+export async function deactivateDepartment(id: number) {
+  const result = await request<{ data: ApiDepartment }>(`/departments/deleteDepartments/${id}`, { method: 'DELETE' });
+  return result.data;
+}
+
+export async function getDepartmentById(id: number, signal?: AbortSignal) {
+  const result = await request<{ data: ApiDepartment }>(`/departments/${id}`, { signal });
+  return result.data;
+}
+
+export const POSITION_LEVELS = [
+  { value: 1, label: 'Entry' }, { value: 2, label: 'Junior' },
+  { value: 3, label: 'Intermediate' }, { value: 4, label: 'Senior' },
+  { value: 5, label: 'Expert / Leadership' },
+] as const;
+
+export interface ApiPosition {
+  id: number;
+  code: string;
+  name: string;
+  jobLevel: number;
+  description: string | null;
+  status: 'ACTIVE' | 'INACTIVE';
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export async function listPositions(signal?: AbortSignal, options: { page?: number; limit?: number; search?: string } = {}) {
+  const result = await request<{ data: ApiPosition[] }>('/positions', { signal });
+  const search = options.search?.trim().toLocaleLowerCase() || '';
+  const filtered = result.data.filter(item => item.status !== 'INACTIVE'
+    && (!search || `${item.code} ${item.name}`.toLocaleLowerCase().includes(search)));
+  const page = options.page ?? 1, limit = options.limit ?? 20, offset = (page - 1) * limit;
+  return { data: filtered.slice(offset, offset + limit), pagination: { page, limit, has_more: offset + limit < filtered.length } };
+}
+
+export async function getPositionById(id: number, signal?: AbortSignal) {
+  return (await request<{ data: ApiPosition }>(`/positions/${id}`, { signal })).data;
+}
+
+type PositionInput = Pick<ApiPosition, 'name' | 'jobLevel' | 'description'>;
+export async function createPosition(input: PositionInput) {
+  return (await request<{ data: ApiPosition }>('/positions', { method: 'POST', body: JSON.stringify(input) })).data;
+}
+
+export async function updatePosition(id: number, input: Partial<PositionInput>) {
+  return (await request<{ data: ApiPosition }>(`/positions/${id}`, { method: 'PATCH', body: JSON.stringify(input) })).data;
+}
+
+export async function deactivatePosition(id: number) {
+  // Team BE exposes DELETE /:id; the spreadsheet's /:id/status is not implemented upstream.
+  return (await request<{ data: ApiPosition }>(`/positions/${id}`, { method: 'DELETE' })).data;
 }
