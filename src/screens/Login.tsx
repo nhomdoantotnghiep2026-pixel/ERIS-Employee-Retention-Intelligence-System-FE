@@ -2,15 +2,13 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft,
-  ChevronDown,
   Eye,
   EyeOff,
   Leaf,
   LockKeyhole,
-  ShieldCheck,
   UserRound,
 } from 'lucide-react';
-import { useRole, ROLE_USERS, type UserRole } from '../context/RoleContext';
+import { useRole, type UserRole } from '../context/RoleContext';
 import { changePassword, getApiErrorMessage, getCurrentUser, login } from '../services/api';
 
 const ROLE_HOME: Record<UserRole, string> = {
@@ -18,13 +16,6 @@ const ROLE_HOME: Record<UserRole, string> = {
   'Data / AI Analyst': '/data-overview',
   'System Administrator': '/admin-overview',
   'Employee / ESS': '/employee-dashboard',
-};
-
-const roleColors: Record<UserRole, string> = {
-  HR: 'border-orange-200 bg-orange-50 text-orange-700',
-  'Data / AI Analyst': 'border-emerald-200 bg-emerald-50 text-emerald-700',
-  'System Administrator': 'border-violet-200 bg-violet-50 text-violet-700',
-  'Employee / ESS': 'border-blue-200 bg-blue-50 text-blue-700',
 };
 
 const LOGIN_SLIDES = [
@@ -47,8 +38,6 @@ const LOGIN_SLIDES = [
     description: 'Phát hiện rủi ro sớm và giữ chân nhân tài đúng thời điểm.',
   },
 ] as const;
-
-const SUGGESTED_ROLE_USERS = ROLE_USERS;
 
 function ErisMark({ compact = false }: { compact?: boolean }) {
   return (
@@ -73,8 +62,7 @@ export default function Login() {
   const [showPass, setShowPass] = useState(false);
   const [showNewPass, setShowNewPass] = useState(false);
   const [showConfirmPass, setShowConfirmPass] = useState(false);
-  const [selectedUserIdx, setSelectedUserIdx] = useState(0);
-  const [loginEmail, setLoginEmail] = useState(SUGGESTED_ROLE_USERS[0].email);
+  const [loginEmail, setLoginEmail] = useState('');
   const [password, setPassword] = useState('');
   const [passwordChangeToken, setPasswordChangeToken] = useState('');
   const [otp, setOtp] = useState('');
@@ -83,11 +71,6 @@ export default function Login() {
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [activeSlide, setActiveSlide] = useState(0);
-
-  const selectedUser = SUGGESTED_ROLE_USERS[selectedUserIdx] || SUGGESTED_ROLE_USERS[0];
-  const isSuggestedEmail = SUGGESTED_ROLE_USERS.some(
-    (roleUser) => roleUser.email.toLowerCase() === loginEmail.trim().toLowerCase(),
-  );
 
   useEffect(() => {
     if (isAuthenticated) navigate(ROLE_HOME[user.role], { replace: true });
@@ -127,11 +110,10 @@ export default function Login() {
       }
       const apiUser = await getCurrentUser();
       const nextUser = {
-        ...selectedUser,
-        name: apiUser.fullName || selectedUser.name,
+        name: apiUser.fullName || apiUser.email,
         email: apiUser.email,
         role: mapApiRole(apiUser.role, apiUser.roleId),
-        initials: (apiUser.fullName || selectedUser.name)
+        initials: (apiUser.fullName || apiUser.email)
           .split(/\s+/)
           .map((part) => part[0])
           .join('')
@@ -250,56 +232,12 @@ export default function Login() {
               <p className="mt-2 text-sm text-slate-500">Truy cập không gian làm việc phù hợp với vai trò của bạn</p>
             </div>
 
-            <div className="mb-5 flex items-start gap-3 rounded-[22px] bg-[#eef0f5] px-5 py-4 text-sm text-slate-600">
-              <ShieldCheck className="mt-0.5 shrink-0 text-[#ef7628]" size={19} />
-              <div>
-                <p className="font-semibold text-slate-700">Tài khoản trong hệ thống</p>
-                <p className="mt-1 leading-5">
-                  Chọn tài khoản đã được cấp và nhập mật khẩu tương ứng.
-                </p>
-              </div>
-            </div>
-
             <form onSubmit={handleSignIn} className="space-y-4" noValidate hidden={Boolean(passwordChangeToken)}>
               <div>
-                  <label htmlFor="demo-account" className="mb-1.5 flex items-center gap-2 text-[13px] font-medium text-slate-600">
+                <label htmlFor="login-email" className="mb-1.5 flex items-center gap-2 text-[13px] font-medium text-slate-600">
                   <UserRound size={15} />
-                  Tài khoản gợi ý
+                  Email
                 </label>
-                <div className="relative">
-                  <select
-                    id="demo-account"
-                    value={selectedUserIdx}
-                    onChange={(event) => {
-                      const nextIndex = Number(event.target.value);
-                      setSelectedUserIdx(nextIndex);
-                      setLoginEmail(SUGGESTED_ROLE_USERS[nextIndex].email);
-                      setError('');
-                    }}
-                    className="h-12 w-full appearance-none rounded-xl border border-slate-200 bg-white px-4 pr-11 text-sm font-medium text-slate-700 outline-none transition focus:border-[#f47b20] focus:ring-4 focus:ring-orange-100"
-                  >
-                    {SUGGESTED_ROLE_USERS.map((roleUser, index) => (
-                      <option key={roleUser.email} value={index}>
-                        {roleUser.name} — {roleUser.role}
-                        {roleUser.available === false ? ' (chưa có tài khoản backend)' : ''}
-                      </option>
-                    ))}
-                  </select>
-                  <ChevronDown
-                    aria-hidden="true"
-                    size={17}
-                    className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-slate-400"
-                  />
-                </div>
-                <div className="mt-2 flex flex-wrap items-center gap-2 px-1">
-                  <span className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold ${isSuggestedEmail ? roleColors[selectedUser.role] : 'border-slate-200 bg-slate-50 text-slate-500'}`}>
-                    {isSuggestedEmail ? selectedUser.role : 'Tài khoản tự nhập'}
-                  </span>
-                  <span className="text-xs text-slate-400">{loginEmail || 'Chưa nhập email'}</span>
-                </div>
-                <p className="mt-2 px-1 text-xs leading-5 text-slate-400">
-                  Chọn tài khoản gợi ý để điền email nhanh, hoặc tự nhập email khác. Mật khẩu luôn cần nhập riêng để bảo mật.
-                </p>
                 <input
                   id="login-email"
                   type="email"
@@ -308,9 +246,9 @@ export default function Login() {
                     setLoginEmail(event.target.value);
                     setError('');
                   }}
-                  placeholder="Hoặc tự nhập email tài khoản"
+                  placeholder="Nhập email tài khoản"
                   autoComplete="username"
-                  className="mt-3 h-11 w-full rounded-xl border border-slate-200 bg-white px-4 text-sm text-slate-700 outline-none transition focus:border-[#f47b20] focus:ring-4 focus:ring-orange-100"
+                  className="h-12 w-full rounded-xl border border-slate-200 bg-white px-4 text-sm text-slate-700 outline-none transition focus:border-[#f47b20] focus:ring-4 focus:ring-orange-100"
                 />
               </div>
 

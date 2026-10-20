@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
-import { refreshSession } from '../services/api';
+import { restoreSession } from '../services/api';
 
 export type UserRole = 'HR' | 'Data / AI Analyst' | 'System Administrator' | 'Employee / ESS';
 
@@ -41,15 +41,16 @@ export function RoleProvider({ children }: { children: ReactNode }) {
   const [user, setUserState] = useState<RoleUser>(storedUser || ROLE_USERS[0]);
   const [isAuthenticated, setIsAuthenticated] = useState(Boolean(storedUser));
   useEffect(() => {
-    if (!storedUser || !sessionStorage.getItem('eris-access-token')) return;
-    void refreshSession()
-      .then(result => sessionStorage.setItem('eris-access-token', result.accessToken))
-      .catch(() => {
-        sessionStorage.removeItem('eris-user');
-        sessionStorage.removeItem('eris-access-token');
-        setIsAuthenticated(false);
-      });
-  }, [storedUser]);
+    if (!storedUser) return;
+    let active = true;
+    void restoreSession().catch(() => {
+      if (!active) return;
+      sessionStorage.removeItem('eris-user');
+      sessionStorage.removeItem('eris-access-token');
+      setIsAuthenticated(false);
+    });
+    return () => { active = false; };
+  }, []);
   const setUser = (next: RoleUser) => {
     sessionStorage.setItem('eris-user', JSON.stringify(next));
     setUserState(next);

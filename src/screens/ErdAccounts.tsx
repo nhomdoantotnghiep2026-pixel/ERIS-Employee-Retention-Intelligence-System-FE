@@ -1,18 +1,17 @@
 import { useEffect, useState } from 'react';
 import { AppShell } from '../components/AppShell';
 import { Button, Card, SectionHeader } from '../components/ui';
-import { createUser, getApiErrorMessage, getUserById, listEmployees, listUsers, updateUserRole, updateUserStatus, type ApiEmployee, type ApiUser } from '../services/api';
+import { createUser, getApiErrorMessage, getUserById, listUsers, updateUserRole, updateUserStatus, type ApiUser } from '../services/api';
 
 const ROLE_OPTIONS = [{ id: 2, name: 'HR' }, { id: 3, name: 'EMPLOYEE' }];
 const control = 'mt-2 w-full rounded-xl border border-slate-300 bg-white p-3 text-sm';
 
 export default function ErdAccounts() {
   const [users, setUsers] = useState<ApiUser[]>([]);
-  const [employees, setEmployees] = useState<ApiEmployee[]>([]);
   const [query, setQuery] = useState('');
+  const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [roleId, setRoleId] = useState(2);
-  const [employeeId, setEmployeeId] = useState<number | null>(null);
   const [editing, setEditing] = useState<ApiUser | null>(null);
   const [details, setDetails] = useState<ApiUser | null>(null);
   const [editRoleId, setEditRoleId] = useState(2);
@@ -28,17 +27,12 @@ export default function ErdAccounts() {
     finally { setLoading(false); }
   }
 
-  async function refreshEmployees() {
-    try { const result = await listEmployees(); setEmployees(result.data); }
-    catch (cause) { setError(getApiErrorMessage(cause, 'Không tải được danh sách nhân viên để liên kết.')); }
-  }
-
-  useEffect(() => { void Promise.all([refreshUsers(), refreshEmployees()]); }, []);
+  useEffect(() => { void refreshUsers(); }, []);
 
   async function handleCreate(event: React.FormEvent) {
     event.preventDefault(); setError(''); setMessage('');
-    if (roleId === 3 && !employeeId) { setError('Vui lòng chọn nhân viên liên kết khi tạo tài khoản Employee.'); return; }
-    try { await createUser({ email: email.trim(), employeeId: roleId === 3 ? employeeId : null, roleId }); setEmail(''); setEmployeeId(null); setMessage('Đã tạo tài khoản.'); await refreshUsers(); }
+    if (!fullName.trim()) { setError('Vui lòng nhập họ tên.'); return; }
+    try { await createUser({ email: email.trim(), fullName: fullName.trim(), roleId }); setFullName(''); setEmail(''); setMessage('Đã tạo tài khoản.'); await refreshUsers(); }
     catch (cause) { setError(getApiErrorMessage(cause, 'Tạo tài khoản thất bại. Vui lòng kiểm tra thông tin và thử lại.')); }
   }
 
@@ -52,10 +46,6 @@ export default function ErdAccounts() {
 
   async function handleEdit(event: React.FormEvent) {
     event.preventDefault(); if (!editing) return; setError(''); setMessage('');
-    if (editRoleId === 3 && editRoleId !== editing.roleId && !editing.employeeId) {
-      setError('Không thể đổi sang EMPLOYEE vì tài khoản chưa có nhân viên liên kết. Hãy tạo tài khoản Employee mới và chọn nhân viên liên kết.');
-      return;
-    }
     try { if (editRoleId !== editing.roleId) await updateUserRole(editing.id, editRoleId); if (editStatus !== editing.status) await updateUserStatus(editing.id, editStatus); setEditing(null); setMessage('Đã cập nhật tài khoản.'); await refreshUsers(); }
     catch (cause) { setError(getApiErrorMessage(cause, 'Cập nhật tài khoản thất bại. Vui lòng thử lại.')); }
   }
@@ -75,7 +65,7 @@ export default function ErdAccounts() {
       {!loading && <div className="mt-4 overflow-x-auto"><table className="w-full text-left text-sm"><thead><tr className="border-b text-slate-500"><th className="p-3">Email</th><th className="p-3">Role</th><th className="p-3">Trạng thái</th><th className="p-3">Thao tác</th></tr></thead><tbody>{filteredUsers.map(user => <tr key={user.id} className="border-b border-slate-100"><td className="p-3">{user.email}</td><td className="p-3">{typeof user.role === 'string' ? user.role : user.role?.name || `Role #${user.roleId ?? '—'}`}</td><td className="p-3">{user.status}</td><td className="flex flex-wrap gap-2 p-3"><Button size="sm" variant="secondary" onClick={() => void viewDetails(user)}>Xem chi tiết</Button><Button size="sm" variant="secondary" onClick={() => openEdit(user)}>Chỉnh sửa</Button><Button size="sm" variant="secondary" onClick={() => void deactivate(user)}>Khóa</Button></td></tr>)}</tbody></table>{!filteredUsers.length && <p className="py-5 text-sm text-slate-500">Không tìm thấy tài khoản.</p>}</div>}
     </Card>
     {details && <Card className="mb-5 border border-orange-100 p-6"><div className="flex items-start justify-between gap-4"><div><h2 className="font-bold text-slate-900">Chi tiết tài khoản</h2><p className="mt-1 text-sm text-slate-500">Dữ liệu lấy từ API UM-02</p></div><Button size="sm" variant="secondary" onClick={() => setDetails(null)}>Đóng</Button></div><dl className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-4"><div><dt className="text-xs text-slate-500">ID</dt><dd className="mt-1 font-semibold text-slate-800">{details.id}</dd></div><div><dt className="text-xs text-slate-500">Email</dt><dd className="mt-1 break-all font-semibold text-slate-800">{details.email}</dd></div><div><dt className="text-xs text-slate-500">Role</dt><dd className="mt-1 font-semibold text-slate-800">{typeof details.role === 'string' ? details.role : details.role?.name || `Role #${details.roleId ?? '—'}`}</dd></div><div><dt className="text-xs text-slate-500">Trạng thái</dt><dd className="mt-1 font-semibold text-slate-800">{details.status}</dd></div></dl></Card>}
-    <Card className="mb-5 p-6"><h2 className="font-bold text-slate-900">Thêm tài khoản</h2><form onSubmit={handleCreate} className="mt-4 grid gap-4 sm:grid-cols-4"><label className="text-sm text-slate-600">Email<input required type="email" className={control} value={email} onChange={event => setEmail(event.target.value)} /></label><label className="text-sm text-slate-600">Vai trò<select className={control} value={roleId} onChange={event => { const nextRoleId = Number(event.target.value); setRoleId(nextRoleId); if (nextRoleId !== 3) setEmployeeId(null); }}>{ROLE_OPTIONS.map(role => <option key={role.id} value={role.id}>{role.name}</option>)}</select></label>{roleId === 3 && <label className="text-sm text-slate-600">Nhân viên liên kết<select required className={control} value={employeeId ?? ''} onChange={event => setEmployeeId(event.target.value ? Number(event.target.value) : null)}><option value="">Chọn nhân viên</option>{employees.map(employee => <option key={employee.id} value={employee.id}>{employee.employee_code || `#${employee.id}`} — {employee.full_name || employee.email || 'Chưa có tên'}</option>)}</select></label>}<div className="flex items-end"><Button type="submit">Thêm tài khoản</Button></div></form><p className="mt-3 text-xs text-slate-500">Tài khoản mới bắt đầu ở trạng thái IN_PROCESS và nhận mật khẩu tạm qua email. Role Employee bắt buộc liên kết một nhân viên.</p></Card>
-    {editing && <Card className="p-6"><h2 className="font-bold text-slate-900">Chỉnh sửa: {editing.email}</h2><form onSubmit={handleEdit} className="mt-4 grid gap-4 sm:grid-cols-3"><label className="text-sm text-slate-600">Vai trò<select className={control} value={editRoleId} onChange={event => setEditRoleId(Number(event.target.value))}>{ROLE_OPTIONS.map(role => <option key={role.id} value={role.id} disabled={role.id === 3 && editing.roleId !== 3 && !editing.employeeId}>{role.name}{role.id === 3 && editing.roleId !== 3 && !editing.employeeId ? ' — cần nhân viên liên kết' : ''}</option>)}</select><span className="mt-1 block text-xs text-slate-500">Tài khoản Employee phải có employeeId. Muốn gán nhân viên, hãy tạo tài khoản Employee mới ở biểu mẫu phía trên.</span></label><label className="text-sm text-slate-600">Trạng thái<select className={control} value={editStatus} onChange={event => setEditStatus(event.target.value)}><option value={editing.status}>{editing.status}</option>{editing.status !== 'INACTIVE' && <option value="INACTIVE">INACTIVE — Khóa tài khoản</option>}</select><span className="mt-1 block text-xs text-slate-500">Theo API UM-04, chỉ hỗ trợ khóa tài khoản sang INACTIVE; không hỗ trợ unlock.</span></label><div className="flex items-end gap-2"><Button type="submit">Lưu</Button><Button type="button" variant="secondary" onClick={() => setEditing(null)}>Hủy</Button></div></form></Card>}
+    <Card className="mb-5 p-6"><h2 className="font-bold text-slate-900">Thêm tài khoản</h2><form onSubmit={handleCreate} className="mt-4 grid gap-4 sm:grid-cols-4"><label className="text-sm text-slate-600">Họ tên<input required type="text" className={control} value={fullName} onChange={event => setFullName(event.target.value)} /></label><label className="text-sm text-slate-600">Email<input required type="email" className={control} value={email} onChange={event => setEmail(event.target.value)} /></label><label className="text-sm text-slate-600">Vai trò<select className={control} value={roleId} onChange={event => setRoleId(Number(event.target.value))}>{ROLE_OPTIONS.map(role => <option key={role.id} value={role.id}>{role.name}</option>)}</select></label><div className="flex items-end"><Button type="submit">Thêm tài khoản</Button></div></form><p className="mt-3 text-xs text-slate-500">Tài khoản mới bắt đầu ở trạng thái IN_PROCESS và nhận mật khẩu tạm qua email.</p></Card>
+    {editing && <Card className="p-6"><h2 className="font-bold text-slate-900">Chỉnh sửa: {editing.email}</h2><form onSubmit={handleEdit} className="mt-4 grid gap-4 sm:grid-cols-3"><label className="text-sm text-slate-600">Vai trò<select className={control} value={editRoleId} onChange={event => setEditRoleId(Number(event.target.value))}>{ROLE_OPTIONS.map(role => <option key={role.id} value={role.id}>{role.name}</option>)}</select></label><label className="text-sm text-slate-600">Trạng thái<select className={control} value={editStatus} onChange={event => setEditStatus(event.target.value)}><option value={editing.status}>{editing.status}</option>{editing.status !== 'INACTIVE' && <option value="INACTIVE">INACTIVE — Khóa tài khoản</option>}</select><span className="mt-1 block text-xs text-slate-500">Theo API UM-04, chỉ hỗ trợ khóa tài khoản sang INACTIVE; không hỗ trợ unlock.</span></label><div className="flex items-end gap-2"><Button type="submit">Lưu</Button><Button type="button" variant="secondary" onClick={() => setEditing(null)}>Hủy</Button></div></form></Card>}
   </AppShell>;
 }
