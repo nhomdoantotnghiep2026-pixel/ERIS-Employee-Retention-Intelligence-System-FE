@@ -18,7 +18,12 @@ test('all routed feature pages use VI/EN consistently and preserve navigation an
  const server = await createServer({ root: process.cwd(), configFile: false, appType: 'custom', server: { middlewareMode: true, ws: false }, esbuild: { jsx: 'automatic' } });
  try {
   const { LanguageProvider, useLanguage } = await server.ssrLoadModule('/src/context/LanguageContext.tsx');
-  const { RoleProvider, ROLE_USERS } = await server.ssrLoadModule('/src/context/RoleContext.tsx');
+  const { RoleProvider, ROLE_USERS: actors } = await server.ssrLoadModule('/src/context/RoleContext.tsx');
+  const ROLE_USERS = ['HR', 'Data / AI Analyst', 'System Administrator', 'Employee / ESS'].map(role => {
+    const actor = actors.find((item: { role: string }) => item.role === role);
+    assert.ok(actor, 'Missing actor: ' + role);
+    return actor;
+  });
   const { EmployeeProvider } = await server.ssrLoadModule('/src/context/EmployeeContext.tsx');
   const { WorkflowProvider } = await server.ssrLoadModule('/src/context/WorkflowContext.tsx');
   const { readDatabase } = await server.ssrLoadModule('/src/erd/database.ts');
@@ -27,6 +32,7 @@ test('all routed feature pages use VI/EN consistently and preserve navigation an
   const reportId = loadReports()[0].id;
   type Page = [number, string, string, Record<string, unknown>?];
   const pages: Page[] = [
+   [0,'/departments','Departments'],[0,'/positions','Positions'],[0,'/employees','HrEmployees'],[0,'/employees/new','HrEmployees'],
    [0,'/org-overview','RiskWorkspace'],[0,'/attrition-risk','RiskWorkspace'],[0,'/executive-reports','RiskWorkspace',{reports:true}],
    [0,'/employees','Employees'],[0,'/employees/new','EmployeeDataManagement',{mode:'add'}],[0,'/employees/bulk-update','EmployeeDataManagement',{mode:'bulk'}],[0,'/employees/import','EmployeeImport'],
    [0,'/employees/'+employeeId,'ErdEmployeeDetails'],[0,'/employees/'+employeeId+'/edit','EmployeeRecord'],[0,'/employees/'+employeeId+'/risk','RiskAnalysis'],
@@ -49,8 +55,8 @@ test('all routed feature pages use VI/EN consistently and preserve navigation an
    };
    const english=render('en'),vietnamese=render('vi'),en=chunks(english),vi=chunks(vietnamese);
    if(name === 'RiskWorkspace') { assert.ok(en.has('Employee')); assert.ok(en.has('Department')); assert.ok(!en.has('employee_id')); }
-   const leftVi=[...vi].filter(text=>/[a-zA-Z]/.test(text)&&!identity(text)&&(en.has(text)||(!/[\u00c0-\u00d6\u00d8-\u00f6\u00f8-\u024f\u1ea0-\u1ef9]/.test(text)&&/[a-zA-Z]{3}/.test(text)&&translators.en(text)===text)));
-   const leftEn=[...en].filter(text=>/[\u00c0-\u00d6\u00d8-\u00f6\u00f8-\u024f\u1ea0-\u1ef9]/.test(text));
+   const leftVi=[...vi].filter(text=>!ROLE_USERS.some(actor=>actor.name===text||actor.initials===text)&&/[a-zA-Z]/.test(text)&&!identity(text)&&(en.has(text)||(!/[\u00c0-\u00d6\u00d8-\u00f6\u00f8-\u024f\u1ea0-\u1ef9]/.test(text)&&/[a-zA-Z]{3}/.test(text)&&translators.en(text)===text)));
+   const leftEn=[...en].filter(text=>!ROLE_USERS.some(actor=>actor.name===text)&&/[\u00c0-\u00d6\u00d8-\u00f6\u00f8-\u024f\u1ea0-\u1ef9]/.test(text));
    if(leftVi.length||leftEn.length)missing[scenario+ROLE_USERS[role].role+' '+path]={vi:leftVi,en:leftEn};
    assert.deepEqual([...english.matchAll(/href="([^"]+)"/g)].map(match=>match[1]),[...vietnamese.matchAll(/href="([^"]+)"/g)].map(match=>match[1]),path+': destination changed');
    assert.deepEqual([...english.matchAll(/<option[^>]*value="([^"]*)"/g)].map(match=>match[1]),[...vietnamese.matchAll(/<option[^>]*value="([^"]*)"/g)].map(match=>match[1]),path+': submitted option changed');

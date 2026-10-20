@@ -1,5 +1,6 @@
 // Display copy only. Stored identifiers, enum values and user-entered content are unchanged.
 export const featureVietnamese: Record<string, string> = {
+  'In process': 'Đang chờ kích hoạt',
   "· Buddy": "· Người hướng dẫn",
   "· run": "· lần chạy",
   "· snapshot": "· bản dữ liệu theo kỳ",
@@ -829,6 +830,30 @@ export const featureVietnamese: Record<string, string> = {
 };
 
 export const featureEnglish: Record<string, string> = {
+  'Tìm theo email...': 'Search by email...',
+  'Khóa': 'Lock',
+  'Đóng': 'Close',
+  "Quản lý tài khoản thật từ Backend. Không lưu mật khẩu trong frontend.": "Manage backend accounts. Passwords are not stored in the frontend.",
+  "Tài khoản trong Backend": "Backend accounts",
+  "GET /api/users · dữ liệu PostgreSQL": "GET /api/users · PostgreSQL data",
+  "Đang tải...": "Loading...",
+  "Tài khoản mới bắt đầu ở trạng thái IN_PROCESS và nhận mật khẩu tạm qua email.": "New accounts start as IN_PROCESS and receive a temporary password by email.",
+  "Không tải được danh sách tài khoản. Vui lòng thử tải lại.": "Could not load accounts. Please retry.",
+  "Vui lòng nhập họ tên.": "Enter a full name.",
+  "Đã tạo tài khoản.": "Account created.",
+  "Tạo tài khoản thất bại. Vui lòng kiểm tra thông tin và thử lại.": "Could not create the account. Check your details and try again.",
+  "Không tải được chi tiết tài khoản. Vui lòng thử lại.": "Could not load account details. Please retry.",
+  "Đã cập nhật tài khoản.": "Account updated.",
+  "Cập nhật tài khoản thất bại. Vui lòng thử lại.": "Could not update the account. Please retry.",
+  "Khóa tài khoản {email}?": "Lock account {email}?",
+  "Đã khóa tài khoản.": "Account locked.",
+  "Không thể khóa tài khoản. Vui lòng thử lại.": "Could not lock the account. Please retry.",
+  "Không tìm thấy tài khoản.": "No accounts found.",
+  "Chi tiết tài khoản": "Account details",
+  "Dữ liệu lấy từ API UM-02": "Data from API UM-02",
+  "Chỉnh sửa:": "Edit:",
+  "INACTIVE — Khóa tài khoản": "INACTIVE — Lock account",
+  "Theo API UM-04, chỉ hỗ trợ khóa tài khoản sang INACTIVE; không hỗ trợ unlock.": "API UM-04 only supports locking accounts as INACTIVE; unlocking is unavailable.",
   "· Dữ liệu đã thay đổi": "· Source data changed",
   "1. Chọn file CSV / Excel": "1. Choose a CSV / Excel file",
   "1. Snapshot đầu vào": "1. Input snapshot",

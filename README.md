@@ -1,6 +1,6 @@
 # ERIS Frontend
 
-Frontend độc lập cho ERIS, tách từ bản làm việc hiện tại. Repo này chứa giao diện React, dữ liệu demo và kiểm tra frontend cho bốn role: HR, Data / AI Analyst, System Administrator, Employee / ESS.
+Frontend độc lập cho ERIS, gồm giao diện React, client API, dữ liệu demo cho các luồng chưa tích hợp và kiểm tra cho bốn role: HR, Data / AI Analyst, System Administrator, Employee / ESS.
 
 ## Chạy trên máy
 
@@ -8,10 +8,12 @@ Cài Node.js 24 trở lên. Mở terminal ngay tại thư mục repo (ví dụ D
 
 ```powershell
 npm ci
+Copy-Item .env.example .env.local
 npm run dev
 ```
 
 Mở địa chỉ Local mà Vite hiển thị. Cổng mặc định là 5173; nếu đang bận, Vite dùng cổng khác.
+Xem [README-LOCAL.md](README-LOCAL.md) để cấu hình proxy API, cổng FE/BE và Origin. Nếu đã có `.env.local`, không ghi đè file cấu hình hiện tại.
 
 ## Kiểm tra
 
@@ -25,10 +27,10 @@ Tests bao gồm phân quyền theo role, nhập CSV/XLSX, dữ liệu demo theo 
 
 ## Phạm vi frontend
 
-- Dữ liệu hiện tại là demo trong trình duyệt; đổi role trong cùng tab giữ dữ liệu của phiên.
+- Đăng nhập sử dụng tài khoản do backend cấp. HR có các luồng nhân viên, phòng ban và chức danh gọi API; một số dashboard/luồng phân tích vẫn dùng dữ liệu demo trong trình duyệt.
 - Mô hình và kết quả AI là minh họa, chưa phải dịch vụ suy luận thật.
 - Các kiểu dữ liệu/quan hệ ERD trong src/erd phục vụ giao diện và kiểm tra dữ liệu demo; không tạo database PostgreSQL.
-- src/lib/supabase.ts và src/services là mã client dành cho tích hợp sau. Không có thông tin đăng nhập hoặc cấu hình dự án Supabase được chuyển sang.
+- src/services chứa client gọi API backend. src/lib/supabase.ts phục vụ tích hợp riêng; không chứa thông tin đăng nhập backend hay database.
 - Repo FE không chứa backend server, SQL hoặc migration. Bài kiểm tra schema PostgreSQL và công cụ sinh SQL được giữ ở dự án cũ, không thuộc bộ kiểm tra frontend này.
 - Không đưa node_modules, dist, .env hay thư mục .git của dự án cũ vào repo.
 

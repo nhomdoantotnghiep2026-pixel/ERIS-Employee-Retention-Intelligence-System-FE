@@ -1,13 +1,15 @@
-import { defineConfig, type HtmlTagDescriptor, type Plugin } from 'vite'
+import { defineConfig, loadEnv, type HtmlTagDescriptor, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import path from 'node:path'
+import { devProxyOrigin } from './src/utils/devProxyOrigin.ts'
 
 import siteConfiguration from './.figma/make/site.json'
 
 
 // Vite config — https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
+  const env = loadEnv(mode, process.cwd(), 'VITE_')
   // .figma/make/deploy-preview passes `--mode development` for cached-preview builds.
   const emitSourcemaps = mode === 'development'
 
@@ -36,8 +38,15 @@ react(),
       strictPort: process.env.STRICT_PORT === 'true',
       proxy: {
         '/api': {
-          target: process.env.VITE_BACKEND_URL || 'http://localhost:3000',
+          target: process.env.VITE_BACKEND_URL || env.VITE_BACKEND_URL || 'http://localhost:3000',
           changeOrigin: true,
+          configure(proxy) {
+            proxy.on('proxyReq', (proxyRequest, request) => {
+              const origin = devProxyOrigin(request.headers.origin, request.headers.host,
+                process.env.VITE_BACKEND_ALLOWED_ORIGIN || env.VITE_BACKEND_ALLOWED_ORIGIN)
+              if (origin) proxyRequest.setHeader('Origin', origin)
+            })
+          },
         },
       },
       watch: {

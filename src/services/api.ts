@@ -79,6 +79,7 @@ export function getApiErrorMessage(error: unknown, fallback: string) {
     INVALID_TOKEN: 'Phiên xác thực không hợp lệ hoặc đã hết hạn. Vui lòng thực hiện lại.',
     INVALID_OTP: 'Mã OTP không đúng hoặc đã hết hạn. Vui lòng kiểm tra email và nhập mã mới.',
     RATE_LIMITED: 'Bạn thao tác quá nhiều lần. Vui lòng chờ một lát rồi thử lại.',
+    NETWORK_ERROR: 'Không kết nối được máy chủ. Vui lòng kiểm tra backend và thử lại.',
     EMAIL_EXISTS: 'Email này đã tồn tại trong hệ thống.',
     USER_ALREADY_EXISTS: 'Tài khoản hoặc nhân viên này đã được liên kết.',
     FORBIDDEN: 'Bạn không có quyền thực hiện thao tác này.',
@@ -105,11 +106,17 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   headers.set('Content-Type', 'application/json');
   if (token) headers.set('Authorization', `Bearer ${token}`);
 
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    ...init,
-    headers,
-    credentials: 'include',
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${API_BASE_URL}${path}`, {
+      ...init,
+      headers,
+      credentials: 'include',
+    });
+  } catch (error) {
+    if (init?.signal?.aborted) throw error;
+    throw new ApiError('Không kết nối được máy chủ. Vui lòng kiểm tra backend và thử lại.', 0, 'NETWORK_ERROR');
+  }
 
   const body = await response.json().catch(() => null) as { message?: string; code?: string; error?: { code?: string; message?: string } } | null;
   if (!response.ok) {
