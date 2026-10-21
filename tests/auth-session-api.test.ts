@@ -2,6 +2,31 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer } from 'vite';
 
+test('network failures have an actionable message and cancelled requests stay cancelled', async () => {
+  const server = await createServer({ configFile: false, server: { middlewareMode: true, ws: false } });
+  const originalFetch = globalThis.fetch;
+  const originalStorage = Object.getOwnPropertyDescriptor(globalThis, 'sessionStorage');
+  Object.defineProperty(globalThis, 'sessionStorage', { configurable: true, value: { getItem: () => null } });
+  try {
+    const api = await server.ssrLoadModule('/src/services/api.ts');
+    globalThis.fetch = async () => { throw new TypeError('Failed to fetch'); };
+    await assert.rejects(api.getCurrentUser(), error => {
+      assert.equal(error.code, 'NETWORK_ERROR');
+      assert.match(api.getApiErrorMessage(error, ''), /backend/);
+      return true;
+    });
+    const controller = new AbortController(); controller.abort();
+    const cancelled = new DOMException('Cancelled', 'AbortError');
+    globalThis.fetch = async () => { throw cancelled; };
+    await assert.rejects(api.getEmployeeProfile(1, controller.signal), error => error === cancelled);
+  } finally {
+    globalThis.fetch = originalFetch;
+    if (originalStorage) Object.defineProperty(globalThis, 'sessionStorage', originalStorage);
+    else Reflect.deleteProperty(globalThis, 'sessionStorage');
+    await server.close();
+  }
+});
+
 test('refresh sends cookies and stores the replacement access token', async () => {
   const server = await createServer({ configFile: false, server: { middlewareMode: true, ws: false } });
   const originalFetch = globalThis.fetch;

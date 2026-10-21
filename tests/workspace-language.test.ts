@@ -19,7 +19,12 @@ test('four role dashboards, sidebars and guides render in one language while pre
   const server = await createServer({ root: process.cwd(), configFile: false, appType: 'custom', server: { middlewareMode: true, ws: false }, esbuild: { jsx: 'automatic' } });
   try {
     const { LanguageProvider, useLanguage } = await server.ssrLoadModule('/src/context/LanguageContext.tsx');
-    const { RoleProvider, ROLE_USERS } = await server.ssrLoadModule('/src/context/RoleContext.tsx');
+    const { RoleProvider, ROLE_USERS: actors } = await server.ssrLoadModule('/src/context/RoleContext.tsx');
+    const ROLE_USERS = ['HR', 'Data / AI Analyst', 'System Administrator', 'Employee / ESS'].map(role => {
+      const actor = actors.find((item: { role: string }) => item.role === role);
+      assert.ok(actor, 'Missing actor: ' + role);
+      return actor;
+    });
     const { EmployeeProvider } = await server.ssrLoadModule('/src/context/EmployeeContext.tsx');
     const { WorkflowProvider } = await server.ssrLoadModule('/src/context/WorkflowContext.tsx');
     const { readDatabase, transactDatabase, makeRow } = await server.ssrLoadModule('/src/erd/database.ts');
@@ -46,15 +51,15 @@ test('four role dashboards, sidebars and guides render in one language while pre
       const english = render(actor, 'en', paths[index], screen);
       const vietnamese = render(actor, 'vi', paths[index], screen);
       const enText = chunks(english), viText = chunks(vietnamese);
-      const leftInVietnamese = [...enText].filter(text => /[a-zA-Z]/.test(text) && !identities.has(text) && !/^[vV]?[0-9.,%$\s:/→–-]+$/.test(text) && viText.has(text));
+      const leftInVietnamese = [...enText].filter(text => /[a-zA-Z]/.test(text) && !text.includes('@') && !identities.has(text) && !/^[vV]?[0-9.,%$\s:/→–-]+$/.test(text) && viText.has(text));
       if (leftInVietnamese.length) leftovers[actor.role] = leftInVietnamese;
-      assert.ok(!/[À-ỹ]/.test([...enText].join(' ')), actor.role + ': Vietnamese remains in English');
+      assert.ok(!/[À-ỹ]/.test([...enText].filter(text => !identities.has(text)).join(' ')), actor.role + ': Vietnamese remains in English');
       assert.ok(english.includes(actor.name) && vietnamese.includes(actor.name));
       assert.deepEqual([...english.matchAll(/href="([^"]+)"/g)].map(match => match[1]), [...vietnamese.matchAll(/href="([^"]+)"/g)].map(match => match[1]), 'Language must not alter route destinations');
       for (const language of ['en', 'vi']) {
         const guide = chunks(render(actor, language, paths[index], React.createElement(RoleJourney, { onNavigate() {} })));
         assert.equal([...guide].filter(text => text === (language === 'en' ? 'Open this step' : 'Mở bước này')).length, 1);
-        if (language === 'en') assert.ok(!/[À-ỹ]/.test([...guide].join(' ')), actor.role + ': untranslated guide');
+        if (language === 'en') assert.ok(!/[À-ỹ]/.test([...guide].filter(text => !identities.has(text)).join(' ')), actor.role + ': untranslated guide');
       }
     }
     assert.deepEqual(leftovers, {}, 'English remains in Vietnamese dashboards');

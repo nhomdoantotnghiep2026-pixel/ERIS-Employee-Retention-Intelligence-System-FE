@@ -5,7 +5,7 @@ export interface ApiUser {
   email: string;
   fullName?: string | null;
   employeeId?: number | null;
-  role?: string | { name: string };
+  role?: string | { id?: number; name: string };
   roleId?: number;
   status: string;
 }
@@ -79,6 +79,7 @@ export function getApiErrorMessage(error: unknown, fallback: string) {
     INVALID_TOKEN: 'Phiên xác thực không hợp lệ hoặc đã hết hạn. Vui lòng thực hiện lại.',
     INVALID_OTP: 'Mã OTP không đúng hoặc đã hết hạn. Vui lòng kiểm tra email và nhập mã mới.',
     RATE_LIMITED: 'Bạn thao tác quá nhiều lần. Vui lòng chờ một lát rồi thử lại.',
+    NETWORK_ERROR: 'Không kết nối được máy chủ. Vui lòng kiểm tra backend và thử lại.',
     EMAIL_EXISTS: 'Email này đã tồn tại trong hệ thống.',
     USER_ALREADY_EXISTS: 'Tài khoản hoặc nhân viên này đã được liên kết.',
     DEPARTMENT_EXISTS: 'Mã hoặc tên phòng ban đã tồn tại. Vui lòng kiểm tra lại.',
@@ -101,17 +102,27 @@ export interface ApiUserListResponse {
   };
 }
 
+function userWithRoleId(user: ApiUser): ApiUser {
+  return { ...user, roleId: user.roleId ?? (typeof user.role === 'object' ? user.role?.id : undefined) };
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const token = sessionStorage.getItem('eris-access-token');
   const headers = new Headers(init?.headers);
   if (!(init?.body instanceof FormData)) headers.set('Content-Type', 'application/json');
   if (token) headers.set('Authorization', `Bearer ${token}`);
 
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    ...init,
-    headers,
-    credentials: 'include',
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${API_BASE_URL}${path}`, {
+      ...init,
+      headers,
+      credentials: 'include',
+    });
+  } catch (error) {
+    if (init?.signal?.aborted) throw error;
+    throw new ApiError('Không kết nối được máy chủ. Vui lòng kiểm tra backend và thử lại.', 0, 'NETWORK_ERROR');
+  }
 
   const body = await response.json().catch(() => null) as { message?: string; code?: string; error?: { code?: string; message?: string } } | null;
   if (!response.ok) {
@@ -185,7 +196,7 @@ export function resetPassword(email: string, otp: string, newPassword: string) {
   });
 }
 
-export function listUsers(params: { page?: number; limit?: number; search?: string; roleId?: number; status?: string } = {}) {
+export async function listUsers(params: { page?: number; limit?: number; search?: string; roleId?: number; status?: string } = {}) {
   const query = new URLSearchParams({
     page: String(params.page ?? 1),
     limit: String(params.limit ?? 10),
@@ -193,7 +204,8 @@ export function listUsers(params: { page?: number; limit?: number; search?: stri
   if (params.search?.trim()) query.set('search', params.search.trim());
   if (params.roleId) query.set('roleId', String(params.roleId));
   if (params.status) query.set('status', params.status);
-  return request<ApiUserListResponse>(`/users?${query.toString()}`);
+  const result = await request<ApiUserListResponse>(`/users?${query.toString()}`);
+  return { ...result, data: result.data.map(userWithRoleId) };
 }
 
 export function listEmployees(search = '') {
@@ -201,15 +213,16 @@ export function listEmployees(search = '') {
   return request<{ data: ApiEmployee[]; pagination: { page: number; limit: number; total: number; totalPages: number } }>(`/employees${query}`);
 }
 
-export function getUserById(id: number) {
-  return request<ApiUser>(`/users/${id}`);
+export async function getUserById(id: number) {
+  return userWithRoleId(await request<ApiUser>(`/users/${id}`));
 }
 
-export function createUser(input: { email: string; roleId: number }) {
-  return request<{ message: string; data: ApiUser & { emailDelivery?: string } }>('/auth/user_register', {
+export async function createUser(input: { email: string; roleId: number }) {
+  const result = await request<ApiUser | { message: string; data: ApiUser & { emailDelivery?: string } }>('/auth/user_register', {
     method: 'POST',
     body: JSON.stringify({ email: input.email, roleId: input.roleId }),
-  }).then(result => result.data);
+  });
+  return userWithRoleId('data' in result ? result.data : result);
 }
 
 export interface ApiRole { id: number; name: string; description?: string | null }

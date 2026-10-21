@@ -17,7 +17,7 @@ test('department requests follow the BE contract and preserve server errors', as
       const result = await api.listDepartments();
       const call = calls.at(-1)!;
       const url = new URL(call.url, 'http://localhost');
-      assert.equal(url.pathname, '/api/departments/listDepartments');
+      assert.equal(url.pathname, '/api/departments');
       assert.equal(url.search, '');
       assert.equal(new Headers(call.init?.headers).get('Authorization'), 'Bearer test-access-token');
       assert.equal(call.init?.credentials, 'include');
@@ -26,12 +26,12 @@ test('department requests follow the BE contract and preserve server errors', as
     await t.test('create and update send only the department fields', async () => {
       response = Response.json({ data: { id: 4, name: 'HR', description: null } }, { status: 201 });
       assert.equal((await api.createDepartment({ name: 'HR', description: null })).name, 'HR');
-      assert.equal(new URL(calls.at(-1)!.url, 'http://localhost').pathname, '/api/departments/createDepartments');
+      assert.equal(new URL(calls.at(-1)!.url, 'http://localhost').pathname, '/api/departments');
       assert.equal(calls.at(-1)?.init?.method, 'POST');
       assert.deepEqual(JSON.parse(String(calls.at(-1)?.init?.body)), { name: 'HR', description: null });
       response = Response.json({ data: { id: 4, name: 'People', description: 'Team' } });
       assert.equal((await api.updateDepartment(4, { name: 'People', description: 'Team' })).name, 'People');
-      assert.equal(new URL(calls.at(-1)!.url, 'http://localhost').pathname, '/api/departments/updateDepartments/4');
+      assert.equal(new URL(calls.at(-1)!.url, 'http://localhost').pathname, '/api/departments/4');
       assert.equal(calls.at(-1)?.init?.method, 'PATCH');
       assert.deepEqual(JSON.parse(String(calls.at(-1)?.init?.body)), { name: 'People', description: 'Team' });
     });
@@ -39,7 +39,7 @@ test('department requests follow the BE contract and preserve server errors', as
       response = Response.json({ data: Array.from({ length: 105 }, (_, id) => ({ id: id + 1, name: 'R&D / Nhân sự', description: null })) });
       const result = await api.listDepartments(undefined, { page: 6, limit: 20, search: ' R&D / Nhân sự ' });
       const url = new URL(calls.at(-1)!.url, 'http://localhost');
-      assert.equal(url.pathname, '/api/departments/listDepartments');
+      assert.equal(url.pathname, '/api/departments');
       assert.equal(result.data.length, 5);
       assert.equal(result.data[0].id, 101);
       assert.equal(result.pagination.has_more, false);
@@ -47,7 +47,7 @@ test('department requests follow the BE contract and preserve server errors', as
     await t.test('DELETE deactivates using the team endpoint and surfaces active-employee conflicts', async () => {
       response = Response.json({ data: { id: 4, name: 'HR', status: 'INACTIVE', description: null } });
       assert.equal((await api.deactivateDepartment(4)).status, 'INACTIVE');
-      assert.equal(new URL(calls.at(-1)!.url, 'http://localhost').pathname, '/api/departments/deleteDepartments/4');
+      assert.equal(new URL(calls.at(-1)!.url, 'http://localhost').pathname, '/api/departments/4');
       assert.equal(calls.at(-1)?.init?.method, 'DELETE');
       assert.equal(calls.at(-1)?.init?.body, undefined);
       response = Response.json({ error: { message: 'Cannot deactivate a department that still has active employees.' } }, { status: 409 });

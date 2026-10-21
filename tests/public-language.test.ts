@@ -6,10 +6,10 @@ import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { MemoryRouter } from 'react-router-dom';
 import { createServer } from 'vite';
-import { publicEnglish, publicVietnamese } from '../src/data/publicTranslations.ts';
+import { publicEnglish } from '../src/data/publicTranslations.ts';
 import { PUBLIC_TOPICS } from '../src/data/publicTopics.ts';
 
-const files = ['src/screens/Landing.tsx', 'src/screens/Login.tsx', 'src/components/LandingProductPreview.tsx', 'src/components/PublicHeader.tsx', 'src/components/PublicFooter.tsx', 'src/screens/PublicDetail.tsx', 'src/data/publicTopics.ts'];
+const files = ['src/screens/Landing.tsx', 'src/screens/Login.tsx', 'src/screens/ForgotPassword.tsx', 'src/components/LandingProductPreview.tsx', 'src/components/PublicHeader.tsx', 'src/components/PublicFooter.tsx', 'src/screens/PublicDetail.tsx', 'src/data/publicTopics.ts'];
 const vietnamese = /[À-ỹ]/;
 
 test('public Vietnamese copy has complete English translations, including login errors and image descriptions', () => {
@@ -28,10 +28,10 @@ test('public Vietnamese copy has complete English translations, including login 
     assert.ok(translation.trim(), source);
     assert.ok(!vietnamese.test(translation), 'Vietnamese left in English copy: ' + source);
   }
-  assert.equal(publicEnglish['Mật khẩu demo chưa đúng. Hãy dùng “password”.'], 'Incorrect demo password. Please use “password”.');
+  assert.equal(publicEnglish['Mật khẩu mới và xác nhận mật khẩu không khớp.'], 'The new password and confirmation do not match.');
 });
 
-test('stored language is shared by home, all four detail pages and login without changing accounts or links', async () => {
+test('stored language is shared by home, detail pages and API login without restoring demo accounts', async () => {
   const server = await createServer({ root: process.cwd(), configFile: false, appType: 'custom', server: { middlewareMode: true, hmr: false, ws: false }, esbuild: { jsx: 'automatic' } });
   const originalStorage = Object.getOwnPropertyDescriptor(globalThis, 'localStorage');
   let storedLanguage = 'vi';
@@ -41,6 +41,7 @@ test('stored language is shared by home, all four detail pages and login without
     const { RoleProvider, ROLE_USERS } = await server.ssrLoadModule('/src/context/RoleContext.tsx');
     const { default: Landing } = await server.ssrLoadModule('/src/screens/Landing.tsx');
     const { default: Login } = await server.ssrLoadModule('/src/screens/Login.tsx');
+    const { default: ForgotPassword } = await server.ssrLoadModule('/src/screens/ForgotPassword.tsx');
     const { default: PublicDetail } = await server.ssrLoadModule('/src/screens/PublicDetail.tsx');
     const render = (path: string, screen: React.ReactNode) => renderToStaticMarkup(React.createElement(MemoryRouter, { initialEntries: [path] }, React.createElement(LanguageProvider, null, React.createElement(RoleProvider, null, screen))));
     const escape = (text: string) => renderToStaticMarkup(React.createElement('span', null, text)).slice(6, -7);
@@ -61,15 +62,20 @@ test('stored language is shared by home, all four detail pages and login without
         if (language === 'en') assert.ok(!vietnamese.test(visibleText(html)), 'Untranslated detail text: ' + topic.path);
       }
       const login = render('/login', React.createElement(Login));
-      assert.ok(login.includes(language === 'en' ? 'Demo accounts' : 'Tài khoản dùng thử'));
-      assert.equal((login.match(/<option/g) || []).length, 4);
-      for (const actor of ROLE_USERS) {
-        assert.ok(login.includes(actor.name));
-        assert.ok(login.includes(language === 'vi' ? publicVietnamese[actor.role] : actor.role));
-      }
-      assert.ok(login.includes('value="password"'));
+      assert.ok(login.includes(language === 'en' ? 'Sign in' : 'Đăng nhập'));
+      assert.equal((login.match(/<option/g) || []).length, 0);
+      for (const actor of ROLE_USERS) assert.ok(!login.includes(actor.email), 'Login must not disclose suggested accounts');
+      assert.match(login, /id="login-email"[^>]*value=""/);
+      assert.match(login, /id="password"[^>]*value=""/);
+      assert.ok(login.includes('autoComplete="username"'));
+      assert.ok(login.includes('autoComplete="current-password"'));
+      assert.ok(login.includes('href="/forgot-password"'));
       assert.ok(login.includes(language === 'en' ? 'Show password' : 'Hiện mật khẩu'));
       if (language === 'en') assert.ok(!vietnamese.test(visibleText(login)), 'Untranslated login text');
+      const reset = render('/forgot-password', React.createElement(ForgotPassword));
+      assert.ok(reset.includes(language === 'en' ? 'Recover password' : 'Khôi phục mật khẩu'));
+      assert.ok(reset.includes('href="/login"'));
+      if (language === 'en') assert.ok(!vietnamese.test(visibleText(reset)), 'Untranslated password recovery text');
     }
   } finally {
     if (originalStorage) Object.defineProperty(globalThis, 'localStorage', originalStorage);
