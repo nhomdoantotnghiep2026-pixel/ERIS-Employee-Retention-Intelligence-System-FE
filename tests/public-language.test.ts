@@ -68,7 +68,8 @@ test('stored language is shared by home, detail pages and API login without rest
       assert.match(login, /id="login-email"[^>]*value=""/);
       assert.match(login, /id="password"[^>]*value=""/);
       assert.ok(login.includes('autoComplete="username"'));
-      assert.ok(login.includes('autoComplete="current-password"'));
+      assert.match(login, /id="password"[^>]*readOnly=""[^>]*autoComplete="off"[^>]*value=""/);
+      assert.ok(!login.includes('autoComplete="current-password"'));
       assert.ok(login.includes('href="/forgot-password"'));
       assert.ok(login.includes(language === 'en' ? 'Show password' : 'Hiện mật khẩu'));
       if (language === 'en') assert.ok(!vietnamese.test(visibleText(login)), 'Untranslated login text');

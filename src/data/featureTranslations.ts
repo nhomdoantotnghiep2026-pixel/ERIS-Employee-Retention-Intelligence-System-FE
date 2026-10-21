@@ -1,5 +1,6 @@
 // Display copy only. Stored identifiers, enum values and user-entered content are unchanged.
 export const featureVietnamese: Record<string, string> = {
+  'Department name already exists.': 'Tên phòng ban đã tồn tại. Vui lòng nhập tên khác.',
   'In process': 'Đang chờ kích hoạt',
   "· Buddy": "· Người hướng dẫn",
   "· run": "· lần chạy",

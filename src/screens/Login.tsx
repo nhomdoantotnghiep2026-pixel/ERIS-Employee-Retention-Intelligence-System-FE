@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft,
@@ -11,6 +11,7 @@ import {
 import { useRole, type UserRole } from '../context/RoleContext';
 import { useLanguage } from '../context/LanguageContext';
 import { changePassword, getApiErrorMessage, getCurrentUser, login } from '../services/api';
+import { isManualPasswordEdit } from '../utils/manualPassword';
 
 const ROLE_HOME: Record<UserRole, string> = {
   HR: '/dashboard',
@@ -66,6 +67,8 @@ export default function Login() {
   const [showConfirmPass, setShowConfirmPass] = useState(false);
   const [loginEmail, setLoginEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [passwordEditable, setPasswordEditable] = useState(false);
+  const passwordInput = useRef<HTMLInputElement>(null);
   const [passwordChangeToken, setPasswordChangeToken] = useState('');
   const [otp, setOtp] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -73,6 +76,17 @@ export default function Login() {
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [activeSlide, setActiveSlide] = useState(0);
+
+  useEffect(() => {
+    const clearPasswords = () => {
+      setPassword(''); setShowPass(false); setPasswordEditable(false);
+      setNewPassword(''); setConfirmPassword(''); setOtp(''); setPasswordChangeToken('');
+      if (passwordInput.current) passwordInput.current.value = '';
+    };
+    clearPasswords();
+    window.addEventListener('pageshow', clearPasswords);
+    return () => window.removeEventListener('pageshow', clearPasswords);
+  }, []);
 
   useEffect(() => {
     if (isAuthenticated) navigate(ROLE_HOME[user.role], { replace: true });
@@ -111,6 +125,7 @@ export default function Login() {
         return;
       }
       const apiUser = await getCurrentUser();
+      setPassword(''); setShowPass(false);
       const nextUser = {
         name: apiUser.fullName || apiUser.email,
         email: apiUser.email,
@@ -144,7 +159,7 @@ export default function Login() {
       await changePassword(passwordChangeToken, password, otp, newPassword);
       setPasswordChangeToken('');
       setOtp('');
-      setPassword(newPassword);
+      setPassword(''); setShowPass(false); setPasswordEditable(false); setShowNewPass(false); setShowConfirmPass(false);
       setNewPassword('');
       setConfirmPassword('');
       setError('Đổi mật khẩu thành công. Bấm Đăng nhập để tiếp tục.');
@@ -234,7 +249,7 @@ export default function Login() {
               <p className="mt-2 text-sm text-slate-500">{t('Truy cập không gian làm việc phù hợp với vai trò của bạn')}</p>
             </div>
 
-            <form onSubmit={handleSignIn} className="space-y-4" noValidate hidden={Boolean(passwordChangeToken)}>
+            <form onSubmit={handleSignIn} className="space-y-4" autoComplete="off" noValidate hidden={Boolean(passwordChangeToken)}>
               <div>
                 <label htmlFor="login-email" className="mb-1.5 flex items-center gap-2 text-[13px] font-medium text-slate-600">
                   <UserRound size={15} />
@@ -246,6 +261,7 @@ export default function Login() {
                   value={loginEmail}
                   onChange={(event) => {
                     setLoginEmail(event.target.value);
+                    setPassword(''); setShowPass(false); setPasswordEditable(false);
                     setError('');
                   }}
                   placeholder={t('Nhập email tài khoản')}
@@ -262,13 +278,25 @@ export default function Login() {
                 <div className="relative">
                   <input
                     id="password"
+                    ref={passwordInput}
+                    readOnly={!passwordEditable}
                     type={showPass ? 'text' : 'password'}
                     value={password}
                     onChange={(event) => {
+                      if (!isManualPasswordEdit((event.nativeEvent as InputEvent).inputType)) {
+                        event.target.value = password;
+                        return;
+                      }
                       setPassword(event.target.value);
                       setError('');
                     }}
-                    autoComplete="current-password"
+                    onFocus={event => { event.target.value = password; setPasswordEditable(true); }}
+                    onBeforeInput={event => {
+                      if (event.currentTarget.value !== password) event.currentTarget.value = password;
+                    }}
+                    autoComplete="off"
+                    data-1p-ignore
+                    data-lpignore="true"
                     aria-invalid={Boolean(error)}
                     aria-describedby={error ? 'login-error' : undefined}
                     className="h-12 w-full rounded-xl border border-slate-200 bg-white px-4 pr-12 text-base outline-none transition focus:border-[#f47b20] focus:ring-4 focus:ring-orange-100"
@@ -276,7 +304,11 @@ export default function Login() {
                   <button
                     type="button"
                     aria-label={t(showPass ? 'Ẩn mật khẩu' : 'Hiện mật khẩu')}
-                    onClick={() => setShowPass((visible) => !visible)}
+                    onClick={() => {
+                      // Never reveal a value injected directly by a password manager.
+                      if (passwordInput.current) passwordInput.current.value = password;
+                      setShowPass((visible) => !visible);
+                    }}
                     className="absolute right-1 top-1/2 grid h-10 w-10 -translate-y-1/2 place-items-center rounded-lg text-slate-400 transition hover:bg-orange-50 hover:text-orange-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-300"
                   >
                     {showPass ? <EyeOff size={17} /> : <Eye size={17} />}

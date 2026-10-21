@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
+import { SearchableSelect } from '../components/SearchableSelect';
 import { AppShell } from '../components/AppShell';
 import { Button, Card } from '../components/ui';
 import { useLanguage } from '../context/LanguageContext';
@@ -27,8 +28,6 @@ export default function HrEmployees() {
   const [rows, setRows] = useState<EmployeeProfile[]>([]);
   const [detail, setDetail] = useState<EmployeeProfile | null>(null);
   const [form, setForm] = useState<Form>(empty);
-  const [positionQuery, setPositionQuery] = useState<string | null>(null);
-  const [positionFilterQuery, setPositionFilterQuery] = useState('');
   const [departments, setDepartments] = useState<Array<{ id: number; name: string }>>([]);
   const [positions, setPositions] = useState<Array<{ id: number; name: string }>>([]);
   const [catalogError, setCatalogError] = useState('');
@@ -51,11 +50,11 @@ export default function HrEmployees() {
   useEffect(() => {
     const controller = new AbortController();
     setError(''); setLoading(true); setDetail(null);
-    if (creating) { setForm(empty); setPositionQuery(null); setLoading(false); return () => controller.abort(); }
+    if (creating) { setForm(empty); setLoading(false); return () => controller.abort(); }
     if (showingRecord) {
       if (!Number.isSafeInteger(employeeId) || employeeId < 1) { setError('Invalid employee ID.'); setLoading(false); return; }
       void getEmployeeProfile(employeeId, controller.signal).then(value => {
-        if (!controller.signal.aborted) { setDetail(value); setForm(toForm(value)); setPositionQuery(null); }
+        if (!controller.signal.aborted) { setDetail(value); setForm(toForm(value)); }
       }).catch(cause => { if (!controller.signal.aborted) setError(getApiErrorMessage(cause, 'Could not load employee.')); })
         .finally(() => { if (!controller.signal.aborted) setLoading(false); });
     } else {
@@ -116,12 +115,11 @@ export default function HrEmployees() {
       maxLength={key === 'fullName' ? 150 : key === 'phone' ? 30 : key === 'email' ? 255 : key === 'employmentType' ? 40 : undefined}
       min={type === 'number' ? '0.01' : undefined} step={type === 'number' ? '0.01' : undefined}
       onChange={event => setForm(value => ({ ...value, [key]: event.target.value }))} /></label>;
-  const select = (label: string, value: string, change: (value: string) => void, options: Array<{ id: number; name: string }>, required = false) =>
-    <label className="text-sm font-medium text-slate-700">{label}<select aria-label={label} className={control} value={value} disabled={pending} required={required} onChange={event => change(event.target.value)}>
-      <option value="">{text('Chọn', 'Select')}</option>
-      {value && !options.some(item => String(item.id) === value) && <option value={value}>{text('Mục hiện tại (ngừng hoạt động)', 'Current inactive item')}</option>}
-      {options.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
-    </select></label>;
+  const catalogSelect = (label: string, value: string, change: (id: string) => void, options: Array<{ id: number; name: string }>, required = false) =>
+    <SearchableSelect key={label + revision + (id || '')} label={label} value={value} options={options} onChange={change} required={required} disabled={pending}
+      placeholder={text('Chọn hoặc nhập để tìm', 'Select or type to search')}
+      emptyText={text('Không tìm thấy kết quả.', 'No results found.')}
+      invalidText={text('Vui lòng chọn một mục trong danh sách.', 'Please select an existing item.')} />;
   const active = (value: string) => value === 'ACTIVE' ? text('Đang hoạt động', 'Active') : value === 'INACTIVE' ? text('Ngừng hoạt động', 'Inactive') : value;
   const display = (label: string, value: unknown) => <div><dt className="text-sm text-slate-500">{label}</dt><dd className="mt-1 whitespace-pre-wrap break-words font-medium">{value == null || value === '' ? '—' : String(value)}</dd></div>;
   return <AppShell breadcrumb={['Workforce', 'Employees']}>
@@ -140,18 +138,8 @@ export default function HrEmployees() {
           {field('email', 'Email *', 'email', true)}
           {field('hireDate', text('Ngày vào làm *', 'Hire date *'), 'date', true)}
           {field('dateOfBirth', text('Ngày sinh', 'Date of birth'), 'date')}
-          {select(text('Phòng ban *', 'Department *'), form.departmentId, v => setForm(f => ({ ...f, departmentId: v })), departments, true)}
-          <label className="text-sm font-medium text-slate-700">{text('Chức danh / Vị trí *', 'Position *')}<input className={control} list="employee-position-options" required disabled={pending}
-            placeholder={text('Chọn hoặc nhập tên chức danh', 'Select or type a position')}
-            value={positionQuery ?? positions.find(item => String(item.id) === form.positionId)?.name ?? ''}
-            onChange={event => {
-              const value = event.target.value;
-              const matched = positions.find(item => item.name.toLocaleLowerCase() === value.trim().toLocaleLowerCase());
-              setPositionQuery(value); setForm(current => ({ ...current, positionId: matched ? String(matched.id) : '' }));
-              event.target.setCustomValidity(matched ? '' : text('Vui lòng chọn chức danh có trong danh sách.', 'Please select an existing position.'));
-            }} />
-            <datalist id="employee-position-options">{positions.map(item => <option key={item.id} value={item.name} />)}</datalist>
-          </label>
+          {catalogSelect(text('Phòng ban *', 'Department *'), form.departmentId, v => setForm(f => ({ ...f, departmentId: v })), departments, true)}
+          {catalogSelect(text('Chức danh / Vị trí *', 'Position *'), form.positionId, v => setForm(f => ({ ...f, positionId: v })), positions, true)}
           {field('phone', text('Số điện thoại', 'Phone'), 'tel')}
           <label className="text-sm font-medium text-slate-700">{text('Giới tính', 'Gender')}<select className={control} value={form.gender} disabled={pending} onChange={e => setForm(f => ({ ...f, gender: e.target.value }))}><option value="">{text('Chưa cung cấp', 'Not provided')}</option><option value="MALE">{text('Nam', 'Male')}</option><option value="FEMALE">{text('Nữ', 'Female')}</option><option value="OTHER">{text('Khác', 'Other')}</option></select></label>
           <label className="text-sm font-medium text-slate-700">{text('Loại hợp đồng', 'Employment type')}<select aria-label={text('Loại hợp đồng', 'Employment type')} className={control} value={form.employmentType} disabled={pending} onChange={event => setForm(value => ({ ...value, employmentType: event.target.value }))}>
@@ -184,18 +172,10 @@ export default function HrEmployees() {
       : !showingRecord && !creating && <Card className="@container p-6">
         <form className="mb-5 grid items-end gap-x-3 gap-y-4 sm:grid-cols-2 @min-[760px]:grid-cols-4 @min-[1080px]:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)_minmax(0,1.15fr)_minmax(0,.9fr)_auto] [&>label]:min-w-0 [&_input]:h-10 [&_input]:py-2 [&_select]:h-10 [&_select]:py-2" onSubmit={e => { e.preventDefault(); setPage(1); setSearch(query.trim()); }}>
           <label className="text-sm font-medium">{text('Tìm tên, mã hoặc email', 'Search name, code or email')}<input type="search" className={control} value={query} maxLength={100} onChange={e => { setQuery(e.target.value); if (!e.target.value.trim()) { setSearch(''); setPage(1); } }} /></label>
-          {select(text('Phòng ban', 'Department'), departmentId, v => { setDepartmentId(v); setPage(1); }, departments)}
-          <label className="text-sm font-medium text-slate-700">{text('Chức danh / Vị trí', 'Position')}<input className={control} list="employee-position-filter-options"
-            placeholder={text('Chọn hoặc nhập tên chức danh', 'Select or type a position')} value={positionFilterQuery}
-            onChange={event => {
-              const value = event.target.value;
-              const matched = positions.find(item => item.name.toLocaleLowerCase() === value.trim().toLocaleLowerCase());
-              setPositionFilterQuery(value); setPositionId(matched ? String(matched.id) : ''); setPage(1);
-            }} />
-            <datalist id="employee-position-filter-options">{positions.map(item => <option key={item.id} value={item.name} />)}</datalist>
-          </label>
+          {catalogSelect(text('Phòng ban', 'Department'), departmentId, v => { setDepartmentId(v); setPage(1); }, departments)}
+          {catalogSelect(text('Chức danh / Vị trí', 'Position'), positionId, v => { setPositionId(v); setPage(1); }, positions)}
           <label className="text-sm font-medium">{text('Trạng thái', 'Status')}<select className={control} value={status} onChange={e => { setStatus(e.target.value); setPage(1); }}><option value="ACTIVE">{text('Đang hoạt động', 'Active')}</option><option value="INACTIVE">{text('Ngừng hoạt động', 'Inactive')}</option><option value="">{text('Tất cả', 'All')}</option></select></label>
-          <div className="col-span-full flex flex-wrap justify-end gap-2 @min-[1080px]:col-span-1 @min-[1080px]:flex-nowrap"><Button>{text('Tìm kiếm', 'Search')}</Button><Button type="button" variant="secondary" onClick={() => { setQuery(''); setSearch(''); setDepartmentId(''); setPositionId(''); setPositionFilterQuery(''); setStatus('ACTIVE'); setPage(1); setRevision(v => v + 1); }}>{text('Xóa bộ lọc', 'Clear filters')}</Button><Button type="button" variant="secondary" onClick={() => setRevision(v => v + 1)}>{text('Tải lại', 'Reload')}</Button></div>
+          <div className="col-span-full flex flex-wrap justify-end gap-2 @min-[1080px]:col-span-1 @min-[1080px]:flex-nowrap"><Button>{text('Tìm kiếm', 'Search')}</Button><Button type="button" variant="secondary" onClick={() => { setQuery(''); setSearch(''); setDepartmentId(''); setPositionId(''); setStatus('ACTIVE'); setPage(1); setRevision(v => v + 1); }}>{text('Xóa bộ lọc', 'Clear filters')}</Button><Button type="button" variant="secondary" onClick={() => setRevision(v => v + 1)}>{text('Tải lại', 'Reload')}</Button></div>
         </form>
         {!error && <><div className="overflow-x-auto"><table className="w-full whitespace-nowrap text-left text-sm"><thead className="bg-slate-50 text-slate-500"><tr>{[text('Mã nhân viên', 'Employee code'), text('Họ và tên', 'Full name'), 'Email', text('Phòng ban', 'Department'), text('Chức danh', 'Position'), text('Trạng thái', 'Status'), text('Thao tác', 'Actions')].map(h => <th key={h} scope="col" className="p-3">{h}</th>)}</tr></thead><tbody>
           {rows.map(row => <tr key={row.id} className="border-b border-slate-100"><td className="p-3">{row.employeeCode}</td><td className="p-3 font-medium">{row.fullName}</td><td className="p-3">{row.email}</td><td className="p-3">{departments.find(d => d.id === row.departmentId)?.name || '—'}</td><td className="p-3">{positions.find(p => p.id === row.positionId)?.name || '—'}</td><td className="p-3">{active(row.employmentStatus)}</td><td className="w-px p-3"><div className="flex flex-nowrap items-center gap-2"><Link className="inline-flex h-10 items-center rounded-full border px-3 font-medium text-orange-700" to={'/employees/' + row.id}>{text('Xem chi tiết', 'View details')}</Link>{row.employmentStatus !== 'INACTIVE' && <><Link className="inline-flex h-10 items-center rounded-full border px-3" to={'/employees/' + row.id + '/edit'}>{text('Chỉnh sửa', 'Edit')}</Link><Button variant="secondary" disabled={pending} onClick={() => void deactivate(row)}>{text('Ngừng hoạt động', 'Deactivate')}</Button></>}</div></td></tr>)}

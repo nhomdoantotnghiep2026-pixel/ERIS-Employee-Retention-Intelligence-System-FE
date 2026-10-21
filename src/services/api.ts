@@ -33,10 +33,19 @@ export interface EmployeeInput {
   address?: string | null; employmentType?: string | null; currentSalary?: number | null;
 }
 export type EmployeeChanges = Partial<Omit<EmployeeInput, 'email' | 'hireDate' | 'dateOfBirth'>>;
-export function listEmployeeProfiles(options: { page?: number; limit?: number; search?: string; departmentId?: number; positionId?: number; employmentStatus?: string } = {}, signal?: AbortSignal) {
+export async function listEmployeeProfiles(options: { page?: number; limit?: number; search?: string; departmentId?: number; positionId?: number; employmentStatus?: string } = {}, signal?: AbortSignal) {
   const query = new URLSearchParams({ page: String(options.page ?? 1), limit: String(options.limit ?? 20) });
   for (const [key, value] of Object.entries(options)) if (value !== undefined && value !== '') query.set(key, String(value));
-  return request<{ data: EmployeeProfile[]; pagination: { page: number; limit: number; total: number; totalPages: number } }>(`/employees?${query}`, { signal });
+  type Result = { data: EmployeeProfile[]; pagination: { page: number; limit: number; total: number; totalPages: number } };
+  try { return await request<Result>(`/employees?${query}`, { signal }); }
+  catch (error) {
+    if (!(error instanceof ApiError) || error.status !== 500 || signal?.aborted) throw error;
+    // Current team BE has broken SQL pagination; use its unpaginated read as a fallback.
+    query.delete('page'); query.delete('limit');
+    const result = await request<Result>(`/employees?${query}`, { signal });
+    const page = options.page ?? 1, limit = options.limit ?? 20, total = result.data.length;
+    return { data: result.data.slice((page - 1) * limit, page * limit), pagination: { page, limit, total, totalPages: Math.ceil(total / limit) } };
+  }
 }
 export function getEmployeeProfile(id: number, signal?: AbortSignal) {
   return request<EmployeeProfile>(`/employees/${id}`, { signal });
@@ -253,17 +262,27 @@ export async function listDepartments(signal?: AbortSignal, options: { page?: nu
 }
 
 export async function createDepartment(input: Pick<ApiDepartment, 'name' | 'description'>) {
-  const result = await request<{ data: ApiDepartment }>('/departments/createDepartments', { method: 'POST', body: JSON.stringify(input) });
+  await assertDepartmentNameAvailable(input.name);
+  const result = await request<{ data: ApiDepartment }>('/departments', { method: 'POST', body: JSON.stringify(input) });
   return result.data;
 }
 
 export async function updateDepartment(id: number, input: Pick<ApiDepartment, 'name' | 'description'>) {
-  const result = await request<{ data: ApiDepartment }>(`/departments/updateDepartments/${id}`, { method: 'PATCH', body: JSON.stringify(input) });
+  await assertDepartmentNameAvailable(input.name, id);
+  const result = await request<{ data: ApiDepartment }>(`/departments/${id}`, { method: 'PATCH', body: JSON.stringify(input) });
   return result.data;
 }
 
+async function assertDepartmentNameAvailable(name: string, excludedId?: number) {
+  const result = await request<{ data: ApiDepartment[] }>('/departments');
+  const normalized = name.trim().toLocaleLowerCase();
+  if (result.data.some(item => item.id !== excludedId && item.name.trim().toLocaleLowerCase() === normalized)) {
+    throw new ApiError('Department name already exists.', 409);
+  }
+}
+
 export async function deactivateDepartment(id: number) {
-  const result = await request<{ data: ApiDepartment }>(`/departments/deleteDepartments/${id}`, { method: 'DELETE' });
+  const result = await request<{ data: ApiDepartment }>(`/departments/${id}`, { method: 'DELETE' });
   return result.data;
 }
 

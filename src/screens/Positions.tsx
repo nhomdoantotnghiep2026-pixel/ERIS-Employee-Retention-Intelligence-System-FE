@@ -129,19 +129,18 @@ export default function Positions() {
     {error && <p role="alert" className="mb-5 rounded-xl bg-red-50 p-4 text-sm text-red-800">{t(error)}</p>}
     {detailId !== null && <Card className="mb-5 p-5 sm:p-6">
       <section aria-labelledby="position-detail-title" aria-busy={detailLoading}>
-        <div className="flex items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 id="position-detail-title" ref={detailHeading} tabIndex={-1} className="text-lg font-bold text-slate-900 outline-none">{t('Position details')}</h2>
           <Button variant="secondary" onClick={() => { setDetailId(null); setDetail(null); }}>{t('Close position details')}</Button>
         </div>
         {detailLoading ? <p role="status" className="py-5 text-sm text-slate-600">{t('Loading position details...')}</p>
           : detailError ? <div role="alert" className="mt-4 rounded-xl bg-red-50 p-4 text-sm text-red-800"><p>{t(detailError)}</p><Button className="mt-3" variant="secondary" onClick={() => setDetailRevision(value => value + 1)}>{t('Retry positions')}</Button></div>
-          : detail && <dl className="mt-5 grid gap-5 sm:grid-cols-2">
-            <div><dt className="text-sm text-slate-500">ID</dt><dd className="mt-1 font-medium">{detail.id}</dd></div>
+          : detail && <dl className="mt-4 grid gap-x-6 gap-y-4 sm:grid-cols-2 lg:grid-cols-4">
             <div><dt className="text-sm text-slate-500">{t('Position code')}</dt><dd className="mt-1 break-words font-medium">{detail.code || '—'}</dd></div>
             <div><dt className="text-sm text-slate-500">{t('Position name')}</dt><dd className="mt-1 break-words font-medium">{detail.name}</dd></div>
             <div><dt className="text-sm text-slate-500">{t('Position level')}</dt><dd className="mt-1 font-medium">{t(POSITION_LEVELS.find(level => level.value === Number(detail.jobLevel))?.label || 'Unknown level')}</dd></div>
             <div><dt className="text-sm text-slate-500">{t('Position status')}</dt><dd className="mt-1 font-medium">{t(detail.status === 'INACTIVE' ? 'Position inactive' : 'Position active')}</dd></div>
-            <div className="sm:col-span-2"><dt className="text-sm text-slate-500">{t('Position description')}</dt><dd className="mt-1 whitespace-pre-wrap break-words">{detail.description || '—'}</dd></div>
+            <div className="min-w-0 border-t border-slate-100 pt-3 sm:col-span-2 lg:col-span-4"><dt className="text-sm text-slate-500">{t('Position description')}</dt><dd className="mt-1 whitespace-pre-wrap break-words">{detail.description || '—'}</dd></div>
           </dl>}
       </section>
     </Card>}
@@ -172,14 +171,13 @@ export default function Positions() {
       {loading ? <p role="status" className="py-6 text-sm text-slate-600">{t('Loading positions...')}</p> : listError ? <div role="alert" className="rounded-xl bg-red-50 p-4 text-sm text-red-800"><p>{t(listError)}</p><Button className="mt-3" variant="secondary" onClick={() => setRevision(value => value + 1)}>{t('Retry positions')}</Button></div> : <>
         {!positions.length ? <p role="status" className="py-6 text-sm text-slate-600">{t('No positions found.')}</p> : <div className="overflow-x-auto"><table className="w-full text-left text-sm">
           <caption className="sr-only">{t('Position list')}</caption>
-          <thead><tr className="border-b text-slate-500"><th scope="col" className="p-3">{t('Position code')}</th><th scope="col" className="p-3">{t('Position name')}</th><th scope="col" className="p-3">{t('Position level')}</th><th scope="col" className="p-3">{t('Position description')}</th><th scope="col" className="p-3">{t('Position status')}</th><th scope="col" className="p-3">{t('Position actions')}</th></tr></thead>
+          <thead><tr className="border-b text-slate-500"><th scope="col" className="p-3">{t('Position code')}</th><th scope="col" className="p-3">{t('Position name')}</th><th scope="col" className="p-3">{t('Position level')}</th><th scope="col" className="p-3">{t('Position status')}</th><th scope="col" className="p-3">{t('Position actions')}</th></tr></thead>
           <tbody>{positions.map(position => <tr key={position.id} className="border-b border-slate-100">
             <td className="p-3">{position.code || '—'}</td>
             <th scope="row" className="max-w-64 break-words p-3 font-medium text-slate-800">{position.name}</th>
             <td className="p-3">{t(POSITION_LEVELS.find(level => level.value === Number(position.jobLevel))?.label || 'Unknown level')}</td>
-            <td className="max-w-96 whitespace-pre-wrap break-words p-3 text-slate-600">{position.description || '—'}</td>
             <td className="p-3">{t(position.status === 'INACTIVE' ? 'Position inactive' : 'Position active')}</td>
-            <td className="p-3"><div className="flex gap-2">
+            <td className="w-px p-3"><div className="flex flex-nowrap gap-2">
               <Button size="sm" variant="secondary" disabled={pending || loading} onClick={() => { setDetail(null); setDetailId(position.id); setDetailRevision(value => value + 1); }} aria-label={t('View position {name}', { name: position.name })}>{t('View details')}</Button>
               <Button size="sm" variant="secondary" disabled={pending || loading} onClick={() => edit(position)} aria-label={t('Edit position {name}', { name: position.name })}>{t('Edit')}</Button>
               <Button size="sm" variant="secondary" disabled={pending || loading || position.status === 'INACTIVE'} onClick={() => void deactivate(position)} aria-label={t('Deactivate position {name}', { name: position.name })}>{t('Deactivate position')}</Button>
