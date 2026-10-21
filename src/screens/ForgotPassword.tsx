@@ -1,11 +1,12 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Eye, EyeOff, LockKeyhole, Mail, ShieldCheck } from 'lucide-react';
 import { getApiErrorMessage, requestPasswordReset, resetPassword } from '../services/api';
 import { useLanguage } from '../context/LanguageContext';
 
 export default function ForgotPassword() {
   const { t } = useLanguage();
+  const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [otp, setOtp] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -29,8 +30,8 @@ export default function ForgotPassword() {
     event.preventDefault(); setBusy(true); setError(''); setMessage('');
     try {
       await resetPassword(email.trim(), otp.trim(), newPassword);
-      setMessage('Đặt lại mật khẩu thành công. Bạn có thể quay lại trang đăng nhập.');
-      setStep('email'); setOtp(''); setNewPassword('');
+      setOtp(''); setNewPassword('');
+      navigate('/login', { replace: true });
     } catch (cause) { setError(getApiErrorMessage(cause, 'Không thể đặt lại mật khẩu. Vui lòng kiểm tra OTP và thử lại.')); }
     finally { setBusy(false); }
   }

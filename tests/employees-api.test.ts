@@ -40,6 +40,26 @@ test('EMP FE uses camelCase queries, bare detail, partial PATCH and bodyless sof
       response = Response.json({ error: { message: 'Validation or configuration error' } }, { status });
       await assert.rejects(api.createEmployeeProfile(input), (error: { status: number }) => error.status === status);
     }
+    const fallbackCalls: URL[] = [];
+    globalThis.fetch = async url => {
+      const parsed = new URL(String(url), 'http://localhost');
+      fallbackCalls.push(parsed);
+      return parsed.searchParams.has('page')
+        ? Response.json({ message: 'Internal server error.' }, { status: 500 })
+        : Response.json({ data: Array.from({ length: 25 }, (_, id) => ({ id: id + 1 })) });
+    };
+    const fallback = await api.listEmployeeProfiles({ page: 2, limit: 20, search: 'a+b', departmentId: 1, employmentStatus: 'ACTIVE' });
+    assert.equal(fallbackCalls.length, 2);
+    assert.equal(fallbackCalls[1].searchParams.has('limit'), false);
+    assert.equal(fallbackCalls[1].searchParams.get('search'), 'a+b');
+    assert.equal(fallbackCalls[1].searchParams.get('departmentId'), '1');
+    assert.equal(fallbackCalls[1].searchParams.get('employmentStatus'), 'ACTIVE');
+    assert.deepEqual(fallback.data.map(item => item.id), [21, 22, 23, 24, 25]);
+    assert.deepEqual(fallback.pagination, { page: 2, limit: 20, total: 25, totalPages: 2 });
+    let deniedCalls = 0;
+    globalThis.fetch = async () => { deniedCalls++; return Response.json({ message: 'Forbidden' }, { status: 403 }); };
+    await assert.rejects(api.listEmployeeProfiles(), { status: 403 });
+    assert.equal(deniedCalls, 1);
   } finally {
     globalThis.fetch = originalFetch;
     if (storage) Object.defineProperty(globalThis, 'sessionStorage', storage); else Reflect.deleteProperty(globalThis, 'sessionStorage');

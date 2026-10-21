@@ -1,5 +1,6 @@
 // Display copy only. Stored identifiers, enum values and user-entered content are unchanged.
 export const featureVietnamese: Record<string, string> = {
+  'Department name already exists.': 'Tên phòng ban đã tồn tại. Vui lòng nhập tên khác.',
   'Next account page': 'Sau',
   'Account page {page} · {total} accounts': 'Trang {page} · {total} tài khoản',
   'Lock account {email}? The user will no longer be able to sign in.': 'Khóa tài khoản {email}? Người dùng sẽ không thể đăng nhập nữa.',

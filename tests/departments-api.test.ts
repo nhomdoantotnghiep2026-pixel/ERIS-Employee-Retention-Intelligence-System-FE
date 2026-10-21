@@ -8,8 +8,13 @@ test('department requests follow the BE contract and preserve server errors', as
   const originalStorage = Object.getOwnPropertyDescriptor(globalThis, 'sessionStorage');
   const calls: Array<{ url: string; init?: RequestInit }> = [];
   let response = new Response();
+  let preflight: Array<{ id: number; name: string; status?: string }> | null = null;
   Object.defineProperty(globalThis, 'sessionStorage', { configurable: true, value: { getItem: () => 'test-access-token' } });
-  globalThis.fetch = async (url, init) => { calls.push({ url: String(url), init }); return response; };
+  globalThis.fetch = async (url, init) => {
+    calls.push({ url: String(url), init });
+    if (preflight !== null && String(url).endsWith('/departments') && !init?.method) return Response.json({ data: preflight });
+    return response;
+  };
   try {
     const api = await server.ssrLoadModule('/src/services/api.ts');
     await t.test('list uses the main backend departments resource', async () => {
@@ -24,6 +29,7 @@ test('department requests follow the BE contract and preserve server errors', as
       assert.equal(result.data[0].name, 'HR');
     });
     await t.test('create and update send only the department fields', async () => {
+      preflight = [];
       response = Response.json({ data: { id: 4, name: 'HR', description: null } }, { status: 201 });
       assert.equal((await api.createDepartment({ name: 'HR', description: null })).name, 'HR');
       assert.equal(new URL(calls.at(-1)!.url, 'http://localhost').pathname, '/api/departments');
@@ -34,6 +40,21 @@ test('department requests follow the BE contract and preserve server errors', as
       assert.equal(new URL(calls.at(-1)!.url, 'http://localhost').pathname, '/api/departments/4');
       assert.equal(calls.at(-1)?.init?.method, 'PATCH');
       assert.deepEqual(JSON.parse(String(calls.at(-1)?.init?.body)), { name: 'People', description: 'Team' });
+      preflight = null;
+    });
+    await t.test('FE blocks duplicate names before POST or PATCH, including inactive records', async () => {
+      preflight = [{ id: 4, name: 'Ecommerce', status: 'INACTIVE' }];
+      for (const name of ['Ecommerce', 'ECOMMERCE', ' Ecommerce ']) {
+        const before = calls.length;
+        await assert.rejects(api.createDepartment({ name, description: null }), { status: 409 });
+        assert.equal(calls.length, before + 1);
+        assert.equal(calls.at(-1)?.init?.method, undefined);
+        await assert.rejects(api.updateDepartment(5, { name, description: null }), { status: 409 });
+      }
+      response = Response.json({ data: { id: 4, name: 'ECOMMERCE', description: null } });
+      await api.updateDepartment(4, { name: 'ECOMMERCE', description: null });
+      assert.equal(calls.at(-1)?.init?.method, 'PATCH');
+      preflight = null;
     });
     await t.test('search and later pages use the full directory returned by team BE', async () => {
       response = Response.json({ data: Array.from({ length: 105 }, (_, id) => ({ id: id + 1, name: 'R&D / Nhân sự', description: null })) });
