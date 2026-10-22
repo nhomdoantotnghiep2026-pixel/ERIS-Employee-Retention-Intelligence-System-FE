@@ -19,8 +19,20 @@ test('merged account filtering, nested roles, HR creation, upload and address su
     assert.equal(calls.at(-1)!.url.searchParams.get('page'), '2');
     assert.equal(calls.at(-1)!.url.searchParams.get('roleId'), '2');
     assert.equal(calls.at(-1)!.url.searchParams.get('status'), 'ACTIVE');
+    response = new Response('Cannot GET /api/users', { status: 404 });
+    await assert.rejects(api.listUsers(), (error: { status: number; code: string; message: string }) =>
+      error.status === 404 && error.code === 'USER_DIRECTORY_UNAVAILABLE' && error.message.includes('backend'));
+    response = Response.json({ message: 'Forbidden' }, { status: 403 });
+    await assert.rejects(api.listUsers(), (error: { status: number; code?: string }) => error.status === 403 && error.code !== 'USER_DIRECTORY_UNAVAILABLE');
+    response = Response.json({ data: [], pagination: { page: 1, limit: 10, total: 0, hasMore: false } });
+    assert.deepEqual((await api.listUsers()).data, [], 'a genuinely empty directory remains distinct from a missing endpoint');
     response = Response.json(user);
     assert.equal((await api.getUserById(9)).roleId, 2);
+    response = Response.json({ ...user, status: 'INACTIVE' });
+    await api.updateUserStatus(9, 'INACTIVE');
+    assert.equal(calls.at(-1)!.url.pathname, '/api/users/9/status');
+    assert.equal(calls.at(-1)!.init?.method, 'PATCH');
+    assert.deepEqual(JSON.parse(String(calls.at(-1)!.init?.body)), { status: 'INACTIVE' });
     response = Response.json({ data: user }, { status: 201 });
     assert.equal((await api.createUser({ email: user.email, roleId: 2 })).id, 9);
     assert.deepEqual(JSON.parse(String(calls.at(-1)!.init?.body)), { email: user.email, roleId: 2 });

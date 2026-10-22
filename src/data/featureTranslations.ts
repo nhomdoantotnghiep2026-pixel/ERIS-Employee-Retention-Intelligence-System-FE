@@ -1,5 +1,8 @@
 // Display copy only. Stored identifiers, enum values and user-entered content are unchanged.
 export const featureVietnamese: Record<string, string> = {
+  'User directory is unavailable on the current backend. HR account creation is still available. Contact the backend maintainer to enable the directory API.': 'Bản backend hiện tại chưa có API danh sách tài khoản. Bạn vẫn có thể tạo tài khoản HR. Cần người phụ trách backend bổ sung API để tải danh sách.',
+  'Retry account directory': 'Tải lại danh sách tài khoản',
+  'Account information returned by the backend.': 'Thông tin tài khoản do backend trả về.',
   'Department name already exists.': 'Tên phòng ban đã tồn tại. Vui lòng nhập tên khác.',
   'Next account page': 'Sau',
   'Account page {page} · {total} accounts': 'Trang {page} · {total} tài khoản',

@@ -213,8 +213,15 @@ export async function listUsers(params: { page?: number; limit?: number; search?
   if (params.search?.trim()) query.set('search', params.search.trim());
   if (params.roleId) query.set('roleId', String(params.roleId));
   if (params.status) query.set('status', params.status);
-  const result = await request<ApiUserListResponse>(`/users?${query.toString()}`);
-  return { ...result, data: result.data.map(userWithRoleId) };
+  try {
+    const result = await request<ApiUserListResponse>(`/users?${query.toString()}`);
+    return { ...result, data: result.data.map(userWithRoleId) };
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 404) {
+      throw new ApiError('User directory is unavailable on the current backend. HR account creation is still available. Contact the backend maintainer to enable the directory API.', 404, 'USER_DIRECTORY_UNAVAILABLE');
+    }
+    throw error;
+  }
 }
 
 export function listEmployees(search = '') {
