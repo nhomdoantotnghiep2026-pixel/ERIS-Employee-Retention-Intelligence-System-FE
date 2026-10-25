@@ -1,5 +1,52 @@
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || '/api').replace(/\/$/, '');
 
+export interface AttendanceLocation {
+  latitude: number;
+  longitude: number;
+  accuracyMeters: number;
+}
+
+export interface AttendanceRecord {
+  checkIn: string | null;
+  checkOut: string | null;
+  workDate: string;
+  workingMinutes: number;
+  overtimeMinutes: number;
+  attendanceStatus: string;
+}
+
+export interface TodayAttendance {
+  date: string;
+  serverTime: string;
+  timeZone: string;
+  workday: boolean;
+  checkedIn: boolean;
+  checkedOut: boolean;
+  checkedInAt: string | null;
+  checkedOutAt: string | null;
+  attendance: AttendanceRecord | null;
+}
+
+export interface AttendanceResult {
+  status: 'INSIDE' | 'OUTSIDE' | 'LOW_ACCURACY';
+  persisted: boolean;
+  distanceMeters: number;
+  accuracyMeters: number;
+  allowedRadiusMeters: number;
+  attendance?: AttendanceRecord;
+}
+
+export function getTodayAttendance(signal?: AbortSignal) {
+  return request<TodayAttendance>('/v1/attendance/today', { signal, cache: 'no-store' });
+}
+
+export function recordAttendance(action: 'check-in' | 'check-out', location: AttendanceLocation, signal?: AbortSignal) {
+  const { latitude, longitude, accuracyMeters } = location;
+  return request<AttendanceResult>(`/v1/attendance/${action}`, {
+    method: 'POST', body: JSON.stringify({ latitude, longitude, accuracyMeters }), signal,
+  });
+}
+
 export interface ApiUser {
   id: number;
   email: string;

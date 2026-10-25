@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   BriefcaseBusiness, CalendarCheck2, CalendarClock, CalendarDays, CheckCircle2,
   ClipboardCheck, Clock3, DoorOpen, FileCheck2, FileText, GraduationCap,
-  HeartPulse, IdCard, LogIn, LogOut, MessageSquareText, PiggyBank, Send,
+  HeartPulse, IdCard, MessageSquareText, PiggyBank, Send,
   ShieldCheck, Target, UserRoundCheck, WalletCards,
 } from 'lucide-react';
 import { AppShell } from '../components/AppShell';
@@ -16,9 +16,9 @@ import { ErdEmployeeRelations } from '../components/ErdEmployeeRelations';
 import type { WorkflowRequest } from '../services/employeeWorkflow';
 import { createEmployeeRequest, listEmployeeRequests, REQUESTS_EVENT } from '../workflows/employeeRequests';
 import { recordAudit } from '../workflows/audit';
+import MyAttendance from './MyAttendance';
 
 export type EmployeePortalMode = 'dashboard' | 'profile' | 'attendance' | 'requests' | 'payroll' | 'performance' | 'offboarding' | 'surveys';
-type AttendanceState = { date: string; checkIn?: string; checkOut?: string };
 type RequestType = 'Annual leave' | 'Overtime' | 'Shift change' | 'Remote work';
 type EmployeeRequest = { id: string; type: RequestType; date: string; detail: string; status: 'Pending' | 'Approved' | 'Rejected'; reviewerNote?: string | null; reviewedAt?: string | null };
 type OffboardingState = { submitted: boolean; lastWorkingDay: string; reason: string; checklist: Record<string, boolean> };
@@ -30,11 +30,6 @@ const payrollLines = [
   { label: 'Overtime pay', amount: 320 },
   { label: 'Insurance deduction', amount: -420 },
   { label: 'Personal income tax', amount: -265 },
-];
-const attendanceHistory = [
-  { date: 'Oct 13, 2026', shift: '08:30 - 17:30', in: '08:27', out: '17:42', status: 'On time' },
-  { date: 'Oct 12, 2026', shift: '08:30 - 17:30', in: '08:39', out: '17:35', status: 'Late 9m' },
-  { date: 'Oct 11, 2026', shift: '08:30 - 17:30', in: '08:25', out: '18:10', status: 'OT 40m' },
 ];
 const learningItems = [
   { course: 'Information security basics', due: 'Oct 18, 2026', status: 'Completed', score: '92%' },
@@ -54,10 +49,6 @@ const offboardingTasks = [
 
 function todayLabel(locale = 'en-US') {
   return new Intl.DateTimeFormat(locale, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }).format(new Date());
-}
-
-function currentTime() {
-  return new Intl.DateTimeFormat('en-US', { hour: '2-digit', minute: '2-digit' }).format(new Date());
 }
 
 function formatMoney(value: number, locale: string) {
@@ -87,10 +78,6 @@ export default function EmployeePortal({ mode }: { mode: EmployeePortalMode }) {
   const db = useErd();
   const linkedEmployeeId = db.users.find(account => account.email === user.email)?.employee_id;
   const employee = employees.find(item => item.id === linkedEmployeeId);
-  const [attendance, setAttendance] = useState<AttendanceState>(() => {
-    const stored = readSession<AttendanceState>('eris-my-attendance', { date: todayLabel() });
-    return stored.date === todayLabel() ? stored : { date: todayLabel() };
-  });
   const [requests, setRequests] = useState<EmployeeRequest[]>([]);
   const [requestMessage, setRequestMessage] = useState('');
   const [requestError, setRequestError] = useState('');
@@ -107,9 +94,6 @@ export default function EmployeePortal({ mode }: { mode: EmployeePortalMode }) {
   }));
 
   const netPay = useMemo(() => payrollLines.reduce((sum, line) => sum + line.amount, 0), []);
-  const saveAttendance = (next: AttendanceState) => { setAttendance(next); sessionStorage.setItem('eris-my-attendance', JSON.stringify(next)); };
-  const checkIn = () => saveAttendance({ date: todayLabel(), checkIn: currentTime() });
-  const checkOut = () => saveAttendance({ ...attendance, date: todayLabel(), checkOut: currentTime() });
   const saveOffboarding = (next: OffboardingState) => { setOffboarding(next); sessionStorage.setItem('eris-offboarding', JSON.stringify(next)); };
 
   useEffect(() => {
@@ -143,6 +127,8 @@ export default function EmployeePortal({ mode }: { mode: EmployeePortalMode }) {
   const openSurveys = db.surveys.filter(survey => survey.status === 'Active' && String(survey.start_date) <= today && String(survey.end_date) >= today && !db.survey_responses.some(response => response.survey_id === survey.id && response.employee_id === linkedEmployeeId)).length;
   const pendingRequests = requests.filter(request => request.status === 'Pending').length;
 
+  if (mode === 'attendance') return <MyAttendance />;
+
   if (!employee) return <AppShell breadcrumb={['Employee Workspace']}><Card className="p-8"><h1 className="text-xl font-bold text-slate-900">{t("Tài khoản chưa liên kết hồ sơ nhân viên")}</h1><p className="mt-3 text-sm text-slate-600">{t("Vui lòng nhờ quản trị viên liên kết tài khoản với hồ sơ nhân viên trong trang quản lý tài khoản.")}</p></Card></AppShell>;
 
   if (mode === 'profile') {
@@ -166,7 +152,6 @@ export default function EmployeePortal({ mode }: { mode: EmployeePortalMode }) {
     return <AppShell breadcrumb={['Self Service', 'My Profile']}><SectionHeader title={t("My Profile")} description={t("Personal data, contract setup, and onboarding documents for the employee record.")}/><div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]"><Card className="p-6"><div className="flex flex-col gap-5 sm:flex-row sm:items-center"><Avatar initials={employee.initials} size="lg"/><div><h2 className="text-xl font-bold text-slate-900">{employee.name}</h2><p className="mt-1 text-sm text-slate-500">{employee.employeeId} · {t(employee.role)}</p></div></div><dl className="mt-6 grid gap-4 border-t border-slate-100 pt-6 sm:grid-cols-2 lg:grid-cols-3">{profileItems.map(([label,value]) => <InfoTile key={label} label={t(label)} value={value} />)}</dl></Card><Card className="p-5"><div className="flex items-center gap-3"><UserRoundCheck className="text-orange-500" size={24}/><div><h2 className="font-bold text-slate-900">{t('Onboarding checklist')}</h2><p className="text-sm text-slate-500">{t('Web demo scope, no external identity integration.')}</p></div></div><div className="mt-5 space-y-3">{onboardingSteps.map(step => <div key={step.label} className="flex items-center justify-between rounded-xl bg-slate-50 px-4 py-3 text-sm"><span className="font-medium text-slate-700">{t(step.label)}</span>{step.done ? <CheckCircle2 size={18} className="text-emerald-500"/> : <StatusBadge status="Pending" />}</div>)}</div></Card></div></AppShell>;
   }
 
-  if (mode === 'attendance') return <AppShell breadcrumb={['Self Service', 'My Attendance']}><SectionHeader title={t("My Attendance")} description={t("Record working time and review recent attendance calculations.")}/><div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]"><Card className="p-6"><div className="flex items-center gap-3"><span className="flex h-12 w-12 items-center justify-center rounded-full bg-orange-100 text-orange-600"><Clock3 size={23}/></span><div><h2 className="font-bold text-slate-900">{t(todayLabel(locale))}</h2><p className="text-sm text-slate-500">{t(attendance.checkOut ? t('Workday completed') : attendance.checkIn ? t('Currently checked in') : t('Not checked in'))}</p></div></div><div className="mt-6 grid gap-3 sm:grid-cols-2"><MetricTile tone="emerald" label={t("Check-in")} value={attendance.checkIn || '-'} /><MetricTile tone="blue" label={t("Check-out")} value={attendance.checkOut || '-'} /></div><div className="mt-6 flex flex-wrap gap-3"><Button disabled={Boolean(attendance.checkIn)} onClick={checkIn}><LogIn size={17}/>{t('Check in')}</Button><Button variant="secondary" disabled={!attendance.checkIn || Boolean(attendance.checkOut)} onClick={checkOut}><LogOut size={17}/>{t('Check out')}</Button></div><div className="mt-6 overflow-x-auto rounded-2xl border border-slate-100"><table className="w-full min-w-[620px]"><thead><tr><Th>{t("Date")}</Th><Th>{t("Shift")}</Th><Th>{t("In")}</Th><Th>{t("Out")}</Th><Th>{t("Status")}</Th></tr></thead><tbody>{attendanceHistory.map(row => <tr key={row.date} className="border-t border-slate-100"><Td>{t(row.date)}</Td><Td>{t(row.shift)}</Td><Td>{t(row.in)}</Td><Td>{t(row.out)}</Td><Td><span className="font-semibold text-slate-700">{t(row.status)}</span></Td></tr>)}</tbody></table></div></Card><Card className="p-5"><CalendarDays size={24} className="text-orange-500"/><h2 className="mt-3 font-bold text-slate-900">{t('Attendance policy')}</h2><p className="mt-2 text-sm leading-6 text-slate-500">{t('Web check-in/check-out replaces hardware devices in this demo. Late arrival, early leave, and OT are calculated from the configured office shift.')}</p><div className="mt-5 grid gap-3"><InfoTile label={t("Monthly workdays")} value="20.5 / 22" /><InfoTile label={t("Late minutes")} value="9 minutes" /><InfoTile label={t("Approved OT")} value="2.7 hours" /></div></Card></div></AppShell>;
 
   if (mode === 'requests') return <AppShell breadcrumb={['Self Service', 'Requests']}><SectionHeader title={t("Requests & Approvals")} description={t("Create a request, confirm submission, then track the HR decision and feedback here.")}/><div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_380px]"><Card className="p-5"><h2 className="font-bold text-slate-900">{t('My request history')}</h2><div className="mt-4 overflow-x-auto rounded-2xl border border-slate-100"><table className="w-full min-w-[700px]"><thead><tr><Th>{t("ID")}</Th><Th>{t("Type")}</Th><Th>{t("Date")}</Th><Th>{t("Detail")}</Th><Th>{t("Status")}</Th><Th>{t("HR feedback")}</Th></tr></thead><tbody>{requests.length === 0 && <tr><td colSpan={6} className="p-5 text-sm text-slate-500">{t("No requests yet. Complete the form to get started.")}</td></tr>}{requests.map(item => <tr key={item.id} className="border-t border-slate-100"><Td className="font-semibold"><span title={t(item.id)}>{t(item.id.slice(0, 8))}</span></Td><Td>{t(item.type)}</Td><Td>{t(item.date)}</Td><Td>{item.detail}</Td><Td><StatusBadge status={item.status} /></Td><Td>{item.reviewerNote || t(item.status === 'Pending' ? 'Waiting for HR review' : 'Reviewed')}{item.reviewedAt && <p className="mt-1 text-xs text-slate-500">{t(new Date(item.reviewedAt).toLocaleString(locale))}</p>}</Td></tr>)}</tbody></table></div></Card><Card className="p-5"><div className="flex items-center gap-3"><CalendarClock size={24} className="text-orange-500"/><h2 className="font-bold text-slate-900">{t('Create request')}</h2></div><div className="mt-5 space-y-4"><label className="block text-sm font-semibold text-slate-700">{t('Request type')}<select value={requestDraft.type} onChange={event => setRequestDraft({ ...requestDraft, type: event.target.value as RequestType })} className="mt-2 h-11 w-full rounded-xl border border-slate-300 px-3 text-sm outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-100">{['Annual leave','Overtime','Shift change','Remote work'].map(option => <option key={option} value={option}>{t(option)}</option>)}</select></label><label className="block text-sm font-semibold text-slate-700">{t('Date')}<input type="date" value={requestDraft.date} onChange={event => setRequestDraft({ ...requestDraft, date: event.target.value })} className="mt-2 h-11 w-full rounded-xl border border-slate-300 px-3 text-sm outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-100"/></label><label className="block text-sm font-semibold text-slate-700">{t('Reason / detail')}<textarea value={requestDraft.detail} onChange={event => setRequestDraft({ ...requestDraft, detail: event.target.value })} className="mt-2 min-h-24 w-full rounded-xl border border-slate-300 p-3 text-sm outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-100"/></label><p className="text-xs text-slate-500">{t("Submit as Employee, review as HR, then return here to see the result. Demo records stay in this tab when switching roles.")}</p>{requestError && <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{t(requestError)}</p>}{requestMessage && <p role="status" className="rounded-xl bg-emerald-50 p-3 text-sm text-emerald-800">{t(requestMessage)}</p>}<Button className="w-full" disabled={submitting || !requestDraft.date || !requestDraft.detail.trim()} onClick={submitRequest}><Send size={16}/>{t('Submit request')}</Button></div><div className="mt-5 grid grid-cols-3 gap-3 text-center"><InfoTile label={t("Annual left")} value={t('{count} days', { count: leaveBalance.annual.toLocaleString(locale) })} /><InfoTile label={t("Used")} value={t('{count} days', { count: leaveBalance.used.toLocaleString(locale) })} /><InfoTile label={t("Pending")} value={t('{count} days', { count: leaveBalance.pending.toLocaleString(locale) })} /></div></Card></div></AppShell>;
 
@@ -180,7 +165,7 @@ export default function EmployeePortal({ mode }: { mode: EmployeePortalMode }) {
 
   const actions = [
     { label:'My Profile', description:'Onboarding documents, contract, shift, and HR record', icon:IdCard, to:'/my-profile', status: 'View profile' },
-    { label:'My Attendance', description:attendance.checkIn&&!attendance.checkOut?'You are currently checked in':attendance.checkOut?'Today workday is complete':'Record today working time', icon:Clock3, to:'/my-attendance', status: attendance.checkIn ? 'Started' : 'Open' },
+    { label:'My Attendance', description:'Record working time using your current GPS location.', icon:Clock3, to:'/my-attendance', status: 'Open' },
     { label:'Requests & Approvals', description:'Leave, OT, shift change, and remote-work requests', icon:CalendarCheck2, to:'/my-requests', status: t('{count} pending', { count: requests.filter(item => item.status === 'Pending').length }) },
     { label:'My Payslips', description:'Salary, OT, allowances, deductions, and payslip status', icon:WalletCards, to:'/my-payroll', status: money(netPay) },
     { label:'Goals & Review', description:'KPI/OKR progress, learning, and self-assessment', icon:ClipboardCheck, to:'/my-performance', status: '66% avg' },
