@@ -161,8 +161,33 @@ export function requestPasswordChangeOtp() {
   return request<{ message: string }>('/auth/change-password/otp', { method: 'POST' });
 }
 
-export function getCurrentUser() {
-  return request<ApiUser>('/auth/me');
+export function getCurrentUser(signal?: AbortSignal) {
+  return request<ApiUser>('/auth/me', { signal, cache: 'no-store' });
+}
+
+export interface OwnEmployeeData {
+  account: ApiUser;
+  employee: EmployeeProfile | null;
+  profileState: 'available' | 'unlinked' | 'unavailable';
+}
+
+export async function getOwnEmployeeData(signal?: AbortSignal): Promise<OwnEmployeeData> {
+  const account = await getCurrentUser(signal);
+  // Omitted employeeId is not evidence that the account has no linked employee.
+  if (account.employeeId === undefined) return { account, employee: null, profileState: 'unavailable' };
+  if (account.employeeId === null) return { account, employee: null, profileState: 'unlinked' };
+  const employeeId = Number(account.employeeId);
+  if (!Number.isSafeInteger(employeeId) || employeeId <= 0) throw new ApiError('Invalid employee profile link.', 502, 'INVALID_PROFILE_LINK');
+  try {
+    const employee = await getEmployeeProfile(employeeId, signal);
+    if (Number(employee.id) !== employeeId) throw new ApiError('Invalid employee profile response.', 502, 'INVALID_PROFILE_LINK');
+    return { account, employee, profileState: 'available' };
+  } catch (error) {
+    if (error instanceof ApiError && (error.status === 403 || error.status === 404)) {
+      return { account, employee: null, profileState: 'unavailable' };
+    }
+    throw error;
+  }
 }
 
 export function logout() {
@@ -199,9 +224,16 @@ export function resetPassword(email: string, otp: string, newPassword: string) {
   });
 }
 
-export function listUsers(search = '') {
-  const query = search ? `?page=1&limit=100&search=${encodeURIComponent(search)}` : '?page=1&limit=100';
-  return request<ApiUserListResponse>(`/users${query}`);
+export function listUsers(options: string | { page?: number; limit?: number; search?: string; roleId?: number; status?: string } = {}) {
+  const filters = typeof options === 'string' ? { search: options } : options;
+  const query = new URLSearchParams({
+    page: String(filters.page ?? 1),
+    limit: String(filters.limit ?? 100),
+  });
+  if (filters.search?.trim()) query.set('search', filters.search.trim());
+  if (filters.roleId !== undefined) query.set('roleId', String(filters.roleId));
+  if (filters.status) query.set('status', filters.status);
+  return request<ApiUserListResponse>(`/users?${query}`);
 }
 
 export function listEmployees(search = '') {
@@ -213,11 +245,12 @@ export function getUserById(id: number) {
   return request<ApiUser>(`/users/${id}`);
 }
 
-export function createUser(input: { email: string; fullName: string; roleId: number }) {
-  return request<ApiUser>('/auth/user_register', {
+export async function createUser(input: { email: string; roleId: number }) {
+  const result = await request<{ message: string; data: ApiUser }>('/auth/user_register', {
     method: 'POST',
     body: JSON.stringify(input),
   });
+  return result.data;
 }
 
 export interface ApiRole { id: number; name: string; description?: string | null }
