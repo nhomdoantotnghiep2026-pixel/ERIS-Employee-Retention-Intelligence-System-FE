@@ -127,7 +127,11 @@ export class ApiError extends Error {
 }
 
 export function getApiErrorMessage(error: unknown, fallback: string) {
-  if (!(error instanceof ApiError)) return error instanceof Error ? error.message : fallback;
+  if (!(error instanceof ApiError)) {
+    if (!(error instanceof Error)) return fallback;
+    if (/failed to fetch|network(error| request failed)|timed?\s*out|timeout|unexpected token|internal server error/i.test(error.message)) return fallback;
+    return error.message;
+  }
   const messages: Record<string, string> = {
     LOGIN_FAILED: 'Email hoặc mật khẩu không đúng. Vui lòng kiểm tra lại.',
     INACTIVE_USER: 'Tài khoản đang bị khóa hoặc chưa sẵn sàng sử dụng. Vui lòng liên hệ quản trị viên.',
@@ -135,17 +139,56 @@ export function getApiErrorMessage(error: unknown, fallback: string) {
     INVALID_TOKEN: 'Phiên xác thực không hợp lệ hoặc đã hết hạn. Vui lòng thực hiện lại.',
     INVALID_OTP: 'Mã OTP không đúng hoặc đã hết hạn. Vui lòng kiểm tra email và nhập mã mới.',
     RATE_LIMITED: 'Bạn thao tác quá nhiều lần. Vui lòng chờ một lát rồi thử lại.',
-    NETWORK_ERROR: 'Không kết nối được máy chủ. Vui lòng kiểm tra backend và thử lại.',
+    NETWORK_ERROR: 'Không thể kết nối đến máy chủ. Vui lòng kiểm tra kết nối mạng và thử lại.',
     EMAIL_EXISTS: 'Email này đã tồn tại trong hệ thống.',
     USER_ALREADY_EXISTS: 'Tài khoản hoặc nhân viên này đã được liên kết.',
     DEPARTMENT_EXISTS: 'Mã hoặc tên phòng ban đã tồn tại. Vui lòng kiểm tra lại.',
     DEPARTMENT_NOT_FOUND: 'Không tìm thấy phòng ban. Danh sách có thể đã thay đổi.',
+    POSITION_NOT_FOUND: 'Không tìm thấy chức danh. Danh sách có thể đã thay đổi.',
     FORBIDDEN: 'Bạn không có quyền thực hiện thao tác này.',
     EMAIL_NOT_CONFIGURED: 'Hệ thống email chưa được cấu hình. Vui lòng liên hệ quản trị viên.',
     EMAIL_DELIVERY_FAILED: 'Không gửi được email. Vui lòng kiểm tra địa chỉ email hoặc thử lại sau.',
     VALIDATION_ERROR: 'Thông tin gửi lên chưa hợp lệ. Vui lòng kiểm tra lại các trường nhập.',
+    USER_DIRECTORY_UNAVAILABLE: 'Chưa thể tải danh sách tài khoản lúc này. Bạn vẫn có thể tiếp tục tạo tài khoản HR.',
   };
-  return messages[error.code || ''] || error.message || fallback;
+  const knownMessage = messages[error.code || ''];
+  if (knownMessage) return knownMessage;
+
+  const technicalMessage = error.message.toLowerCase();
+  if (error.status === 400 && /otp.*(invalid|expired)|one.time.password/.test(technicalMessage)) return messages.INVALID_OTP;
+  if (error.status === 401 && /invalid email or password/.test(technicalMessage)) return messages.LOGIN_FAILED;
+  if (error.status === 409 && /email.*already in use|email.*already exists/.test(technicalMessage)) return messages.EMAIL_EXISTS;
+  if (error.status === 409 && /profile.*already exists|already has a profile|already linked/.test(technicalMessage)) return messages.USER_ALREADY_EXISTS;
+  if (error.status === 409 && /department.*already exists/.test(technicalMessage)) return messages.DEPARTMENT_EXISTS;
+  if (error.status === 404 && /department.*not found/.test(technicalMessage)) return messages.DEPARTMENT_NOT_FOUND;
+  if (error.status === 404 && /position.*not found/.test(technicalMessage)) return messages.POSITION_NOT_FOUND;
+
+  const statusMessages: Record<number, string> = {
+    400: messages.VALIDATION_ERROR,
+    401: messages.INVALID_SESSION,
+    403: messages.FORBIDDEN,
+    404: 'Không tìm thấy thông tin cần thiết. Dữ liệu có thể đã thay đổi; vui lòng tải lại và thử lại.',
+    409: 'Thông tin đã thay đổi hoặc bị trùng. Vui lòng tải lại dữ liệu và kiểm tra lại.',
+    413: 'Tệp tải lên vượt quá dung lượng cho phép. Vui lòng chọn tệp nhỏ hơn.',
+    422: messages.VALIDATION_ERROR,
+    429: messages.RATE_LIMITED,
+  };
+  if (statusMessages[error.status]) return statusMessages[error.status];
+
+  if (error.status >= 500) {
+    const serverMessages: Record<number, string> = {
+      500: 'Hệ thống đang gặp sự cố khi xử lý yêu cầu. Vui lòng thử lại sau.',
+      502: 'Máy chủ đang tạm thời không phản hồi. Vui lòng thử lại sau ít phút.',
+      503: 'Dịch vụ hiện tạm thời không khả dụng. Vui lòng thử lại sau.',
+      504: 'Yêu cầu mất quá nhiều thời gian để xử lý. Vui lòng thử lại.',
+    };
+    return serverMessages[error.status] || 'Hệ thống đang gặp sự cố. Vui lòng thử lại sau.';
+  }
+
+  if (/request failed with status \d+|bad request|unauthorized|forbidden|not found|conflict|unprocessable entity|payload too large/i.test(error.message)) {
+    return fallback;
+  }
+  return error.message || fallback;
 }
 
 export interface ApiUserListResponse {
@@ -177,7 +220,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     });
   } catch (error) {
     if (init?.signal?.aborted) throw error;
-    throw new ApiError('Không kết nối được máy chủ. Vui lòng kiểm tra backend và thử lại.', 0, 'NETWORK_ERROR');
+    throw new ApiError('Không thể kết nối đến máy chủ. Vui lòng kiểm tra kết nối mạng và thử lại.', 0, 'NETWORK_ERROR');
   }
 
   const body = await response.json().catch(() => null) as { message?: string; code?: string; error?: { code?: string; message?: string } } | null;
@@ -214,8 +257,33 @@ export function requestPasswordChangeOtp() {
   return request<{ message: string }>('/auth/change-password/otp', { method: 'POST' });
 }
 
-export function getCurrentUser() {
-  return request<ApiUser>('/auth/me');
+export function getCurrentUser(signal?: AbortSignal) {
+  return request<ApiUser>('/auth/me', { signal, cache: 'no-store' });
+}
+
+export interface OwnEmployeeData {
+  account: ApiUser;
+  employee: EmployeeProfile | null;
+  profileState: 'available' | 'unlinked' | 'unavailable';
+}
+
+export async function getOwnEmployeeData(signal?: AbortSignal): Promise<OwnEmployeeData> {
+  const account = await getCurrentUser(signal);
+  // Omitted employeeId is not evidence that the account has no linked employee.
+  if (account.employeeId === undefined) return { account, employee: null, profileState: 'unavailable' };
+  if (account.employeeId === null) return { account, employee: null, profileState: 'unlinked' };
+  const employeeId = Number(account.employeeId);
+  if (!Number.isSafeInteger(employeeId) || employeeId <= 0) throw new ApiError('Invalid employee profile link.', 502, 'INVALID_PROFILE_LINK');
+  try {
+    const employee = await getEmployeeProfile(employeeId, signal);
+    if (Number(employee.id) !== employeeId) throw new ApiError('Invalid employee profile response.', 502, 'INVALID_PROFILE_LINK');
+    return { account, employee, profileState: 'available' };
+  } catch (error) {
+    if (error instanceof ApiError && (error.status === 403 || error.status === 404)) {
+      return { account, employee: null, profileState: 'unavailable' };
+    }
+    throw error;
+  }
 }
 
 export function logout() {

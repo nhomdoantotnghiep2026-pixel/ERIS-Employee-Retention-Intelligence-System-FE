@@ -5,7 +5,7 @@ import { AppShell } from '../components/AppShell';
 import { Button, Card } from '../components/ui';
 import { useLanguage } from '../context/LanguageContext';
 import { createEmployeeProfile, deactivateEmployeeProfile, getEmployeeProfile, listEmployeeProfiles, updateEmployeeProfile,
-  listDepartments, listPositions, searchPlaces, getApiErrorMessage, type EmployeeProfile, type EmployeeInput, type EmployeeChanges, type PlaceSuggestion } from '../services/api';
+  listDepartments, listPositions, searchPlaces, getApiErrorMessage, ApiError, type EmployeeProfile, type EmployeeInput, type EmployeeChanges, type PlaceSuggestion } from '../services/api';
 
 const control = 'mt-1 w-full rounded-xl border border-slate-300 bg-white p-3 text-sm focus:outline-orange-500 disabled:bg-slate-100';
 const EMPLOYEE_DRAFT_KEY = 'eris.employee-create-draft.v1';
@@ -40,7 +40,7 @@ export default function HrEmployees() {
   const [status, setStatus] = useState('ACTIVE');
   const [page, setPage] = useState(1), [total, setTotal] = useState(0), [pages, setPages] = useState(0);
   const [revision, setRevision] = useState(0), [loading, setLoading] = useState(true), [pending, setPending] = useState(false);
-  const [error, setError] = useState(''), [message, setMessage] = useState('');
+  const [error, setError] = useState(''), [message, setMessage] = useState(''), [emailError, setEmailError] = useState('');
 
   useEffect(() => {
     const controller = new AbortController();
@@ -85,7 +85,7 @@ export default function HrEmployees() {
   async function save(event: FormEvent) {
     event.preventDefault();
     if (pending || (editing && !detail)) return;
-    setError(''); setMessage(''); setPending(true);
+    setError(''); setMessage(''); setEmailError(''); setPending(true);
     try {
       const input: EmployeeInput = {
         fullName: form.fullName.trim(), email: form.email.trim(), hireDate: form.hireDate,
@@ -110,7 +110,13 @@ export default function HrEmployees() {
         ? text('Đã lưu hồ sơ và tài khoản nhưng gửi email thất bại. Không tạo lại; liên hệ quản trị viên để cấp mật khẩu tạm an toàn.', 'Profile and account saved, but email delivery failed. Do not create again; contact your administrator.')
         : text(editing ? 'Đã cập nhật nhân viên.' : 'Đã tạo nhân viên và tài khoản đăng nhập. Mật khẩu tạm được gửi qua email.', editing ? 'Employee updated.' : 'Employee and login account created. The temporary password is sent by email.'));
       navigate('/employees/' + saved.id); setRevision(value => value + 1);
-    } catch (cause) { setError(getApiErrorMessage(cause, 'Could not save employee.')); }
+    } catch (cause) {
+      if (cause instanceof ApiError && (cause.status === 409 || cause.code === 'EMAIL_EXISTS')) {
+        setEmailError(text('Email này đã tồn tại trong hệ thống. Vui lòng nhập email khác.', 'This email is already in use. Please enter another email.'));
+        return;
+      }
+      setError(getApiErrorMessage(cause, 'Could not save employee.'));
+    }
     finally { setPending(false); }
   }
 
@@ -129,7 +135,10 @@ export default function HrEmployees() {
     <input className={control} type={type} required={required} value={form[key]} disabled={pending || (editing && ['email', 'hireDate', 'dateOfBirth'].includes(key))}
       maxLength={key === 'fullName' ? 150 : key === 'phone' ? 30 : key === 'email' ? 255 : key === 'employmentType' ? 40 : undefined}
       min={type === 'number' ? '0.01' : undefined} step={type === 'number' ? '0.01' : undefined}
-      onChange={event => setForm(value => ({ ...value, [key]: event.target.value }))} /></label>;
+      aria-invalid={key === 'email' && Boolean(emailError)} aria-describedby={key === 'email' && emailError ? 'employee-email-error' : undefined}
+      onChange={event => { if (key === 'email') setEmailError(''); setForm(value => ({ ...value, [key]: event.target.value })); }} />
+    {key === 'email' && emailError && <span id="employee-email-error" role="alert" className="mt-1 block text-xs font-medium text-red-600">{emailError}</span>}
+  </label>;
   const catalogSelect = (label: string, value: string, change: (id: string) => void, options: Array<{ id: number; name: string }>, required = false) =>
     <SearchableSelect key={label + revision + (id || '')} label={label} value={value} options={options} onChange={change} required={required} disabled={pending}
       placeholder={text('Chọn hoặc nhập để tìm', 'Select or type to search')}

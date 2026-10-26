@@ -371,7 +371,7 @@ export default function Login() {
             <Link to="/forgot-password" className="mt-3 block text-center text-sm font-semibold text-orange-700 hover:underline">{t('Quên mật khẩu?')}</Link>
           </div>
 
-          <footer className="mt-6 text-center text-[11px] text-slate-400">{t('© 2026 ERIS · Graduation Capstone Project')}</footer>
+          <footer className="mt-6 text-center text-[11px] text-slate-400">{t('© 2026 ERIS · Employee Retention Intelligence System')}</footer>
         </div>
       </section>
 

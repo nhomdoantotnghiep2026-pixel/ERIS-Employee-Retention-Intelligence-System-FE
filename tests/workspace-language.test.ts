@@ -41,6 +41,9 @@ test('four role dashboards, sidebars and guides render in one language while pre
       return renderToStaticMarkup(React.createElement(MemoryRouter, { initialEntries: [path] }, React.createElement(LanguageProvider, null, React.createElement(RoleProvider, null, React.createElement(EmployeeProvider, null, React.createElement(WorkflowProvider, null, React.createElement(Probe), screen))))));
     };
     const db = readDatabase();
+    const payroll = render(ROLE_USERS[3], 'en', '/my-payroll', React.createElement(Employee, { mode: 'payroll' }));
+    assert.ok(payroll.includes('Payslip data is not connected yet.'));
+    assert.ok(!/5[,.]885|5[,.]800|20\.5|2\.7|October 2026 payslip|Awaiting approval|Payroll inputs/.test([...chunks(payroll)].join(' ')), 'Unavailable payroll must never display sample amounts or payment states');
     const identities = new Set(['ERIS', 'e', 'VI', 'EN', 'English', 'Tiếng Việt', ...ROLE_USERS.flatMap((user: { name: string; email: string; initials: string }) => [user.name, user.email, user.initials]), ...db.employees.map((row: { full_name: string }) => String(row.full_name))]);
     const screens = [HR, Data, Admin, Employee];
     const paths = ['/dashboard', '/data-overview', '/admin-overview', '/employee-dashboard'];
@@ -92,13 +95,16 @@ test('four role dashboards, sidebars and guides render in one language while pre
     transactDatabase((draft: typeof db) => createSurvey(draft, draft.users[0].id, { title: 'User-provided survey title', description: '', start_date: '2000-01-01', end_date: '2099-12-31', questions: [{ question_text: 'User-provided question', dimension_code: 'general', required: true }] }));
     const employeeVi = chunks(render(ROLE_USERS[3], 'vi', paths[3], React.createElement(Employee, { mode: 'dashboard' })));
     const employeeEn = chunks(render(ROLE_USERS[3], 'en', paths[3], React.createElement(Employee, { mode: 'dashboard' })));
-    assert.ok(employeeVi.has('Có 1 khảo sát đang chờ bạn trả lời.'));
-    assert.ok(employeeVi.has('1 đang mở'));
-    assert.ok(employeeEn.has('Surveys awaiting your response: 1.'));
-    // A translated request option must keep its original submitted enum value.
+    // Personal workspace waits for the real account API rather than claiming a
+    // missing link or showing counts from unrelated browser demo records.
+    assert.ok(employeeVi.has('Đang tải thông tin tài khoản...'));
+    assert.ok(employeeEn.has('Loading your account...'));
+    assert.ok(!employeeEn.has('Surveys awaiting your response: 1.'));
+    assert.ok(!employeeVi.has('Tài khoản chưa liên kết hồ sơ nhân viên'));
+    // Requests also wait for the real account instead of failing a demo lookup.
     const requestForm = render(ROLE_USERS[3], 'vi', '/my-requests', React.createElement(Employee, { mode: 'requests' }));
-    assert.ok(requestForm.includes('value="Annual leave"'));
-    assert.ok(requestForm.includes('Nghỉ phép năm'));
+    assert.ok(requestForm.includes('Đang tải thông tin tài khoản...'));
+    assert.ok(!requestForm.includes('Tài khoản chưa liên kết hồ sơ nhân viên'));
 
   } finally {
     await server.close();
