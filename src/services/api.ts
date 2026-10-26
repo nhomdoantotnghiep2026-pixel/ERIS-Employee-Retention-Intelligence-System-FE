@@ -210,8 +210,33 @@ export function requestPasswordChangeOtp() {
   return request<{ message: string }>('/auth/change-password/otp', { method: 'POST' });
 }
 
-export function getCurrentUser() {
-  return request<ApiUser>('/auth/me');
+export function getCurrentUser(signal?: AbortSignal) {
+  return request<ApiUser>('/auth/me', { signal, cache: 'no-store' });
+}
+
+export interface OwnEmployeeData {
+  account: ApiUser;
+  employee: EmployeeProfile | null;
+  profileState: 'available' | 'unlinked' | 'unavailable';
+}
+
+export async function getOwnEmployeeData(signal?: AbortSignal): Promise<OwnEmployeeData> {
+  const account = await getCurrentUser(signal);
+  // Omitted employeeId is not evidence that the account has no linked employee.
+  if (account.employeeId === undefined) return { account, employee: null, profileState: 'unavailable' };
+  if (account.employeeId === null) return { account, employee: null, profileState: 'unlinked' };
+  const employeeId = Number(account.employeeId);
+  if (!Number.isSafeInteger(employeeId) || employeeId <= 0) throw new ApiError('Invalid employee profile link.', 502, 'INVALID_PROFILE_LINK');
+  try {
+    const employee = await getEmployeeProfile(employeeId, signal);
+    if (Number(employee.id) !== employeeId) throw new ApiError('Invalid employee profile response.', 502, 'INVALID_PROFILE_LINK');
+    return { account, employee, profileState: 'available' };
+  } catch (error) {
+    if (error instanceof ApiError && (error.status === 403 || error.status === 404)) {
+      return { account, employee: null, profileState: 'unavailable' };
+    }
+    throw error;
+  }
 }
 
 export function logout() {
