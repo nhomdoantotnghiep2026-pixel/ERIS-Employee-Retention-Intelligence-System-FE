@@ -36,8 +36,40 @@ export interface AttendanceResult {
   attendance?: AttendanceRecord;
 }
 
+export interface AttendanceHistoryRecord extends AttendanceRecord {
+  id: number;
+  employeeId: number;
+  employeeCode: string;
+  fullName: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export function getAttendanceConfig(signal?: AbortSignal) {
+  return request<{
+    companyLocation: { latitude: number; longitude: number };
+    allowedRadiusMeters: number;
+    maximumAccuracyMeters: number;
+    timeZone: string;
+    workStart: string;
+    workEnd: string;
+    lunchStart: string;
+    lunchEnd: string;
+    storage: string;
+    mockMode: boolean;
+  }>('/v1/attendance/config', { signal, cache: 'no-store' });
+}
+
 export function getTodayAttendance(signal?: AbortSignal) {
   return request<TodayAttendance>('/v1/attendance/today', { signal, cache: 'no-store' });
+}
+
+export function listAttendanceHistory(signal?: AbortSignal) {
+  return request<{ data: AttendanceHistoryRecord[] }>('/v1/attendance', { signal, cache: 'no-store' });
+}
+
+export function getAttendanceRecord(id: number, signal?: AbortSignal) {
+  return request<{ data: AttendanceHistoryRecord }>(`/v1/attendance/${id}`, { signal, cache: 'no-store' });
 }
 
 export function recordAttendance(action: 'check-in' | 'check-out', location: AttendanceLocation, signal?: AbortSignal) {
@@ -45,6 +77,238 @@ export function recordAttendance(action: 'check-in' | 'check-out', location: Att
   return request<AttendanceResult>(`/v1/attendance/${action}`, {
     method: 'POST', body: JSON.stringify({ latitude, longitude, accuracyMeters }), signal,
   });
+}
+
+export interface EmployeeEducation {
+  id: number;
+  employeeId: number;
+  educationLevel: number | null;
+  fieldOfStudy: string | null;
+  institution: string | null;
+  graduationYear: number | null;
+  status: 'ACTIVE' | 'INACTIVE';
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface EducationInstitution {
+  id: string;
+  institution: string;
+  country?: string | null;
+  display?: string;
+  address?: string | null;
+  website?: string | null;
+  source: 'ROR' | 'VIETMAP';
+  levelFit?: string;
+  levelWarning?: string | null;
+}
+
+export interface EmployeeJobHistory {
+  id: number;
+  employeeId: number;
+  employeeCode?: string;
+  employeeName?: string;
+  departmentId: number | null;
+  departmentName: string | null;
+  positionId: number | null;
+  positionName: string | null;
+  jobLevel: number | null;
+  managerId: number | null;
+  changeType: 'HIRE' | 'PROMOTION' | 'ROLE_CHANGE';
+  startDate: string;
+  endDate: string | null;
+  createdAt: string;
+}
+
+export interface EmployeeWorkExperience {
+  id: number;
+  employeeId: number;
+  employeeCode?: string;
+  fullName?: string;
+  companyName: string;
+  positionTitle: string;
+  startDate: string;
+  endDate: string | null;
+  status: 'ACTIVE' | 'INACTIVE' | 'IN_PROCESS';
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SurveySummary {
+  id: number;
+  title: string;
+  description: string | null;
+  startDate: string | null;
+  endDate: string | null;
+  status: 'DRAFT' | 'ACTIVE' | 'CLOSED';
+  createdAt?: string;
+  updatedAt?: string;
+  createdBy?: number;
+  createdByName?: string | null;
+  questionCount?: number;
+  responseCount?: number;
+}
+
+export interface SurveyQuestion {
+  id: number;
+  questionText: string;
+  dimensionCode: string;
+  required: boolean;
+  displayOrder: number;
+}
+
+export interface AvailableSurvey extends SurveySummary {
+  questionCount: number;
+  responseStatus: 'NOT_STARTED' | 'IN_PROGRESS';
+}
+
+export interface SurveyResponse {
+  responseId: number;
+  surveyId: number;
+  submittedAt: string;
+}
+
+export interface SurveyResults {
+  id: number;
+  title: string;
+  status: SurveySummary['status'];
+  responseCount: number;
+  questions: Array<SurveyQuestion & {
+    answerCount: number;
+    averageScore: number | null;
+    scoreDistribution: Record<1 | 2 | 3 | 4, number>;
+  }>;
+}
+
+export function listSurveys(signal?: AbortSignal) {
+  return request<{ data: SurveySummary[] }>('/surveys', { signal, cache: 'no-store' });
+}
+
+export function listAvailableSurveys(signal?: AbortSignal) {
+  return request<{ data: AvailableSurvey[] }>('/surveys/available', { signal, cache: 'no-store' });
+}
+
+export function getSurveyForEmployee(id: number, signal?: AbortSignal) {
+  return request<{ data: SurveySummary & { questions: SurveyQuestion[] } }>(`/surveys/${id}`, { signal, cache: 'no-store' });
+}
+
+export function createSurvey(input: { title: string; description?: string | null; startDate: string; endDate: string }) {
+  return request<{ message: string; data: SurveySummary & { questions: SurveyQuestion[] } }>('/surveys', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
+export function publishSurvey(id: number) {
+  return request<{ message: string; data: SurveySummary }>(`/surveys/${id}/publish`, { method: 'POST' });
+}
+
+export function getSurveyResults(id: number, signal?: AbortSignal) {
+  return request<{ data: SurveyResults }>(`/surveys/${id}/results`, { signal, cache: 'no-store' });
+}
+
+export function getMySurveyResponse(id: number, signal?: AbortSignal) {
+  return request<{
+    data: {
+      survey: { id: number; title: string };
+      response: { id: number; status: 'SUBMITTED' | 'DRAFT'; submittedAt: string | null };
+      answers: Array<{
+        questionId: number;
+        questionText: string;
+        dimensionCode: string;
+        required: boolean;
+        displayOrder: number;
+        score: number | null;
+        comment: string | null;
+      }>;
+    };
+  }>(`/surveys/${id}/my-response`, { signal, cache: 'no-store' });
+}
+
+export function submitSurveyResponse(id: number, answers: Array<{ questionId: number; score: number; comment?: string | null }>) {
+  return request<{ message: string; data: SurveyResponse }>(`/surveys/${id}/responses`, {
+    method: 'POST',
+    body: JSON.stringify({ answers }),
+  });
+}
+
+export function listEmployeeEducation(employeeId: number, signal?: AbortSignal) {
+  return request<{ data: EmployeeEducation[] }>(`/employees/${employeeId}/educations`, { signal, cache: 'no-store' });
+}
+
+export function listOwnEducation(signal?: AbortSignal) {
+  return request<{ data: EmployeeEducation[] }>('/employees/me/educations', { signal, cache: 'no-store' });
+}
+
+export function listAllEmployeeEducation(signal?: AbortSignal) {
+  return request<{ data: Array<EmployeeEducation & { employeeCode: string; fullName: string }> }>('/employee-educations', { signal, cache: 'no-store' });
+}
+
+export function listEducationEmployees(signal?: AbortSignal) {
+  return request<{ data: Array<{ id: number; employeeCode: string; fullName: string; dateOfBirth: string | null; employmentStatus: string }> }>('/employee-educations/employees', { signal, cache: 'no-store' });
+}
+
+export function searchEducationInstitutions(name: string, educationLevel?: number, signal?: AbortSignal) {
+  const query = new URLSearchParams({ name });
+  if (educationLevel !== undefined) query.set('educationLevel', String(educationLevel));
+  return request<{ data: EducationInstitution[]; source: string; manualEntryAllowed: boolean }>(`/employee-educations/institutions?${query}`, { signal });
+}
+
+export function createEmployeeEducation(employeeId: number, input: {
+  educationLevel: number;
+  fieldOfStudy?: string | null;
+  institution: string;
+  institutionRefId: string;
+  graduationYear?: number | null;
+}) {
+  return request<{ message: string; data: EmployeeEducation; warning?: string | null }>(`/employees/${employeeId}/educations`, {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
+export function updateEmployeeEducation(employeeId: number, educationId: number, input: Partial<{
+  educationLevel: number;
+  fieldOfStudy: string | null;
+  institution: string;
+  institutionRefId: string;
+  graduationYear: number | null;
+}>) {
+  return request<{ message: string; data: EmployeeEducation; warning?: string | null }>(`/employees/${employeeId}/educations/${educationId}`, {
+    method: 'PATCH',
+    body: JSON.stringify(input),
+  });
+}
+
+export function deactivateEmployeeEducation(employeeId: number, educationId: number) {
+  return request<{ message: string; data: EmployeeEducation }>(`/employees/${employeeId}/educations/${educationId}`, { method: 'DELETE' });
+}
+
+export function listEmployeeJobHistory(employeeId: number, signal?: AbortSignal) {
+  return request<{ data: EmployeeJobHistory[] }>(`/employees/${employeeId}/job-histories`, { signal, cache: 'no-store' });
+}
+
+export function listOwnJobHistory(signal?: AbortSignal) {
+  return request<{ data: EmployeeJobHistory[] }>('/employees/me/job-histories', { signal, cache: 'no-store' });
+}
+
+export function listAllJobHistory(signal?: AbortSignal) {
+  return request<{ data: EmployeeJobHistory[] }>('/job-histories', { signal, cache: 'no-store' });
+}
+
+export function listAllEmployeeWorkExperiences(signal?: AbortSignal) {
+  return request<{ data: EmployeeWorkExperience[] }>('/employee-work-experiences', { signal, cache: 'no-store' });
+}
+
+export function listEmployeeWorkExperiences(employeeId: number, signal?: AbortSignal) {
+  return request<{
+    employee: { id: number; employeeCode: string; fullName: string; employmentStatus: string };
+    data: EmployeeWorkExperience[];
+  }>(`/employees/${employeeId}/work-experiences`, { signal, cache: 'no-store' });
+}
+
+export function deactivateEmployeeWorkExperience(employeeId: number, experienceId: number) {
+  return request<{ message: string; data: EmployeeWorkExperience }>(`/employees/${employeeId}/work-experiences/${experienceId}`, { method: 'DELETE' });
 }
 
 export interface ApiUser {
@@ -78,21 +342,25 @@ export interface EmployeeInput {
   fullName: string; email: string; hireDate: string; departmentId: number; positionId: number;
   phone?: string | null; dateOfBirth?: string | null; gender?: string | null;
   address?: string | null; addressRefId?: string | null; employmentType?: string | null; currentSalary?: number | null;
+  educations?: Array<{
+    educationLevel: number; fieldOfStudy?: string | null; institution: string;
+    institutionRefId: string; graduationYear?: number | null;
+  }>;
+  workExperiences?: Array<{
+    companyName: string; positionTitle: string; startDate: string; endDate?: string | null;
+  }>;
 }
 export type EmployeeChanges = Partial<Omit<EmployeeInput, 'email' | 'hireDate' | 'dateOfBirth'>>;
 export async function listEmployeeProfiles(options: { page?: number; limit?: number; search?: string; departmentId?: number; positionId?: number; employmentStatus?: string } = {}, signal?: AbortSignal) {
-  const query = new URLSearchParams({ page: String(options.page ?? 1), limit: String(options.limit ?? 20) });
-  for (const [key, value] of Object.entries(options)) if (value !== undefined && value !== '') query.set(key, String(value));
-  type Result = { data: EmployeeProfile[]; pagination: { page: number; limit: number; total: number; totalPages: number } };
-  try { return await request<Result>(`/employees?${query}`, { signal }); }
-  catch (error) {
-    if (!(error instanceof ApiError) || error.status !== 500 || signal?.aborted) throw error;
-    // Current team BE has broken SQL pagination; use its unpaginated read as a fallback.
-    query.delete('page'); query.delete('limit');
-    const result = await request<Result>(`/employees?${query}`, { signal });
-    const page = options.page ?? 1, limit = options.limit ?? 20, total = result.data.length;
-    return { data: result.data.slice((page - 1) * limit, page * limit), pagination: { page, limit, total, totalPages: Math.ceil(total / limit) } };
-  }
+  const { page = 1, limit = 20, ...filters } = options;
+  const query = new URLSearchParams();
+  for (const [key, value] of Object.entries(filters)) if (value !== undefined && value !== '') query.set(key, String(value));
+  const result = await request<{ data: EmployeeProfile[] }>(`/employees?${query}`, { signal });
+  const total = result.data.length;
+  return {
+    data: result.data.slice((page - 1) * limit, page * limit),
+    pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
+  };
 }
 export function getEmployeeProfile(id: number, signal?: AbortSignal) {
   return request<EmployeeProfile>(`/employees/${id}`, { signal });
@@ -156,7 +424,13 @@ export function getApiErrorMessage(error: unknown, fallback: string) {
 
   const technicalMessage = error.message.toLowerCase();
   if (error.status === 400 && /otp.*(invalid|expired)|one.time.password/.test(technicalMessage)) return messages.INVALID_OTP;
+  if (error.status === 400 && error.message.trim() && !/^bad request$|^request failed with status \d+$/i.test(error.message.trim())) {
+    return error.message;
+  }
   if (error.status === 401 && /invalid email or password/.test(technicalMessage)) return messages.LOGIN_FAILED;
+  if (error.status === 409 && /employee account must be active to view education|employee profile must be active/.test(technicalMessage)) {
+    return 'Education is only available when the employee profile and account are active.';
+  }
   if (error.status === 409 && /email.*already in use|email.*already exists/.test(technicalMessage)) return messages.EMAIL_EXISTS;
   if (error.status === 409 && /profile.*already exists|already has a profile|already linked/.test(technicalMessage)) return messages.USER_ALREADY_EXISTS;
   if (error.status === 409 && /department.*already exists/.test(technicalMessage)) return messages.DEPARTMENT_EXISTS;
@@ -438,14 +712,16 @@ export interface ApiPosition {
   code: string;
   name: string;
   jobLevel: number;
+  departmentId?: number | null;
   description: string | null;
   status: 'ACTIVE' | 'INACTIVE';
   createdAt?: string;
   updatedAt?: string;
 }
 
-export async function listPositions(signal?: AbortSignal, options: { page?: number; limit?: number; search?: string } = {}) {
-  const result = await request<{ data: ApiPosition[] }>('/positions', { signal });
+export async function listPositions(signal?: AbortSignal, options: { page?: number; limit?: number; search?: string; departmentId?: number } = {}) {
+  const query = options.departmentId ? `?departmentId=${encodeURIComponent(options.departmentId)}` : '';
+  const result = await request<{ data: ApiPosition[] }>(`/positions${query}`, { signal });
   const search = options.search?.trim().toLocaleLowerCase() || '';
   const filtered = result.data.filter(item => item.status !== 'INACTIVE'
     && (!search || `${item.code} ${item.name}`.toLocaleLowerCase().includes(search)));

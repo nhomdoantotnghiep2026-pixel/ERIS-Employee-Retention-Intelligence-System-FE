@@ -12,6 +12,7 @@ export function SearchableSelect({ label, value, options, onChange, placeholder,
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(-1);
   const selected = options.find(option => String(option.id) === value);
+  const visibleLabel = label.replace(/\s*\*\s*$/, '');
   const text = query ?? selected?.name ?? '';
   const filtered = options.filter(option => option.name.toLocaleLowerCase().includes((query ?? '').trim().toLocaleLowerCase()));
   useEffect(() => {
@@ -23,7 +24,7 @@ export function SearchableSelect({ label, value, options, onChange, placeholder,
     input.current?.focus();
   }
   return <div className="min-w-0 text-sm font-medium text-slate-700">
-    <label htmlFor={id}>{label}</label>
+    <label htmlFor={id}>{visibleLabel}{required && <span aria-hidden="true" className="ml-1 font-semibold text-red-600">*</span>}</label>
     <div className="relative mt-1">
       <input ref={input} id={id} role="combobox" autoComplete="off" aria-autocomplete="list"
         aria-expanded={open} aria-controls={`${id}-options`} aria-activedescendant={open && active >= 0 ? `${id}-option-${active}` : undefined}
@@ -45,12 +46,12 @@ export function SearchableSelect({ label, value, options, onChange, placeholder,
             event.preventDefault(); choose(filtered[active]);
           } else if (event.key === 'Escape') { event.preventDefault(); setOpen(false); }
         }} />
-      <button type="button" tabIndex={-1} disabled={disabled} aria-label={label} aria-expanded={open} aria-controls={`${id}-options`}
+      <button type="button" tabIndex={-1} disabled={disabled} aria-label={visibleLabel} aria-expanded={open} aria-controls={`${id}-options`}
         className="absolute inset-y-0 right-0 flex w-10 items-center justify-center text-slate-600"
         onMouseDown={event => event.preventDefault()} onClick={() => { input.current?.focus(); setOpen(!open); setActive(-1); }}>
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg>
       </button>
-      {open && <ul id={`${id}-options`} role="listbox" aria-label={label}
+      {open && <ul id={`${id}-options`} role="listbox" aria-label={visibleLabel}
         className="absolute left-0 right-0 top-full z-30 mt-1 max-h-60 overflow-y-auto rounded-xl border border-slate-200 bg-white py-1 shadow-lg">
         {filtered.map((option, index) => <li key={option.id} id={`${id}-option-${index}`} role="option" aria-selected={String(option.id) === value}
           className={`cursor-pointer break-words px-3 py-3 text-sm hover:bg-orange-50 ${active === index ? 'bg-orange-50' : ''}`}

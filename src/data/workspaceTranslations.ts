@@ -22,6 +22,8 @@ export const workspaceVietnamese: Record<string, string> = {
   "Bulk Update": "Cập nhật hàng loạt",
   "Workforce Snapshot": "Dữ liệu nhân sự theo kỳ",
   "Employee Requests": "Yêu cầu của nhân viên",
+  "Attendance History": "Lịch sử chấm công",
+  "Education & Job History": "Học vấn và lịch sử công việc",
   "Employee Outcomes": "Kết quả theo dõi nhân viên",
   "My Workspace": "Không gian của tôi",
   "Employee Dashboard": "Bảng điều khiển nhân viên",

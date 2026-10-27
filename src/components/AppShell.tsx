@@ -39,6 +39,8 @@ const NAV_BY_ROLE: Record<UserRole, NavGroup[]> = {
         { label: 'Departments', icon: Network, to: '/departments' },
         { label: 'Positions', icon: ClipboardList, to: '/positions' },
         { label: 'Employee Requests', icon: ClipboardList, to: '/employee-requests' },
+        { label: 'Attendance History', icon: Activity, to: '/attendance' },
+        { label: 'Education & Job History', icon: History, to: '/employee-history' },
         { label: 'Org Chart', icon: Network, to: '/org-chart' },
         { label: 'Onboarding & Offboarding', icon: UserPlus, to: '/onboarding' },
       ],
@@ -96,7 +98,6 @@ const NAV_BY_ROLE: Record<UserRole, NavGroup[]> = {
       items: [
         { label: 'Employee Directory', icon: Users, to: '/employees' },
         { label: 'Add Employee', icon: UserPlus, to: '/employees/new' },
-        { label: 'Import Employees', icon: Upload, to: '/employees/import' },
         { label: 'Data Preparation', icon: Workflow, to: '/preparation' },
         { label: 'Schema & Mapping', icon: Table2, to: '/schema' },
       ],
@@ -272,14 +273,25 @@ export function AppShell({ children, breadcrumb }: { children: ReactNode; breadc
     return () => document.removeEventListener('keydown', closeOnEscape);
   }, []);
 
+  useEffect(() => {
+    const bodyOverflow = document.body.style.overflow;
+    const rootOverflow = document.documentElement.style.overflow;
+    document.body.style.overflow = 'hidden';
+    document.documentElement.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = bodyOverflow;
+      document.documentElement.style.overflow = rootOverflow;
+    };
+  }, []);
+
   return (
-    <div className="flex h-screen overflow-hidden bg-[#F4F3F9]">
+    <div className="flex h-dvh min-h-0 overflow-hidden bg-[#F4F3F9]">
       <a href="#main-content" className="fixed left-4 top-4 z-[70] -translate-y-24 rounded-lg bg-orange-600 px-4 py-3 font-semibold text-white shadow-lg transition focus:translate-y-0">{t('Skip to main content')}</a>
       {sidebarOpen && <button type="button" aria-label={t('Close navigation')} onClick={closeMobileSidebar} className="fixed inset-0 z-40 bg-slate-950/45 backdrop-blur-[1px] lg:hidden" />}
       <Sidebar key={user.role} onNavigate={closeMobileSidebar} collapsed={!sidebarOpen} onToggle={toggleSidebar} />
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
         <EnterpriseHeader breadcrumb={breadcrumb} sidebarOpen={sidebarOpen} toggleSidebar={toggleSidebar} links={NAV_BY_ROLE} />
-        <main id="main-content" tabIndex={-1} className="flex-1 overflow-y-auto bg-[radial-gradient(circle_at_top_right,rgba(249,115,22,0.07),transparent_28rem)] outline-none">
+        <main id="main-content" tabIndex={-1} className="min-h-0 flex-1 overflow-y-auto overscroll-contain bg-[radial-gradient(circle_at_top_right,rgba(249,115,22,0.07),transparent_28rem)] outline-none">
           <div className="eris-content mx-auto w-full max-w-[1480px] p-4 sm:p-5 lg:p-6">
             {children}
           </div>

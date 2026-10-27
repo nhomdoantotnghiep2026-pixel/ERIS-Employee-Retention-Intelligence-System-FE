@@ -46,6 +46,14 @@
   box-sizing: border-box;
 }
 
+html,
+body,
+#root {
+  width: 100%;
+  min-height: 100%;
+  margin: 0;
+}
+
 html, body {
   font-family: 'Inter', Arial, sans-serif;
   background-color: #F4F3F9;

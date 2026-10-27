@@ -27,6 +27,8 @@ import PublicDetail from './screens/PublicDetail';
 import { PUBLIC_TOPICS } from './data/publicTopics';
 import Login from './screens/Login';
 import ForgotPassword from './screens/ForgotPassword';
+import AttendanceHistory from './screens/AttendanceHistory';
+import EmployeeHistory from './screens/EmployeeHistory';
 
 // HR
 import Dashboard from './screens/Dashboard';
@@ -123,6 +125,8 @@ export default function App() {
           <Route path="/employees/:id/edit" element={<RoleGuard><EmployeeWorkspace mode="edit" /></RoleGuard>} />
           <Route path="/employees/:id/risk" element={<RoleGuard><RiskAnalysis /></RoleGuard>} />
           <Route path="/employee-requests" element={<RoleGuard><EmployeeRequests /></RoleGuard>} />
+          <Route path="/attendance" element={<RoleGuard><AttendanceHistory /></RoleGuard>} />
+          <Route path="/employee-history" element={<RoleGuard><EmployeeHistory /></RoleGuard>} />
           <Route path="/reports" element={<RoleGuard><RiskWorkspace reports /></RoleGuard>} />
           <Route path="/reports/:reportId" element={<RoleGuard><ReportDetail /></RoleGuard>} />
 
