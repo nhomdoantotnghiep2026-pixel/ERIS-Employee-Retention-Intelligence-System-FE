@@ -3,7 +3,7 @@ import { BriefcaseBusiness, Building2, CalendarDays, GraduationCap, Pencil, Powe
 import { Button, Card } from './ui';
 import { useLanguage } from '../context/LanguageContext';
 import {
-  createEmployeeEducation, deactivateEmployeeEducation, deactivateEmployeeWorkExperience, getApiErrorMessage, getCurrentUser,
+  createEmployeeEducation, createEmployeeWorkExperience, deactivateEmployeeEducation, deactivateEmployeeWorkExperience, getApiErrorMessage, getCurrentUser,
   listEmployeeEducation, listEmployeeJobHistory, listOwnEducation, listOwnJobHistory,
   listEmployeeWorkExperiences, searchEducationInstitutions, updateEmployeeEducation, type EducationInstitution,
   type EmployeeEducation, type EmployeeJobHistory, type EmployeeWorkExperience,
@@ -15,7 +15,15 @@ type EducationDraft = {
   graduationYear: string;
 };
 
+type WorkExperienceDraft = {
+  companyName: string;
+  positionTitle: string;
+  startDate: string;
+  endDate: string;
+};
+
 const emptyDraft: EducationDraft = { educationLevel: '2', fieldOfStudy: '', graduationYear: '' };
+const emptyWorkExperienceDraft: WorkExperienceDraft = { companyName: '', positionTitle: '', startDate: '', endDate: '' };
 const inputClass = 'mt-1 w-full rounded-xl border border-slate-300 bg-white p-3 text-sm font-medium text-slate-800 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-orange-400 focus:ring-4 focus:ring-orange-100';
 const sectionTitleClass = 'text-[20px] font-semibold leading-7 text-[#111827]';
 const subsectionTitleClass = 'text-[16px] font-semibold leading-6 text-[#111827]';
@@ -31,17 +39,19 @@ const educationLevels: Record<number, string> = {
   4: 'Doctorate',
 };
 
-export function EmployeeApiHistory({ employeeId, employeeEmail, dateOfBirth, own = false, editable = false }: {
+export function EmployeeApiHistory({ employeeId, employeeEmail, dateOfBirth, own = false, editable = false, initialEducations = [], initialWorkExperiences = [] }: {
   employeeId?: number;
   employeeEmail?: string | null;
   dateOfBirth?: string | null;
   own?: boolean;
   editable?: boolean;
+  initialEducations?: EmployeeEducation[];
+  initialWorkExperiences?: EmployeeWorkExperience[];
 }) {
   const { t } = useLanguage();
-  const [education, setEducation] = useState<EmployeeEducation[]>([]);
+  const [education, setEducation] = useState<EmployeeEducation[]>(initialEducations);
   const [history, setHistory] = useState<EmployeeJobHistory[]>([]);
-  const [workExperiences, setWorkExperiences] = useState<EmployeeWorkExperience[]>([]);
+  const [workExperiences, setWorkExperiences] = useState<EmployeeWorkExperience[]>(initialWorkExperiences);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -52,12 +62,15 @@ export function EmployeeApiHistory({ employeeId, employeeEmail, dateOfBirth, own
   const [revision, setRevision] = useState(0);
   const [editing, setEditing] = useState<EmployeeEducation | null>(null);
   const [showEducationForm, setShowEducationForm] = useState(false);
+  const [showWorkExperienceForm, setShowWorkExperienceForm] = useState(false);
   const [draft, setDraft] = useState<EducationDraft>(emptyDraft);
+  const [workExperienceDraft, setWorkExperienceDraft] = useState<WorkExperienceDraft>(emptyWorkExperienceDraft);
   const [institutionQuery, setInstitutionQuery] = useState('');
   const [selectedInstitution, setSelectedInstitution] = useState<EducationInstitution | null>(null);
   const [suggestions, setSuggestions] = useState<EducationInstitution[]>([]);
   const [searching, setSearching] = useState(false);
-  const [canManageEducation, setCanManageEducation] = useState(false);
+  const [educationPermission, setCanManageEducation] = useState(false);
+  const canManageEducation = editable && !own && educationPermission;
   const [editPermissionError, setEditPermissionError] = useState('');
 
   useEffect(() => {
@@ -73,7 +86,7 @@ export function EmployeeApiHistory({ employeeId, employeeEmail, dateOfBirth, own
     }
     const educationRequest = own ? listOwnEducation(controller.signal) : listEmployeeEducation(employeeId!, controller.signal);
     const historyRequest = own ? listOwnJobHistory(controller.signal) : listEmployeeJobHistory(employeeId!, controller.signal);
-    const workExperienceRequest = own ? Promise.resolve({ data: [] as EmployeeWorkExperience[] }) : listEmployeeWorkExperiences(employeeId!, controller.signal);
+    const workExperienceRequest = own ? Promise.resolve({ data: initialWorkExperiences }) : listEmployeeWorkExperiences(employeeId!, controller.signal);
     if (editable && !own) {
       void getCurrentUser(controller.signal).then(actor => {
         if (controller.signal.aborted) return;
@@ -103,7 +116,18 @@ export function EmployeeApiHistory({ employeeId, employeeEmail, dateOfBirth, own
         if (!controller.signal.aborted) setLoading(false);
       });
     return () => controller.abort();
-  }, [employeeId, employeeEmail, own, revision]);
+  }, [employeeId, employeeEmail, own, revision, editable]);
+
+  useEffect(() => {
+    setShowEducationForm(false);
+    setShowWorkExperienceForm(false);
+    setEditing(null);
+    setDraft(emptyDraft);
+    setWorkExperienceDraft(emptyWorkExperienceDraft);
+    setInstitutionQuery('');
+    setSelectedInstitution(null);
+    setSuggestions([]);
+  }, [editable, employeeId]);
 
   useEffect(() => {
     const query = institutionQuery.trim();
@@ -124,6 +148,7 @@ export function EmployeeApiHistory({ employeeId, employeeEmail, dateOfBirth, own
   }, [institutionQuery, draft.educationLevel]);
 
   function beginEdit(row?: EmployeeEducation) {
+    if (!canManageEducation || saving) return;
     setEditing(row || null);
     setShowEducationForm(true);
     setDraft(row ? {
@@ -150,7 +175,7 @@ export function EmployeeApiHistory({ employeeId, employeeEmail, dateOfBirth, own
 
   async function saveEducation(event: FormEvent) {
     event.preventDefault();
-    if (!employeeId || saving) return;
+    if (!canManageEducation || !employeeId || saving) return;
     if (!editing && !selectedInstitution) {
       setError('Select an institution from the search suggestions before saving.');
       return;
@@ -209,7 +234,7 @@ export function EmployeeApiHistory({ employeeId, employeeEmail, dateOfBirth, own
   }
 
   async function removeEducation(row: EmployeeEducation) {
-    if (!employeeId || saving || !window.confirm(t('Deactivate this education record?'))) return;
+    if (!canManageEducation || !employeeId || saving || !window.confirm(t('Deactivate this education record?'))) return;
     setSaving(true); setError(''); setNotice('');
     try {
       const result = await deactivateEmployeeEducation(employeeId, row.id);
@@ -223,7 +248,7 @@ export function EmployeeApiHistory({ employeeId, employeeEmail, dateOfBirth, own
   }
 
   async function removeWorkExperience(row: EmployeeWorkExperience) {
-    if (!employeeId || saving || !window.confirm(t('Remove this work experience from the active profile? The database record will be retained.'))) return;
+    if (!canManageEducation || !employeeId || saving || !window.confirm(t('Remove this work experience from the active profile? The database record will be retained.'))) return;
     setSaving(true); setError(''); setNotice('');
     try {
       const result = await deactivateEmployeeWorkExperience(employeeId, row.id);
@@ -231,6 +256,37 @@ export function EmployeeApiHistory({ employeeId, employeeEmail, dateOfBirth, own
       setRevision(value => value + 1);
     } catch (cause) {
       setError(getApiErrorMessage(cause, 'Could not remove work experience.'));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function closeWorkExperienceForm() {
+    setShowWorkExperienceForm(false);
+    setWorkExperienceDraft(emptyWorkExperienceDraft);
+    setError('');
+  }
+
+  async function saveWorkExperience(event: FormEvent) {
+    event.preventDefault();
+    if (!canManageEducation || !employeeId || saving) return;
+    if (workExperienceDraft.endDate && workExperienceDraft.endDate < workExperienceDraft.startDate) {
+      setError('End date cannot be before start date.');
+      return;
+    }
+    setSaving(true); setError(''); setNotice('');
+    try {
+      const result = await createEmployeeWorkExperience(employeeId, {
+        companyName: workExperienceDraft.companyName.trim(),
+        positionTitle: workExperienceDraft.positionTitle.trim(),
+        startDate: workExperienceDraft.startDate,
+        endDate: workExperienceDraft.endDate || null,
+      });
+      setNotice(result.message);
+      closeWorkExperienceForm();
+      setRevision(value => value + 1);
+    } catch (cause) {
+      setError(getApiErrorMessage(cause, 'Could not save work experience.'));
     } finally {
       setSaving(false);
     }
@@ -319,11 +375,14 @@ export function EmployeeApiHistory({ employeeId, employeeEmail, dateOfBirth, own
       </section>
 
       {!own && <section className="rounded-2xl border border-slate-200 bg-slate-50/50 p-4 sm:p-5">
-        <div className="flex items-center gap-2.5">
-          <span className={subsectionIconClass}>
-            <Building2 size={18} aria-hidden="true" />
-          </span>
-          <h3 className={subsectionTitleClass}>{t('Work experience')}</h3>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5">
+            <span className={subsectionIconClass}>
+              <Building2 size={18} aria-hidden="true" />
+            </span>
+            <h3 className={subsectionTitleClass}>{t('Work experience')}</h3>
+          </div>
+          {canManageEducation && !showWorkExperienceForm && <Button size="sm" className="text-sm shadow-[0_6px_18px_rgba(249,115,22,0.18)]" onClick={() => { setShowWorkExperienceForm(true); setError(''); setNotice(''); }}>{t('Add work experience')}</Button>}
         </div>
         {workExperienceError && <p role="alert" className="mt-3 rounded-xl border border-red-200 bg-red-50 p-4 text-sm font-medium text-red-800">{t(workExperienceError)}</p>}
         {workExperienceError ? null : workExperiences.length === 0 ? <p className="mt-4 rounded-xl border border-dashed border-slate-300 bg-white px-4 py-7 text-center text-sm text-slate-500">{t('No active work experience records.')}</p>
@@ -340,6 +399,32 @@ export function EmployeeApiHistory({ employeeId, employeeEmail, dateOfBirth, own
               </div>}
             </div>
           </article>)}</div>}
+        {canManageEducation && showWorkExperienceForm && <form onSubmit={event => void saveWorkExperience(event)} className="mt-5 rounded-2xl border border-orange-100 bg-orange-50/40 p-4 sm:p-5">
+          <h4 className="text-base font-bold text-slate-950">{t('Add work experience')}</h4>
+          <div className="mt-3 grid gap-4 sm:grid-cols-2">
+            <label className="text-sm font-semibold text-slate-700">{t('Company')}
+              <input required maxLength={150} className={inputClass} value={workExperienceDraft.companyName} disabled={saving}
+                onChange={event => setWorkExperienceDraft(value => ({ ...value, companyName: event.target.value }))} />
+            </label>
+            <label className="text-sm font-semibold text-slate-700">{t('Position title')}
+              <input required maxLength={150} className={inputClass} value={workExperienceDraft.positionTitle} disabled={saving}
+                onChange={event => setWorkExperienceDraft(value => ({ ...value, positionTitle: event.target.value }))} />
+            </label>
+            <label className="text-sm font-semibold text-slate-700">{t('Start date')}
+              <input required type="date" max={new Date().toISOString().slice(0, 10)} className={inputClass} value={workExperienceDraft.startDate} disabled={saving}
+                onChange={event => setWorkExperienceDraft(value => ({ ...value, startDate: event.target.value }))} />
+            </label>
+            <label className="text-sm font-semibold text-slate-700">{t('End date')}
+              <input type="date" min={workExperienceDraft.startDate || undefined} max={new Date().toISOString().slice(0, 10)} className={inputClass} value={workExperienceDraft.endDate} disabled={saving}
+                onChange={event => setWorkExperienceDraft(value => ({ ...value, endDate: event.target.value }))} />
+              <span className="mt-1 block text-xs font-medium text-slate-600">{t('Leave blank if this is the current job.')}</span>
+            </label>
+          </div>
+          <div className="mt-4 flex flex-wrap gap-2">
+            <Button disabled={saving}>{t(saving ? 'Saving...' : 'Save work experience')}</Button>
+            <Button type="button" variant="secondary" disabled={saving} onClick={closeWorkExperienceForm}>{t('Cancel')}</Button>
+          </div>
+        </form>}
       </section>}
       </div>
 

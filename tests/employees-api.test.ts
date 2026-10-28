@@ -11,6 +11,9 @@ test('EMP FE uses camelCase queries, bare detail, partial PATCH and bodyless sof
   globalThis.fetch = async (url, init) => { calls.push({ url: String(url), init }); return response; };
   try {
     const api = await server.ssrLoadModule('/src/services/api.ts');
+    assert.equal(api.getApiErrorMessage(new api.ApiError('Số điện thoại đã được sử dụng trong hồ sơ nhân viên khác.', 409), 'fallback'), 'Số điện thoại đã được sử dụng trong hồ sơ nhân viên khác. Vui lòng kiểm tra và nhập số khác.');
+    assert.equal(api.getApiErrorMessage(new api.ApiError('Không thể đổi vị trí hai lần trong cùng ngày khi lịch sử chỉ lưu ngày.', 409), 'fallback'), 'Không thể đổi vị trí hai lần trong cùng ngày khi lịch sử chỉ lưu ngày.');
+    assert.equal(api.getApiErrorMessage(new api.ApiError('Inactive employees cannot be updated.', 409), 'fallback'), 'Không thể chỉnh sửa nhân viên đã ngừng hoạt động. Vui lòng tải lại hồ sơ.');
     response = Response.json({ data: Array.from({ length: 25 }, (_, id) => ({ id: id + 1 })) });
     const list = await api.listEmployeeProfiles({ page: 2, search: 'a+b', departmentId: 1, positionId: 2, employmentStatus: 'ACTIVE' });
     assert.equal(list.pagination.totalPages, 2);

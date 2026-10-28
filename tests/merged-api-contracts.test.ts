@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { createServer } from 'vite';
 
 test('merged account filtering, nested roles, HR creation, upload and address suggestions preserve BE contracts', async () => {
-  const server = await createServer({ configFile: false, server: { middlewareMode: true, ws: false } });
+  const server = await createServer({ configFile: false, define: { 'import.meta.env.VITE_ADMIN_API_BASE_URL': JSON.stringify('') }, server: { middlewareMode: true, ws: false } });
   const originalFetch = globalThis.fetch, storage = Object.getOwnPropertyDescriptor(globalThis, 'sessionStorage');
   const calls: Array<{ url: URL; init?: RequestInit }> = [];
   let response = Response.json({});
@@ -19,6 +19,11 @@ test('merged account filtering, nested roles, HR creation, upload and address su
     assert.equal(calls.at(-1)!.url.searchParams.get('page'), '2');
     assert.equal(calls.at(-1)!.url.searchParams.get('roleId'), '2');
     assert.equal(calls.at(-1)!.url.searchParams.get('status'), 'ACTIVE');
+    assert.equal(calls.at(-1)!.init?.cache, 'no-store');
+    const controller = new AbortController();
+    response = Response.json({ data: [user], pagination: { page: 1, limit: 10, total: 1, hasMore: false } });
+    await api.listUsers({}, controller.signal);
+    assert.equal(calls.at(-1)!.init?.signal, controller.signal);
     response = new Response('Cannot GET /api/users', { status: 404 });
     await assert.rejects(api.listUsers(), (error: { status: number; code: string; message: string }) =>
       error.status === 404 && error.code === 'USER_DIRECTORY_UNAVAILABLE' && error.message.includes('backend'));
@@ -33,6 +38,8 @@ test('merged account filtering, nested roles, HR creation, upload and address su
     assert.equal(calls.at(-1)!.url.pathname, '/api/users/9/status');
     assert.equal(calls.at(-1)!.init?.method, 'PATCH');
     assert.deepEqual(JSON.parse(String(calls.at(-1)!.init?.body)), { status: 'INACTIVE' });
+    response = Response.json({ message: 'User status updated successfully.', data: { ...user, status: 'INACTIVE' } });
+    assert.equal((await api.updateUserStatus(9, 'INACTIVE')).status, 'INACTIVE');
     response = Response.json({ data: user }, { status: 201 });
     assert.equal((await api.createUser({ email: user.email, roleId: 2 })).id, 9);
     assert.deepEqual(JSON.parse(String(calls.at(-1)!.init?.body)), { email: user.email, roleId: 2 });

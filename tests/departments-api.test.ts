@@ -94,17 +94,17 @@ test('department requests follow the BE contract and preserve server errors', as
         assert.equal(calls.length, before + 1);
       }
     });
-    await t.test('DEPT-05 fetches detail by ID with a bearer token and no request body', async () => {
+    await t.test('DEPT-05 resolves details from the supported department directory endpoint', async () => {
       const controller = new AbortController();
-      response = Response.json({ data: { id: 4, code: 'DP004', name: 'Fresh detail', description: 'From API', status: 'ACTIVE' } });
+      response = Response.json({ data: [{ id: 4, code: 'DP004', name: 'Fresh detail', description: 'From API', status: 'ACTIVE' }] });
       assert.equal((await api.getDepartmentById(4, controller.signal)).name, 'Fresh detail');
       const call = calls.at(-1)!;
-      assert.equal(new URL(call.url, 'http://localhost').pathname, '/api/departments/4');
+      assert.equal(new URL(call.url, 'http://localhost').pathname, '/api/departments');
       assert.equal(call.init?.method ?? 'GET', 'GET');
       assert.equal(call.init?.body, undefined);
       assert.equal(call.init?.signal, controller.signal);
       assert.equal(new Headers(call.init?.headers).get('Authorization'), 'Bearer test-access-token');
-      response = Response.json({ error: { code: 'DEPARTMENT_NOT_FOUND', message: 'Department not found.' } }, { status: 404 });
+      response = Response.json({ data: [{ id: 4, code: 'DP004', name: 'Fresh detail', description: 'From API', status: 'ACTIVE' }] });
       await assert.rejects(api.getDepartmentById(99999), (error: { status: number }) => error.status === 404);
     });
   } finally {

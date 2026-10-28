@@ -36,6 +36,9 @@ test('new backend APIs use the published routes and payload contracts', async ()
     await api.listAllJobHistory();
     await api.listAllEmployeeWorkExperiences();
     await api.listEmployeeWorkExperiences(7);
+    await api.createEmployeeWorkExperience(7, {
+      companyName: 'Example Company', positionTitle: 'Frontend Developer', startDate: '2024-01-01', endDate: null,
+    });
     await api.deactivateEmployeeWorkExperience(7, 4);
     await api.listSurveys();
     await api.listAvailableSurveys();
@@ -66,6 +69,7 @@ test('new backend APIs use the published routes and payload contracts', async ()
       '/api/job-histories',
       '/api/employee-work-experiences',
       '/api/employees/7/work-experiences',
+      '/api/employees/7/work-experiences',
       '/api/employees/7/work-experiences/4',
       '/api/surveys',
       '/api/surveys/available',
@@ -83,12 +87,16 @@ test('new backend APIs use the published routes and payload contracts', async ()
     });
     assert.equal(calls[9].init?.method, 'PATCH');
     assert.equal(calls[10].init?.method, 'DELETE');
-    assert.equal(calls[16].init?.method, 'DELETE');
-    assert.deepEqual(JSON.parse(String(calls[20].init?.body)), {
+    assert.equal(calls[16].init?.method, 'POST');
+    assert.deepEqual(JSON.parse(String(calls[16].init?.body)), {
+      companyName: 'Example Company', positionTitle: 'Frontend Developer', startDate: '2024-01-01', endDate: null,
+    });
+    assert.equal(calls[17].init?.method, 'DELETE');
+    assert.deepEqual(JSON.parse(String(calls[21].init?.body)), {
       title: 'Engagement check-in', description: 'Quarterly survey',
       startDate: '2026-10-01T00:00:00+07:00', endDate: '2026-10-31T23:59:59+07:00',
     });
-    assert.deepEqual(JSON.parse(String(calls[24].init?.body)), {
+    assert.deepEqual(JSON.parse(String(calls[25].init?.body)), {
       answers: [{ questionId: 2, score: 4, comment: 'Good' }],
     });
     for (const call of calls) {

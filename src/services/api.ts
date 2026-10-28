@@ -1,4 +1,9 @@
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || '/api').replace(/\/$/, '');
+const ADMIN_API_BASE_URL = (import.meta.env.VITE_ADMIN_API_BASE_URL || '').replace(/\/$/, '');
+const isAdminAccount = (user?: ApiUser) => {
+  const role = (typeof user?.role === 'string' ? user.role : user?.role?.name)?.trim().toUpperCase();
+  return role ? role === 'ADMIN' || role === 'SYSTEM ADMINISTRATOR' : user?.roleId === 1;
+};
 
 export interface AttendanceLocation {
   latitude: number;
@@ -174,6 +179,10 @@ export interface SurveyResults {
   status: SurveySummary['status'];
   responseCount: number;
   questions: Array<SurveyQuestion & {
+    answers?: Array<{
+      score: number | null;
+      comment: string | null;
+    }>;
     answerCount: number;
     averageScore: number | null;
     scoreDistribution: Record<1 | 2 | 3 | 4, number>;
@@ -307,6 +316,18 @@ export function listEmployeeWorkExperiences(employeeId: number, signal?: AbortSi
   }>(`/employees/${employeeId}/work-experiences`, { signal, cache: 'no-store' });
 }
 
+export function createEmployeeWorkExperience(employeeId: number, input: {
+  companyName: string;
+  positionTitle: string;
+  startDate: string;
+  endDate?: string | null;
+}) {
+  return request<{ message: string; data: EmployeeWorkExperience }>(`/employees/${employeeId}/work-experiences`, {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
 export function deactivateEmployeeWorkExperience(employeeId: number, experienceId: number) {
   return request<{ message: string; data: EmployeeWorkExperience }>(`/employees/${employeeId}/work-experiences/${experienceId}`, { method: 'DELETE' });
 }
@@ -334,6 +355,8 @@ export interface EmployeeProfile {
   phone: string | null; dateOfBirth: string | null; gender: string | null;
   address: string | null; departmentId: number; positionId: number; hireDate: string;
   employmentType: string | null; employmentStatus: string; currentSalary: string | number | null;
+  educations?: EmployeeEducation[];
+  workExperiences?: EmployeeWorkExperience[];
   distanceFromHomeKm: number | null;
   distanceCalculation: { status: string; reason?: string | null };
   account?: { email: string; status: string }; emailDelivery?: string; warning?: string;
@@ -417,12 +440,24 @@ export function getApiErrorMessage(error: unknown, fallback: string) {
     EMAIL_NOT_CONFIGURED: 'Hệ thống email chưa được cấu hình. Vui lòng liên hệ quản trị viên.',
     EMAIL_DELIVERY_FAILED: 'Không gửi được email. Vui lòng kiểm tra địa chỉ email hoặc thử lại sau.',
     VALIDATION_ERROR: 'Thông tin gửi lên chưa hợp lệ. Vui lòng kiểm tra lại các trường nhập.',
-    USER_DIRECTORY_UNAVAILABLE: 'Chưa thể tải danh sách tài khoản lúc này. Bạn vẫn có thể tiếp tục tạo tài khoản HR.',
+    USER_DIRECTORY_UNAVAILABLE: 'Backend hiện tại chưa cung cấp API danh sách tài khoản (GET /api/users). Cần người phụ trách BE bổ sung API này để tải và lọc danh sách HR.',
   };
   const knownMessage = messages[error.code || ''];
   if (knownMessage) return knownMessage;
 
   const technicalMessage = error.message.toLowerCase();
+  if (error.status === 409 && /số điện thoại|phone.*(?:already|duplicate|in use)/i.test(error.message)) {
+    return 'Số điện thoại đã được sử dụng trong hồ sơ nhân viên khác. Vui lòng kiểm tra và nhập số khác.';
+  }
+  if (error.status === 409 && /inactive employees cannot be updated/.test(technicalMessage)) {
+    return 'Không thể chỉnh sửa nhân viên đã ngừng hoạt động. Vui lòng tải lại hồ sơ.';
+  }
+  // These Vietnamese business conflicts explain why a change was rejected (for
+  // example, same-day job changes). Do not replace them with an email error.
+  if ((error.status === 409 || error.status === 422) && /[\u00c0-\u1ef9]/.test(error.message)) return error.message;
+  if (error.status === 422 && /distance could not be calculated/.test(technicalMessage)) {
+    return 'Chưa tính được khoảng cách từ địa chỉ mới. Vui lòng chọn địa chỉ từ danh sách gợi ý và thử lại. Hồ sơ chưa được cập nhật.';
+  }
   if (error.status === 400 && /otp.*(invalid|expired)|one.time.password/.test(technicalMessage)) return messages.INVALID_OTP;
   if (error.status === 400 && error.message.trim() && !/^bad request$|^request failed with status \d+$/i.test(error.message.trim())) {
     return error.message;
@@ -479,15 +514,21 @@ function userWithRoleId(user: ApiUser): ApiUser {
   return { ...user, roleId: user.roleId ?? (typeof user.role === 'object' ? user.role?.id : undefined) };
 }
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const token = sessionStorage.getItem('eris-access-token');
+async function request<T>(path: string, init?: RequestInit, baseOverride?: string): Promise<T> {
+  const adminSession = sessionStorage.getItem('eris-api-backend') === 'admin';
+  const adminResource = /^\/(users(?:\/|\?|$)|roles(?:\/|\?|$)|auth\/user_register$)/.test(path);
+  if (!baseOverride && ADMIN_API_BASE_URL && adminResource && !adminSession) {
+    throw new ApiError('Vui lòng đăng xuất và đăng nhập lại tài khoản admin để kết nối dịch vụ quản lý người dùng.', 401, 'ADMIN_SESSION_REQUIRED');
+  }
+  const base = baseOverride || (ADMIN_API_BASE_URL && adminSession ? ADMIN_API_BASE_URL : API_BASE_URL);
+  const token = path === '/auth/login' ? null : sessionStorage.getItem('eris-access-token');
   const headers = new Headers(init?.headers);
   if (!(init?.body instanceof FormData)) headers.set('Content-Type', 'application/json');
   if (token) headers.set('Authorization', `Bearer ${token}`);
 
   let response: Response;
   try {
-    response = await fetch(`${API_BASE_URL}${path}`, {
+    response = await fetch(`${base}${path}`, {
       ...init,
       headers,
       credentials: 'include',
@@ -506,10 +547,18 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export async function login(email: string, password: string) {
-  const result = await request<LoginResponse>('/auth/login', {
+  sessionStorage.setItem('eris-api-backend', 'primary');
+  let result = await request<LoginResponse>('/auth/login', {
     method: 'POST',
     body: JSON.stringify({ email, password }),
-  });
+  }, API_BASE_URL);
+  if (ADMIN_API_BASE_URL && isAdminAccount(result.user)) {
+    result = await request<LoginResponse>('/auth/login', {
+      method: 'POST', body: JSON.stringify({ email, password }),
+    }, ADMIN_API_BASE_URL);
+    if (!isAdminAccount(result.user)) throw new ApiError('Admin account required.', 403, 'FORBIDDEN');
+    sessionStorage.setItem('eris-api-backend', 'admin');
+  }
 
   if (!result.accessToken && !result.passwordChangeToken) {
     throw new Error(result.message || 'Tài khoản cần hoàn tất đổi mật khẩu trước khi đăng nhập.');
@@ -531,8 +580,12 @@ export function requestPasswordChangeOtp() {
   return request<{ message: string }>('/auth/change-password/otp', { method: 'POST' });
 }
 
-export function getCurrentUser(signal?: AbortSignal) {
-  return request<ApiUser>('/auth/me', { signal, cache: 'no-store' });
+export async function getCurrentUser(signal?: AbortSignal) {
+  const user = await request<ApiUser>('/auth/me', { signal, cache: 'no-store' });
+  if (ADMIN_API_BASE_URL && isAdminAccount(user) && sessionStorage.getItem('eris-api-backend') !== 'admin') {
+    throw new ApiError('Vui lòng đăng nhập lại tài khoản admin.', 401, 'ADMIN_SESSION_REQUIRED');
+  }
+  return user;
 }
 
 export interface OwnEmployeeData {
@@ -543,17 +596,15 @@ export interface OwnEmployeeData {
 
 export async function getOwnEmployeeData(signal?: AbortSignal): Promise<OwnEmployeeData> {
   const account = await getCurrentUser(signal);
-  // Omitted employeeId is not evidence that the account has no linked employee.
-  if (account.employeeId === undefined) return { account, employee: null, profileState: 'unavailable' };
-  if (account.employeeId === null) return { account, employee: null, profileState: 'unlinked' };
-  const employeeId = Number(account.employeeId);
-  if (!Number.isSafeInteger(employeeId) || employeeId <= 0) throw new ApiError('Invalid employee profile link.', 502, 'INVALID_PROFILE_LINK');
   try {
-    const employee = await getEmployeeProfile(employeeId, signal);
-    if (Number(employee.id) !== employeeId) throw new ApiError('Invalid employee profile response.', 502, 'INVALID_PROFILE_LINK');
+    const result = await request<{ data: EmployeeProfile }>('/employees/me', { signal, cache: 'no-store' });
+    const employee = result.data;
     return { account, employee, profileState: 'available' };
   } catch (error) {
-    if (error instanceof ApiError && (error.status === 403 || error.status === 404)) {
+    if (error instanceof ApiError && error.status === 404) {
+      return { account, employee: null, profileState: 'unlinked' };
+    }
+    if (error instanceof ApiError && (error.status === 403 || error.status === 400)) {
       return { account, employee: null, profileState: 'unavailable' };
     }
     throw error;
@@ -571,6 +622,12 @@ export async function refreshSession() {
 }
 
 export async function restoreSession() {
+  const accessToken = sessionStorage.getItem('eris-access-token');
+  if (!accessToken) {
+    await refreshSession();
+    return getCurrentUser();
+  }
+
   try {
     return await getCurrentUser();
   } catch (error) {
@@ -594,7 +651,7 @@ export function resetPassword(email: string, otp: string, newPassword: string) {
   });
 }
 
-export async function listUsers(params: { page?: number; limit?: number; search?: string; roleId?: number; status?: string } = {}) {
+export async function listUsers(params: { page?: number; limit?: number; search?: string; roleId?: number; status?: string } = {}, signal?: AbortSignal) {
   const query = new URLSearchParams({
     page: String(params.page ?? 1),
     limit: String(params.limit ?? 10),
@@ -603,7 +660,7 @@ export async function listUsers(params: { page?: number; limit?: number; search?
   if (params.roleId) query.set('roleId', String(params.roleId));
   if (params.status) query.set('status', params.status);
   try {
-    const result = await request<ApiUserListResponse>(`/users?${query.toString()}`);
+    const result = await request<ApiUserListResponse>(`/users?${query.toString()}`, { signal, cache: 'no-store' });
     return { ...result, data: result.data.map(userWithRoleId) };
   } catch (error) {
     if (error instanceof ApiError && error.status === 404) {
@@ -636,8 +693,9 @@ export function listRoles() {
   return request<{ data: ApiRole[] }>('/roles');
 }
 
-export function updateUserStatus(id: number, status: string) {
-  return request<ApiUser>(`/users/${id}/status`, { method: 'PATCH', body: JSON.stringify({ status }) });
+export async function updateUserStatus(id: number, status: string) {
+  const result = await request<ApiUser | { data: ApiUser }>(`/users/${id}/status`, { method: 'PATCH', body: JSON.stringify({ status }) });
+  return userWithRoleId('data' in result ? result.data : result);
 }
 
 export function updateUserRole(id: number, roleId: number) {
@@ -697,8 +755,10 @@ export async function deactivateDepartment(id: number) {
 }
 
 export async function getDepartmentById(id: number, signal?: AbortSignal) {
-  const result = await request<{ data: ApiDepartment }>(`/departments/${id}`, { signal });
-  return result.data;
+  const result = await request<{ data: ApiDepartment[] }>('/departments', { signal, cache: 'no-store' });
+  const department = result.data.find(item => item.id === id);
+  if (!department) throw new ApiError('Department not found.', 404, 'DEPARTMENT_NOT_FOUND');
+  return department;
 }
 
 export const POSITION_LEVELS = [
