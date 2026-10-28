@@ -1,0 +1,198 @@
+- main [ref=e3]:
+  - link "Skip navigation" [ref=e4] [cursor=pointer]:
+    - /url: "#landing-content"
+  - navigation "ERIS navigation" [ref=e7]:
+    - link "ERIS — Home" [ref=e8] [cursor=pointer]:
+      - /url: /
+      - generic "ERIS - Retention Intelligence" [ref=e9]:
+        - generic [ref=e10]: e
+        - generic [ref=e12]:
+          - generic [ref=e13]: ERIS
+          - generic [ref=e14]: Retention Intelligence
+    - generic [ref=e15]:
+      - button "Solutions" [ref=e16]
+      - button "Roles" [ref=e19]
+      - button "Workflow" [ref=e22]
+      - button "Security" [ref=e25]
+    - generic [ref=e28]:
+      - group "Choose language" [ref=e29]:
+        - button "Tiếng Việt" [ref=e35]: VI
+        - button "English" [pressed] [ref=e36]: EN
+      - link "Sign in" [ref=e37] [cursor=pointer]:
+        - /url: /login
+  - generic [ref=e40]:
+    - generic [ref=e44]:
+      - link "New Your role-based ERIS workspace" [ref=e46] [cursor=pointer]:
+        - /url: /login
+        - generic [ref=e47]: New
+        - text: Your role-based ERIS workspace
+      - heading "Understand people sooner. Retain talent at the right time." [level=1] [ref=e50]
+      - paragraph [ref=e51]: ERIS turns employee data into clear risk signals, helping HR prioritize, intervene and track retention outcomes proactively.
+      - link "Enter workspace" [ref=e53] [cursor=pointer]:
+        - /url: /login
+      - paragraph [ref=e56]: AI supports analysis · HR makes the final decision
+    - region "ERIS workspaces for HR, administrators and employees" [ref=e60]:
+      - 'link "View full workspace: System Admin (opens in a new tab)" [ref=e61] [cursor=pointer]':
+        - /url: /product-previews/admin-dashboard.png
+        - 'img "ERIS administration: accounts, permissions and system status." [ref=e62]'
+      - 'link "View full workspace: Employee / ESS (opens in a new tab)" [ref=e63] [cursor=pointer]':
+        - /url: /product-previews/employee-dashboard.png
+        - 'img "ERIS employee workspace: profile, attendance, requests, payslips and surveys." [ref=e64]'
+      - 'link "View full workspace: HR (opens in a new tab)" [ref=e65] [cursor=pointer]':
+        - /url: /product-previews/hr-dashboard.png
+        - 'img "ERIS HR dashboard: employee overview, quick access and department signals." [ref=e66]'
+  - region [ref=e67]:
+    - generic [ref=e68]:
+      - paragraph [ref=e69]: Designed to adapt
+      - heading "Built for different organizations and teams" [level=2] [ref=e70]
+    - generic [ref=e72]:
+      - generic [ref=e73]: Business
+      - generic [ref=e80]: Professional services
+      - generic [ref=e87]: Education
+      - generic [ref=e93]: Healthcare
+      - generic [ref=e99]: Manufacturing
+      - generic [ref=e104]: Finance
+      - generic [ref=e109]: Retail
+      - generic [ref=e116]: Global teams
+      - generic [ref=e130]: Business
+      - generic [ref=e137]: Professional services
+      - generic [ref=e143]: Education
+      - generic [ref=e149]: Healthcare
+      - generic [ref=e154]: Manufacturing
+      - generic [ref=e159]: Finance
+      - generic [ref=e166]: Retail
+      - generic [ref=e174]: Global teams
+    - paragraph [ref=e175]: ERIS adapts data flows, permissions and analysis to each organization's operating structure.
+  - generic [ref=e177]:
+    - paragraph [ref=e178]: One platform connecting every role
+    - generic [ref=e179]:
+      - generic [ref=e186]:
+        - generic [ref=e187]: HR
+        - text: Profiles · Risk · Interventions
+      - generic [ref=e194]:
+        - generic [ref=e195]: Data / AI
+        - text: Data · Models · Evaluation
+      - generic [ref=e210]:
+        - generic [ref=e211]: System Admin
+        - text: Accounts · Permissions · Configuration
+      - generic [ref=e217]:
+        - generic [ref=e218]: Employee / ESS
+        - text: My profile · Surveys · Self-service
+  - generic [ref=e219]:
+    - region [ref=e220]:
+      - heading "A clear process that turns data into retention actions." [level=2] [ref=e221]
+      - generic [ref=e222]:
+        - article [ref=e223]:
+          - paragraph [ref=e224]:
+            - generic "01" [ref=e225]:
+              - generic [aria-hidden] [ref=e226]: "00"
+          - heading "One source of data" [level=3] [ref=e227]
+          - paragraph [ref=e228]: Profiles, performance, engagement and work history.
+        - article [ref=e229]:
+          - paragraph [ref=e230]:
+            - generic "04" [ref=e231]:
+              - generic [aria-hidden] [ref=e232]: "00"
+          - heading "Role-based workspaces" [level=3] [ref=e233]
+          - paragraph [ref=e234]: A dedicated workflow for each user group.
+        - article [ref=e235]:
+          - paragraph [ref=e236]:
+            - generic "24/7" [ref=e237]:
+              - generic [aria-hidden] [ref=e238]: 0/7
+          - heading "Continuous monitoring" [level=3] [ref=e239]
+          - paragraph [ref=e240]: Alerts, action history and system status.
+    - region [ref=e241]:
+      - generic [ref=e242]:
+        - text: Core value
+        - heading "ERIS helps HR see what needs attention." [level=2] [ref=e243]
+        - paragraph [ref=e244]: Instead of combining spreadsheets and manual assessments, ERIS organizes data into a consistent workflow.
+      - generic [ref=e245]:
+        - article [ref=e246]:
+          - heading "Spot early signals" [level=3] [ref=e260]
+          - paragraph [ref=e261]: Estimate employee risk so HR can prioritize the people who need attention.
+        - article [ref=e262]:
+          - heading "Understand contributing factors" [level=3] [ref=e266]
+          - paragraph [ref=e267]: Bring performance, engagement, overtime and tenure into one view.
+        - article [ref=e268]:
+          - heading "Track retention actions" [level=3] [ref=e274]
+          - paragraph [ref=e275]: Plan interventions, assign ownership and track outcomes over time.
+        - article [ref=e276]:
+          - heading "Controlled data" [level=3] [ref=e282]
+          - paragraph [ref=e283]: Standardize inputs and check data quality before AI analysis.
+        - article [ref=e284]:
+          - heading "Role-based workspaces" [level=3] [ref=e298]
+          - paragraph [ref=e299]: HR, Data/AI, System Admin and Employee see only the features they are authorized to use.
+        - article [ref=e300]:
+          - heading "People make the decisions" [level=3] [ref=e305]
+          - paragraph [ref=e306]: AI provides supporting information; HR remains responsible for final people decisions.
+    - region [ref=e307]:
+      - generic [ref=e308]:
+        - generic [ref=e309]:
+          - text: A controlled workflow
+          - heading "AI supports analysis. People make decisions." [level=2] [ref=e310]
+        - paragraph [ref=e311]: HR must review each prediction in its real-world context before taking action.
+      - generic [ref=e312]:
+        - article [ref=e313]:
+          - text: "01"
+          - heading "Receive data" [level=3] [ref=e314]
+          - paragraph [ref=e315]: Employee data comes from sources approved by the organization.
+        - article [ref=e316]:
+          - text: "02"
+          - heading "Check quality" [level=3] [ref=e317]
+          - paragraph [ref=e318]: Identify missing fields, invalid formats and values that need standardization.
+        - article [ref=e319]:
+          - text: "03"
+          - heading "Analyze risk" [level=3] [ref=e320]
+          - paragraph [ref=e321]: The model produces predictions and explains relevant factors.
+        - article [ref=e322]:
+          - text: "04"
+          - heading "HR review" [level=3] [ref=e323]
+          - paragraph [ref=e324]: HR verifies the context, decides on actions and tracks outcomes.
+    - region [ref=e325]:
+      - generic [ref=e326]:
+        - paragraph [ref=e332]: Enterprise sign-in
+        - heading "No public registration." [level=2] [ref=e333]
+        - paragraph [ref=e334]: Administrators create accounts and assign permissions. Users authenticate before entering their role-based workspace.
+      - generic [ref=e335]:
+        - article [ref=e336]:
+          - generic [ref=e337]: "01"
+          - heading "Admin creates accounts" [level=3] [ref=e352]
+          - paragraph [ref=e353]: No public registration.
+        - article [ref=e354]:
+          - generic [ref=e355]: "02"
+          - heading "First sign-in" [level=3] [ref=e362]
+          - paragraph [ref=e363]: Use the credentials provided by your organization.
+        - article [ref=e364]:
+          - generic [ref=e365]: "03"
+          - heading "Enterprise authentication" [level=3] [ref=e372]
+          - paragraph [ref=e373]: OTP will be added with backend integration.
+        - article [ref=e374]:
+          - generic [ref=e375]: "04"
+          - heading "Role-based access" [level=3] [ref=e381]
+          - paragraph [ref=e382]: Show only authorized features.
+    - generic [ref=e383]:
+      - generic [ref=e385]:
+        - paragraph [ref=e386]: Ready to work
+        - heading "Continue to your ERIS workspace." [level=2] [ref=e387]
+        - paragraph [ref=e388]: Use the account and access permissions provided by your organization.
+      - link "Continue to sign in" [ref=e389] [cursor=pointer]:
+        - /url: /login
+  - generic [ref=e393]:
+    - generic [ref=e394]:
+      - link [ref=e395] [cursor=pointer]:
+        - /url: /
+        - generic "ERIS - Retention Intelligence" [ref=e396]:
+          - generic [ref=e397]: e
+          - generic [ref=e399]:
+            - generic [ref=e400]: ERIS
+            - generic [ref=e401]: Retention Intelligence
+      - paragraph [ref=e402]: AI supports analysis and prioritization. Final people decisions remain with authorized decision-makers in the organization.
+    - navigation "Explore ERIS" [ref=e403]:
+      - link "Solutions" [ref=e404] [cursor=pointer]:
+        - /url: /giai-phap
+      - link "Roles" [ref=e405] [cursor=pointer]:
+        - /url: /vai-tro
+      - link "Workflow" [ref=e406] [cursor=pointer]:
+        - /url: /quy-trinh
+      - link "Security" [ref=e407] [cursor=pointer]:
+        - /url: /bao-mat
+    - paragraph [ref=e408]: © 2026 ERIS · Employee Retention Intelligence System
