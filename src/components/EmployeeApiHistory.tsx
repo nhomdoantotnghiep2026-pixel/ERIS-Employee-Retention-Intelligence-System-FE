@@ -39,17 +39,19 @@ const educationLevels: Record<number, string> = {
   4: 'Doctorate',
 };
 
-export function EmployeeApiHistory({ employeeId, employeeEmail, dateOfBirth, own = false, editable = false }: {
+export function EmployeeApiHistory({ employeeId, employeeEmail, dateOfBirth, own = false, editable = false, initialEducations = [], initialWorkExperiences = [] }: {
   employeeId?: number;
   employeeEmail?: string | null;
   dateOfBirth?: string | null;
   own?: boolean;
   editable?: boolean;
+  initialEducations?: EmployeeEducation[];
+  initialWorkExperiences?: EmployeeWorkExperience[];
 }) {
   const { t } = useLanguage();
-  const [education, setEducation] = useState<EmployeeEducation[]>([]);
+  const [education, setEducation] = useState<EmployeeEducation[]>(initialEducations);
   const [history, setHistory] = useState<EmployeeJobHistory[]>([]);
-  const [workExperiences, setWorkExperiences] = useState<EmployeeWorkExperience[]>([]);
+  const [workExperiences, setWorkExperiences] = useState<EmployeeWorkExperience[]>(initialWorkExperiences);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -84,7 +86,7 @@ export function EmployeeApiHistory({ employeeId, employeeEmail, dateOfBirth, own
     }
     const educationRequest = own ? listOwnEducation(controller.signal) : listEmployeeEducation(employeeId!, controller.signal);
     const historyRequest = own ? listOwnJobHistory(controller.signal) : listEmployeeJobHistory(employeeId!, controller.signal);
-    const workExperienceRequest = own ? Promise.resolve({ data: [] as EmployeeWorkExperience[] }) : listEmployeeWorkExperiences(employeeId!, controller.signal);
+    const workExperienceRequest = own ? Promise.resolve({ data: initialWorkExperiences }) : listEmployeeWorkExperiences(employeeId!, controller.signal);
     if (editable && !own) {
       void getCurrentUser(controller.signal).then(actor => {
         if (controller.signal.aborted) return;

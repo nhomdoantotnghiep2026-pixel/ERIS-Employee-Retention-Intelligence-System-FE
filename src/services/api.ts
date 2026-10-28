@@ -355,6 +355,8 @@ export interface EmployeeProfile {
   phone: string | null; dateOfBirth: string | null; gender: string | null;
   address: string | null; departmentId: number; positionId: number; hireDate: string;
   employmentType: string | null; employmentStatus: string; currentSalary: string | number | null;
+  educations?: EmployeeEducation[];
+  workExperiences?: EmployeeWorkExperience[];
   distanceFromHomeKm: number | null;
   distanceCalculation: { status: string; reason?: string | null };
   account?: { email: string; status: string }; emailDelivery?: string; warning?: string;

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Clock3, IdCard } from 'lucide-react';
 import { AppShell } from '../components/AppShell';
+import { EmployeeApiHistory } from '../components/EmployeeApiHistory';
 import { Button, Card, SectionHeader } from '../components/ui';
 import { useLanguage } from '../context/LanguageContext';
 import { useRole } from '../context/RoleContext';
@@ -50,6 +51,7 @@ export default function MyWorkspace({ mode }: { mode: 'dashboard' | 'profile' })
       {data?.profileState === 'unlinked' && <p className="mt-5 rounded-xl bg-orange-50 p-4 text-sm text-orange-800">{t('Your account has no linked employee profile. Please contact HR.')}</p>}
       {mode === 'profile' && data?.profileState === 'unavailable' && <p className="mt-5 text-sm leading-6 text-slate-500">{t('Your account information is shown above. Additional employee details are currently unavailable for this account.')}</p>}
     </Card>
+    {mode === 'profile' && data?.profileState === 'available' && <EmployeeApiHistory own initialEducations={employee?.educations} initialWorkExperiences={employee?.workExperiences} />}
     <div className="mt-5 grid gap-5 sm:grid-cols-2">
       {[{ to: '/my-profile', label: 'My Profile', description: 'View your account and available employee information.', icon: IdCard }, { to: '/my-attendance', label: 'My Attendance', description: 'Record working time using your current GPS location.', icon: Clock3 }].map(item => <Link key={item.to} to={item.to} className="rounded-2xl border border-slate-200 bg-white p-6 text-slate-900 shadow-sm transition hover:border-orange-300 focus-visible:outline-2 focus-visible:outline-orange-500"><item.icon className="text-orange-500" size={24} /><h2 className="mt-3 font-bold">{t(item.label)}</h2><p className="mt-2 text-sm leading-6 text-slate-500">{t(item.description)}</p></Link>)}
     </div>
