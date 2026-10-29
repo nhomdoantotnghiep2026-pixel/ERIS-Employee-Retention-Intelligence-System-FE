@@ -721,8 +721,18 @@ export async function listUsers(params: { page?: number; limit?: number; search?
   if (params.roleId) query.set('roleId', String(params.roleId));
   if (params.status) query.set('status', params.status);
   try {
-    const result = await request<ApiUserListResponse>(`/users?${query.toString()}`, { signal, cache: 'no-store' });
-    return { ...result, data: result.data.map(userWithRoleId) };
+    const result = await request<{ data: ApiUser[]; pagination?: ApiUserListResponse['pagination'] }>(`/users?${query.toString()}`, { signal, cache: 'no-store' });
+    const users = result.data.map(userWithRoleId);
+    if (result.pagination) return { ...result, data: users, pagination: result.pagination };
+    const search = params.search?.trim().toLocaleLowerCase() || '';
+    const filtered = users.filter(user =>
+      (!search || `${user.email} ${user.fullName || ''}`.toLocaleLowerCase().includes(search)) &&
+      (!params.roleId || Number(user.roleId) === params.roleId) &&
+      (!params.status || user.status === params.status));
+    const page = params.page ?? 1;
+    const limit = params.limit ?? 10;
+    const offset = (page - 1) * limit;
+    return { data: filtered.slice(offset, offset + limit), pagination: { page, limit, total: filtered.length, hasMore: offset + limit < filtered.length } };
   } catch (error) {
     if (error instanceof ApiError && error.status === 404) {
       throw new ApiError('User directory is unavailable on the current backend. HR account creation is still available. Contact the backend maintainer to enable the directory API.', 404, 'USER_DIRECTORY_UNAVAILABLE');
@@ -737,15 +747,17 @@ export function listEmployees(search = '') {
 }
 
 export async function getUserById(id: number) {
-  return userWithRoleId(await request<ApiUser>(`/users/${id}`));
+  const result = await request<ApiUser | { data: ApiUser }>(`/users/${id}`, { cache: 'no-store' });
+  return userWithRoleId('data' in result ? result.data : result);
 }
 
 export async function createUser(input: { email: string; roleId: number }) {
-  const result = await request<ApiUser | { message: string; data: ApiUser & { emailDelivery?: string } }>('/auth/user_register', {
+  const result = await request<(ApiUser & { emailDelivery?: string }) | { message: string; data: ApiUser & { emailDelivery?: string } }>('/auth/user_register', {
     method: 'POST',
     body: JSON.stringify({ email: input.email, roleId: input.roleId }),
   });
-  return userWithRoleId('data' in result ? result.data : result);
+  const account = 'data' in result ? result.data : result;
+  return { ...userWithRoleId(account), emailDelivery: account.emailDelivery };
 }
 
 export interface ApiRole { id: number; name: string; description?: string | null }

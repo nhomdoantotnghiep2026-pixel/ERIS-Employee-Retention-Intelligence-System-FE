@@ -33,6 +33,8 @@ test('merged account filtering, nested roles, HR creation, upload and address su
     assert.deepEqual((await api.listUsers()).data, [], 'a genuinely empty directory remains distinct from a missing endpoint');
     response = Response.json(user);
     assert.equal((await api.getUserById(9)).roleId, 2);
+    response = Response.json({ data: user });
+    assert.deepEqual(await api.getUserById(9), { ...user, roleId: 2 });
     response = Response.json({ ...user, status: 'INACTIVE' });
     await api.updateUserStatus(9, 'INACTIVE');
     assert.equal(calls.at(-1)!.url.pathname, '/api/users/9/status');

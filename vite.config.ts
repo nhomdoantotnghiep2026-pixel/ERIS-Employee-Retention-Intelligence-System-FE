@@ -37,10 +37,6 @@ react(),
       port: parseInt(process.env.PORT || '5173'),
       strictPort: process.env.STRICT_PORT === 'true',
       proxy: {
-        '/api/surveys': {
-          target: process.env.VITE_SURVEY_BACKEND_URL || env.VITE_SURVEY_BACKEND_URL || process.env.VITE_BACKEND_URL || env.VITE_BACKEND_URL || 'http://localhost:3000',
-          changeOrigin: true,
-        },
         '/admin-api': {
           target: process.env.VITE_ADMIN_BACKEND_URL || env.VITE_ADMIN_BACKEND_URL || 'http://127.0.0.1:3001',
           changeOrigin: true,

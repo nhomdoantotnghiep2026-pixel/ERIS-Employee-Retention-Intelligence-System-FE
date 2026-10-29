@@ -1103,6 +1103,8 @@ export const featureVietnamese: Record<string, string> = {
 };
 
 export const featureEnglish: Record<string, string> = {
+  "Đã tạo tài khoản nhưng không gửi được email. Không tạo lại tài khoản; vui lòng liên hệ quản trị viên.": "The account was created, but the email could not be sent. Do not create it again; please contact your administrator.",
+  "Mật khẩu tạm sẽ được gửi qua email.": "A temporary password will be sent by email.",
   "Tài khoản trong hệ thống": "System accounts",
   "Quản lý danh sách tài khoản và quyền truy cập": "Manage accounts and access permissions",
   "Tạo tài khoản": "Create account",
