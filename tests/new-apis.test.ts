@@ -49,6 +49,7 @@ test('new backend APIs use the published routes and payload contracts', async ()
     });
     await api.publishSurvey(9);
     await api.getSurveyResults(9);
+    await api.getSurveyParticipants(9);
     await api.getMySurveyResponse(9);
     await api.submitSurveyResponse(9, [{ questionId: 2, score: 4, comment: 'Good' }]);
 
@@ -77,6 +78,7 @@ test('new backend APIs use the published routes and payload contracts', async ()
       '/api/surveys',
       '/api/surveys/9/publish',
       '/api/surveys/9/results',
+      '/api/surveys/9/responses',
       '/api/surveys/9/my-response',
       '/api/surveys/9/responses',
     ]);
@@ -96,7 +98,7 @@ test('new backend APIs use the published routes and payload contracts', async ()
       title: 'Engagement check-in', description: 'Quarterly survey',
       startDate: '2026-10-01T00:00:00+07:00', endDate: '2026-10-31T23:59:59+07:00',
     });
-    assert.deepEqual(JSON.parse(String(calls[25].init?.body)), {
+    assert.deepEqual(JSON.parse(String(calls[26].init?.body)), {
       answers: [{ questionId: 2, score: 4, comment: 'Good' }],
     });
     for (const call of calls) {

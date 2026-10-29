@@ -7,6 +7,8 @@ interface RoleUser {
   name: string;
   initials: string;
   role: UserRole;
+  accountRole?: UserRole;
+  workspace?: 'management' | 'employee';
   email: string;
   available?: boolean;
 }

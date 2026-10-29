@@ -65,6 +65,35 @@ export function getAttendanceConfig(signal?: AbortSignal) {
   }>('/v1/attendance/config', { signal, cache: 'no-store' });
 }
 
+export interface CompanyLocation {
+  address: string;
+  latitude: number;
+  longitude: number;
+  source: 'env' | 'redis';
+  updatedAt: string | null;
+  updatedBy: number | null;
+}
+
+export interface CompanyLocationResponse {
+  data: CompanyLocation;
+  allowedRadiusMeters: number;
+  message?: string;
+}
+
+export function getCompanyLocation(signal?: AbortSignal) {
+  return request<CompanyLocationResponse>('/v1/attendance/company-location', {
+    signal,
+    cache: 'no-store',
+  });
+}
+
+export function updateCompanyLocation(input: Pick<CompanyLocation, 'address' | 'latitude' | 'longitude'>) {
+  return request<CompanyLocationResponse>('/v1/attendance/company-location', {
+    method: 'PUT',
+    body: JSON.stringify(input),
+  });
+}
+
 export function getTodayAttendance(signal?: AbortSignal) {
   return request<TodayAttendance>('/v1/attendance/today', { signal, cache: 'no-store' });
 }
@@ -173,6 +202,30 @@ export interface SurveyResponse {
   submittedAt: string;
 }
 
+export interface SurveyParticipantResponse {
+  responseId: number;
+  submittedAt: string;
+  employee: {
+    id: number;
+    employeeCode: string;
+    fullName: string;
+  };
+  answers: Array<{
+    questionId: number;
+    questionText: string;
+    dimensionCode?: string | null;
+    displayOrder?: number;
+    score: number | null;
+    comment: string | null;
+  }>;
+}
+
+export interface SurveyParticipantResults {
+  survey: SurveySummary;
+  responseCount: number;
+  participants: SurveyParticipantResponse[];
+}
+
 export interface SurveyResults {
   id: number;
   title: string;
@@ -214,6 +267,10 @@ export function publishSurvey(id: number) {
 
 export function getSurveyResults(id: number, signal?: AbortSignal) {
   return request<{ data: SurveyResults }>(`/surveys/${id}/results`, { signal, cache: 'no-store' });
+}
+
+export function getSurveyParticipants(id: number, signal?: AbortSignal) {
+  return request<{ data: SurveyParticipantResults }>(`/surveys/${id}/responses`, { signal, cache: 'no-store' });
 }
 
 export function getMySurveyResponse(id: number, signal?: AbortSignal) {
@@ -338,6 +395,7 @@ export interface ApiUser {
   fullName?: string | null;
   employeeId?: number | null;
   role?: string | { id?: number; name: string };
+  roleName?: string;
   roleId?: number;
   status: string;
 }
@@ -582,10 +640,13 @@ export function requestPasswordChangeOtp() {
 
 export async function getCurrentUser(signal?: AbortSignal) {
   const user = await request<ApiUser>('/auth/me', { signal, cache: 'no-store' });
-  if (ADMIN_API_BASE_URL && isAdminAccount(user) && sessionStorage.getItem('eris-api-backend') !== 'admin') {
+  const adminSession = sessionStorage.getItem('eris-api-backend') === 'admin';
+  if (ADMIN_API_BASE_URL && isAdminAccount(user) && !adminSession) {
     throw new ApiError('Vui lòng đăng nhập lại tài khoản admin.', 401, 'ADMIN_SESSION_REQUIRED');
   }
-  return user;
+  return adminSession && isAdminAccount(user) && !user.role && !user.roleName
+    ? { ...user, role: 'ADMIN' }
+    : user;
 }
 
 export interface OwnEmployeeData {

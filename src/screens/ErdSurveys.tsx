@@ -10,8 +10,8 @@ import { useRole } from '../context/RoleContext';
 import { SurveyResultDetails, surveyScoreLabels } from '../components/SurveyResultDetails';
 import {
   ApiError, createSurvey, getApiErrorMessage, getMySurveyResponse, getSurveyForEmployee,
-  getSurveyResults, listAvailableSurveys, listSurveys, publishSurvey, submitSurveyResponse,
-  type AvailableSurvey, type SurveyQuestion, type SurveyResults, type SurveySummary,
+  getSurveyParticipants, getSurveyResults, listAvailableSurveys, listSurveys, publishSurvey, submitSurveyResponse,
+  type AvailableSurvey, type SurveyParticipantResponse, type SurveyQuestion, type SurveyResults, type SurveySummary,
 } from '../services/api';
 
 const control = 'mt-2 h-11 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-orange-400 focus:ring-4 focus:ring-orange-100';
@@ -35,7 +35,7 @@ export default function ErdSurveys() {
   const [answers, setAnswers] = useState<Record<number, { score: number; comment: string }>>({});
   const [results, setResults] = useState<Record<number, SurveyResults>>({});
   const [openResults, setOpenResults] = useState<number | null>(null);
-  const [detailResult, setDetailResult] = useState<SurveyResults | null>(null);
+  const [detailResult, setDetailResult] = useState<{ result: SurveyResults; participants: SurveyParticipantResponse[] } | null>(null);
   const [loadingResults, setLoadingResults] = useState(false);
   const [publishTarget, setPublishTarget] = useState<SurveySummary | null>(null);
 
@@ -108,7 +108,10 @@ export default function ErdSurveys() {
     try {
       const { data } = await getSurveyResults(id);
       setResults(current => ({ ...current, [id]: data }));
-      if (details) setDetailResult(data);
+      if (details) {
+        const participantResult = await getSurveyParticipants(id);
+        setDetailResult({ result: data, participants: participantResult.data.participants });
+      }
       else setOpenResults(id);
     } catch (cause) {
       setError(getApiErrorMessage(cause, 'Could not load survey results.'));
@@ -253,7 +256,7 @@ export default function ErdSurveys() {
           </Card>;
         })}</div>}</>}
 
-    {isHr && detailResult && <SurveyResultDetails result={detailResult} onClose={() => setDetailResult(null)} />}
+    {isHr && detailResult && <SurveyResultDetails result={detailResult.result} participants={detailResult.participants} onClose={() => setDetailResult(null)} />}
     <ConfirmationDialog open={Boolean(publishTarget)} title="Publish survey?" description="Employees will be able to see and answer this survey during its scheduled period." confirmLabel="Publish" onCancel={() => setPublishTarget(null)} onConfirm={() => { const target = publishTarget; setPublishTarget(null); if (target) void publish(target.id); }} />
   </AppShell>;
 }

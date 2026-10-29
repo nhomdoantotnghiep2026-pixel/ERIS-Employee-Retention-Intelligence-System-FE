@@ -28,7 +28,7 @@ test('admin authenticates with its users backend; HR stays on the primary backen
     assert.deepEqual(calls.map(call=>call.url), ['/api/auth/login','/admin-api/auth/login']);
     assert.equal(values.get('eris-access-token'),'admin-token');
     assert.equal(values.get('eris-api-backend'),'admin');
-    await api.getCurrentUser();
+    assert.equal((await api.getCurrentUser()).role, 'ADMIN');
     await api.listUsers();
     assert.equal(calls.at(-2)!.url,'/admin-api/auth/me');
     assert.ok(calls.at(-1)!.url.startsWith('/admin-api/users?'));

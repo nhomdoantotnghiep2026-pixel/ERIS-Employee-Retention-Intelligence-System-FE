@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
-import { Clock3, LogIn, LogOut, MapPin } from 'lucide-react';
+import { AlertTriangle, Clock3, Crosshair, LogIn, LogOut, MapPin, Radio } from 'lucide-react';
 import { AppShell } from '../components/AppShell';
 import { Button, Card, SectionHeader } from '../components/ui';
 import { useLanguage } from '../context/LanguageContext';
 import { useRole } from '../context/RoleContext';
-import { ApiError, getApiErrorMessage, getTodayAttendance, recordAttendance, type TodayAttendance } from '../services/api';
+import { ApiError, getApiErrorMessage, getAttendanceConfig, getTodayAttendance, recordAttendance, type AttendanceResult, type TodayAttendance } from '../services/api';
 import { getAttendanceLocation } from '../utils/attendanceLocation';
 
 function attendanceError(error: unknown) {
@@ -33,6 +33,8 @@ export default function MyAttendance() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+  const [rejection, setRejection] = useState<AttendanceResult | null>(null);
+  const [maximumAccuracy, setMaximumAccuracy] = useState(100);
   const [reload, setReload] = useState(0);
   const actionRequest = useRef<AbortController | null>(null);
   const actionBusy = useRef(false);
@@ -40,9 +42,9 @@ export default function MyAttendance() {
 
   useEffect(() => {
     const controller = new AbortController();
-    setToday(null); setLoading(true); setBusy(false); setError(''); setNotice('');
-    void getTodayAttendance(controller.signal)
-      .then(result => { if (!controller.signal.aborted) setToday(result); })
+    setToday(null); setLoading(true); setBusy(false); setError(''); setNotice(''); setRejection(null);
+    void Promise.all([getTodayAttendance(controller.signal), getAttendanceConfig(controller.signal).catch(() => null)])
+      .then(([result, config]) => { if (!controller.signal.aborted) { setToday(result); if (config) setMaximumAccuracy(config.maximumAccuracyMeters); } })
       .catch(cause => { if (!controller.signal.aborted) setError(attendanceError(cause)); })
       .finally(() => { if (!controller.signal.aborted) setLoading(false); });
     return () => { controller.abort(); actionRequest.current?.abort(); actionBusy.current = false; };
@@ -54,16 +56,17 @@ export default function MyAttendance() {
     const controller = new AbortController();
     actionRequest.current = controller;
     actionBusy.current = true;
-    setBusy(true); setError(''); setNotice('');
+    setBusy(true); setError(''); setNotice(''); setRejection(null);
     let saved = false;
     try {
       const location = await getAttendanceLocation(controller.signal);
       const result = await recordAttendance(action, location, controller.signal);
       if (controller.signal.aborted) return;
       if (!result.persisted) {
+        setRejection(result);
         setError(result.status === 'LOW_ACCURACY'
-          ? 'GPS accuracy is too low. Move to an open area and try again. Attendance was not saved.'
-          : 'You are outside the allowed attendance radius. Move within 100 m of the office and try again. Attendance was not saved.');
+          ? 'GPS accuracy is too low. Attendance was not saved.'
+          : 'You are outside the allowed attendance radius. Attendance was not saved.');
         return;
       }
       saved = true;
@@ -105,7 +108,18 @@ export default function MyAttendance() {
           <Button variant="secondary" disabled={loading || busy} onClick={() => setReload(value => value + 1)}>{t('Reload attendance')}</Button>
         </div>
         {loading && <p role="status" className="mt-5 text-sm text-slate-500">{t('Loading attendance...')}</p>}
-        {error && <p role="alert" className="mt-5 rounded-xl bg-red-50 p-4 text-sm text-red-700">{t(error)}</p>}
+        {error && <div role="alert" className="mt-5 rounded-2xl border border-red-200 bg-red-50 p-4 text-red-800">
+          <div className="flex items-start gap-3"><AlertTriangle className="mt-0.5 shrink-0 text-red-600" size={20}/><div className="min-w-0"><p className="text-sm font-semibold">{t(error)}</p>
+            {rejection?.status === 'LOW_ACCURACY' && <><div className="mt-3 grid gap-2 sm:grid-cols-2">
+              <div className="flex items-center gap-2 rounded-xl bg-white/80 px-3 py-2 text-sm ring-1 ring-red-100"><Radio size={16} className="text-red-500"/><span>{t('GPS error radius')}: <strong className="tabular-nums">{Math.round(rejection.accuracyMeters)} m</strong></span></div>
+              <div className="flex items-center gap-2 rounded-xl bg-white/80 px-3 py-2 text-sm ring-1 ring-red-100"><Crosshair size={16} className="text-emerald-600"/><span>{t('Required maximum')}: <strong className="tabular-nums">≤ {maximumAccuracy} m</strong></span></div>
+            </div><p className="mt-3 text-sm leading-6 text-red-700">{t('Move near a window or outdoors, enable precise location and Wi-Fi, then try again. Desktop and device-emulation GPS may be less accurate than a phone.')}</p></>}
+            {rejection?.status === 'OUTSIDE' && <><div className="mt-3 grid gap-2 sm:grid-cols-2">
+              <div className="flex items-center gap-2 rounded-xl bg-white/80 px-3 py-2 text-sm ring-1 ring-red-100"><MapPin size={16} className="text-red-500"/><span>{t('Distance to office')}: <strong className="tabular-nums">{rejection.distanceMeters} m</strong></span></div>
+              <div className="flex items-center gap-2 rounded-xl bg-white/80 px-3 py-2 text-sm ring-1 ring-red-100"><Crosshair size={16} className="text-emerald-600"/><span>{t('Allowed radius')}: <strong className="tabular-nums">≤ {rejection.allowedRadiusMeters} m</strong></span></div>
+            </div><p className="mt-3 text-sm leading-6 text-red-700">{t('Move within the configured office radius and request a fresh GPS position before trying again.')}</p></>}
+          </div></div>
+        </div>}
         {notice && <p role="status" className="mt-5 rounded-xl bg-emerald-50 p-4 text-sm text-emerald-800">{t(notice)}</p>}
         {today && <>
           <dl className="mt-6 grid gap-4 sm:grid-cols-2">
@@ -120,7 +134,7 @@ export default function MyAttendance() {
         </div>
         {busy && <p role="status" className="mt-3 text-sm text-slate-500">{t('Getting GPS location and recording attendance...')}</p>}
       </Card>
-      <Card className="h-fit p-6"><MapPin size={25} className="text-orange-500" /><h2 className="mt-3 font-bold text-slate-900">{t('Attendance policy')}</h2><p className="mt-3 text-sm leading-6 text-slate-600">{t('Allow location access when checking in or out. You must be within 100 m of the office with an accurate GPS location.')}</p><p className="mt-3 text-sm leading-6 text-slate-600">{t('Attendance times and working minutes are calculated by the server in Vietnam time. Check out on the same work date after checking in.')}</p></Card>
+      <Card className="h-fit p-6"><MapPin size={25} className="text-orange-500" /><h2 className="mt-3 font-bold text-slate-900">{t('Attendance policy')}</h2><p className="mt-3 text-sm leading-6 text-slate-600">{t('Allow location access when checking in or out. You must be within 100 m of the office with an accurate GPS location.')}</p><div className="mt-4 rounded-xl bg-orange-50 p-3 text-sm text-orange-900"><strong>{t('GPS requirement')}:</strong> {t('error radius')} ≤ {maximumAccuracy} m</div><p className="mt-3 text-sm leading-6 text-slate-600">{t('Attendance times and working minutes are calculated by the server in Vietnam time. Check out on the same work date after checking in.')}</p></Card>
     </div>
   </AppShell>;
 }

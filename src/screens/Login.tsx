@@ -2,16 +2,19 @@ import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft,
+  BriefcaseBusiness,
   Eye,
   EyeOff,
   Leaf,
   LockKeyhole,
   UserRound,
+  UsersRound,
 } from 'lucide-react';
 import { useRole, type UserRole } from '../context/RoleContext';
 import { useLanguage } from '../context/LanguageContext';
-import { changePassword, getApiErrorMessage, getCurrentUser, login } from '../services/api';
+import { changePassword, getApiErrorMessage, getCurrentUser, login, logout } from '../services/api';
 import { isManualPasswordEdit } from '../utils/manualPassword';
+import { loginPortalForRole, mapApiRole, portalAllowsRole, workspaceRoleForPortal, type LoginPortal } from '../utils/loginPortal';
 
 const ROLE_HOME: Record<UserRole, string> = {
   HR: '/dashboard',
@@ -76,6 +79,7 @@ export default function Login() {
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [activeSlide, setActiveSlide] = useState(0);
+  const [loginPortal, setLoginPortal] = useState<LoginPortal>('management');
 
   useEffect(() => {
     const clearPasswords = () => {
@@ -103,14 +107,11 @@ export default function Login() {
     return () => window.clearInterval(timer);
   }, []);
 
-  function mapApiRole(role?: string | { name: string }, roleId?: number): UserRole {
-    const normalized = (typeof role === 'string' ? role : role?.name)?.trim().toUpperCase();
-    if (normalized === 'ADMIN' || normalized === 'SYSTEM ADMINISTRATOR') return 'System Administrator';
-    if (normalized === 'HR') return 'HR';
-    if (normalized === 'ANALYST' || normalized === 'DATA / AI ANALYST' || normalized === 'DATA_ANALYST') return 'Data / AI Analyst';
-    if (roleId === 1) return 'System Administrator';
-    if (roleId === 2) return 'HR';
-    return 'Employee / ESS';
+  function portalErrorForRole(role: UserRole) {
+    if (loginPortalForRole(role) === null) return 'Vai trò Data/AI không còn được hỗ trợ đăng nhập trong hệ thống 3 role hiện tại.';
+    return loginPortal === 'management'
+      ? 'Đây là tài khoản nhân viên. Vui lòng chọn cổng Nhân viên / ESS.'
+      : 'Đây là tài khoản thuộc khối quản trị. Vui lòng chọn cổng HR & Quản trị.';
   }
 
   async function handleSignIn(e: React.FormEvent) {
@@ -120,16 +121,34 @@ export default function Login() {
     try {
       const loginResult = await login(loginEmail.trim(), password);
       if (loginResult.passwordChangeToken) {
+        const pendingRole = loginResult.user ? mapApiRole(loginResult.user) : null;
+        if (pendingRole && !portalAllowsRole(loginPortal, pendingRole)) {
+          sessionStorage.removeItem('eris-access-token');
+          sessionStorage.removeItem('eris-api-backend');
+          setError(portalErrorForRole(pendingRole));
+          return;
+        }
         setPasswordChangeToken(loginResult.passwordChangeToken);
         setError('Mã OTP đổi mật khẩu đã được gửi tới email của tài khoản.');
         return;
       }
       const apiUser = await getCurrentUser();
       setPassword(''); setShowPass(false);
+      const resolvedRole = mapApiRole(apiUser);
+      if (!resolvedRole) {
+        await logout().catch(() => undefined);
+        sessionStorage.removeItem('eris-access-token');
+        sessionStorage.removeItem('eris-api-backend');
+        setError('Hệ thống không xác định được vai trò của tài khoản. Vui lòng liên hệ quản trị viên.');
+        return;
+      }
+      const workspaceRole = workspaceRoleForPortal(loginPortal, resolvedRole);
       const nextUser = {
         name: apiUser.fullName || apiUser.email,
         email: apiUser.email,
-        role: mapApiRole(apiUser.role, apiUser.roleId),
+        role: workspaceRole,
+        accountRole: resolvedRole,
+        workspace: loginPortal,
         initials: (apiUser.fullName || apiUser.email)
           .split(/\s+/)
           .map((part) => part[0])
@@ -137,6 +156,14 @@ export default function Login() {
           .slice(-2)
           .toUpperCase(),
       };
+      if (!portalAllowsRole(loginPortal, nextUser.role)) {
+        await logout().catch(() => undefined);
+        sessionStorage.removeItem('eris-access-token');
+        sessionStorage.removeItem('eris-api-backend');
+        setPassword(''); setShowPass(false); setPasswordEditable(false);
+        setError(portalErrorForRole(nextUser.role));
+        return;
+      }
       setUser(nextUser);
       navigate(ROLE_HOME[nextUser.role]);
     } catch (loginError) {
@@ -245,14 +272,47 @@ export default function Login() {
 
           <div className="px-1 sm:px-8">
             <div className="mb-5 text-center">
-              <h1 className="text-3xl font-bold tracking-tight text-slate-800">{t('Đăng nhập')}</h1>
-              <p className="mt-2 text-sm text-slate-500">{t('Truy cập không gian làm việc phù hợp với vai trò của bạn')}</p>
+              <h1 className="text-3xl font-bold tracking-tight text-slate-800">{t(loginPortal === 'employee' ? 'Đăng nhập nhân viên' : 'Đăng nhập khối quản trị')}</h1>
+              <p className="mt-2 text-base leading-6 text-slate-600">{t('Chọn đúng cổng; quyền truy cập được xác minh từ tài khoản của bạn.')}</p>
             </div>
+
+            {!passwordChangeToken && <div className="mb-5">
+              <div role="tablist" aria-label={t('Chọn cổng đăng nhập')} className="grid grid-cols-2 gap-1.5 rounded-2xl bg-slate-100 p-1.5">
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={loginPortal === 'management'}
+                  disabled={isSubmitting}
+                  onClick={() => {
+                    setLoginPortal('management'); setLoginEmail(''); setPassword(''); setError('');
+                    setShowPass(false); setPasswordEditable(false);
+                  }}
+                  className={`flex min-h-16 items-center gap-3 rounded-xl px-4 py-2.5 text-left transition duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-400 disabled:cursor-wait disabled:opacity-60 ${loginPortal === 'management' ? 'bg-white text-slate-900 shadow-sm ring-1 ring-slate-300' : 'text-slate-700 hover:bg-white/70 hover:text-slate-900'}`}
+                >
+                  <span className={`grid size-10 shrink-0 place-items-center rounded-xl ${loginPortal === 'management' ? 'bg-orange-50 text-orange-600' : 'bg-white text-slate-500'}`}><BriefcaseBusiness size={20} /></span>
+                  <span className="text-base font-semibold">{t('HR & Quản trị')}</span>
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={loginPortal === 'employee'}
+                  disabled={isSubmitting}
+                  onClick={() => {
+                    setLoginPortal('employee'); setLoginEmail(''); setPassword(''); setError('');
+                    setShowPass(false); setPasswordEditable(false);
+                  }}
+                  className={`flex min-h-16 items-center gap-3 rounded-xl px-4 py-2.5 text-left transition duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-400 disabled:cursor-wait disabled:opacity-60 ${loginPortal === 'employee' ? 'bg-white text-slate-900 shadow-sm ring-1 ring-slate-300' : 'text-slate-700 hover:bg-white/70 hover:text-slate-900'}`}
+                >
+                  <span className={`grid size-10 shrink-0 place-items-center rounded-xl ${loginPortal === 'employee' ? 'bg-orange-50 text-orange-600' : 'bg-white text-slate-500'}`}><UsersRound size={20} /></span>
+                  <span className="text-base font-semibold">{t('Nhân viên')}</span>
+                </button>
+              </div>
+            </div>}
 
             <form onSubmit={handleSignIn} className="space-y-4" autoComplete="off" noValidate hidden={Boolean(passwordChangeToken)}>
               <div>
-                <label htmlFor="login-email" className="mb-1.5 flex items-center gap-2 text-[13px] font-medium text-slate-600">
-                  <UserRound size={15} />
+                <label htmlFor="login-email" className="mb-2 flex items-center gap-2 text-sm font-semibold text-slate-700">
+                  <UserRound size={17} />
                   Email
                 </label>
                 <input
@@ -266,13 +326,13 @@ export default function Login() {
                   }}
                   placeholder={t('Nhập email tài khoản')}
                   autoComplete="username"
-                  className="h-12 w-full rounded-xl border border-slate-200 bg-white px-4 text-sm text-slate-700 outline-none transition focus:border-[#f47b20] focus:ring-4 focus:ring-orange-100"
+                  className="h-[52px] w-full rounded-xl border border-slate-300 bg-white px-4 text-base text-slate-800 outline-none transition placeholder:text-slate-500 focus:border-[#f47b20] focus:ring-4 focus:ring-orange-100"
                 />
               </div>
 
               <div>
-                <label htmlFor="password" className="mb-1.5 flex items-center gap-2 text-[13px] font-medium text-slate-600">
-                  <LockKeyhole size={15} />
+                <label htmlFor="password" className="mb-2 flex items-center gap-2 text-sm font-semibold text-slate-700">
+                  <LockKeyhole size={17} />
                   {t('Mật khẩu')}
                 </label>
                 <div className="relative">
@@ -299,7 +359,7 @@ export default function Login() {
                     data-lpignore="true"
                     aria-invalid={Boolean(error)}
                     aria-describedby={error ? 'login-error' : undefined}
-                    className="h-12 w-full rounded-xl border border-slate-200 bg-white px-4 pr-12 text-base outline-none transition focus:border-[#f47b20] focus:ring-4 focus:ring-orange-100"
+                    className="h-[52px] w-full rounded-xl border border-slate-300 bg-white px-4 pr-12 text-base text-slate-800 outline-none transition focus:border-[#f47b20] focus:ring-4 focus:ring-orange-100"
                   />
                   <button
                     type="button"
@@ -323,8 +383,8 @@ export default function Login() {
 
               <button
                 type="submit"
-                disabled={isSubmitting}
-                className="mt-1 h-12 w-full rounded-full bg-gradient-to-r from-[#fa8b2e] to-[#ef6827] text-sm font-semibold text-white shadow-[0_12px_28px_rgba(239,104,39,0.28)] transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_16px_32px_rgba(239,104,39,0.34)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-orange-200 active:translate-y-0"
+                disabled={isSubmitting || !loginEmail.trim() || !password}
+                className="mt-1 h-[52px] w-full rounded-full bg-gradient-to-r from-[#fa8b2e] to-[#ef6827] text-base font-semibold text-white shadow-[0_12px_28px_rgba(239,104,39,0.28)] transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_16px_32px_rgba(239,104,39,0.34)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-orange-200 active:translate-y-0 disabled:cursor-not-allowed disabled:opacity-70 disabled:shadow-none disabled:hover:translate-y-0"
               >
                 {t(isSubmitting ? 'Đang đăng nhập...' : 'Đăng nhập')}
               </button>
@@ -365,13 +425,13 @@ export default function Login() {
               </form>
             )}
 
-            <p className="mt-5 text-center text-xs leading-5 text-slate-400">
+            <p className="mt-5 text-center text-sm leading-6 text-slate-600">
               {t('Tài khoản do doanh nghiệp cấp và quản lý. Liên hệ quản trị viên nếu bạn không thể đăng nhập.')}
             </p>
-            <Link to="/forgot-password" className="mt-3 block text-center text-sm font-semibold text-orange-700 hover:underline">{t('Quên mật khẩu?')}</Link>
+            <Link to="/forgot-password" className="mt-3 block text-center text-base font-semibold text-orange-700 hover:underline">{t('Quên mật khẩu?')}</Link>
           </div>
 
-          <footer className="mt-6 text-center text-[11px] text-slate-400">{t('© 2026 ERIS · Employee Retention Intelligence System')}</footer>
+          <footer className="mt-6 text-center text-xs font-medium text-slate-500">{t('© 2026 ERIS · Employee Retention Intelligence System')}</footer>
         </div>
       </section>
 
