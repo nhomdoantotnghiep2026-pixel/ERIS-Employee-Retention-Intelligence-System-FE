@@ -1,4 +1,4 @@
-import { AlertTriangle, ArrowRight, BriefcaseBusiness, CheckCircle2, ClipboardList, MessageSquare, Target, TrendingUp, UserPlus, Users } from 'lucide-react';
+import { AlertTriangle, ArrowRight, BriefcaseBusiness, CheckCircle2, MessageSquare, Target, TrendingUp, UserPlus, Users } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { AppShell } from '../components/AppShell';
 import { AIAdvisoryBanner, Card, RiskBadge } from '../components/ui';
@@ -29,7 +29,6 @@ export default function Dashboard() {
     { label: 'Risk Review', icon: AlertTriangle, to: '/attrition-risk', tone: 'bg-red-100 text-red-600' },
     { label: 'Interventions', icon: Target, to: '/interventions', tone: 'bg-orange-100 text-orange-600' },
     { label: 'Survey', icon: MessageSquare, to: '/engagement', tone: 'bg-emerald-100 text-emerald-600' },
-    { label: 'Reports', icon: ClipboardList, to: '/executive-reports', tone: 'bg-amber-100 text-amber-700' },
   ];
 
   return (
@@ -55,7 +54,7 @@ export default function Dashboard() {
           <Card className="overflow-hidden">
             <WidgetTitle title={t('Employees needing attention')} description={t('Highest retention risk scores this week')} action={<button onClick={() => navigate('/employees')} className="text-xs font-bold text-orange-600 hover:underline">{t('View all')} →</button>} />
             <div className="divide-y divide-slate-100">
-              {priority.length === 0 && <div className="px-5 py-8"><p className="font-semibold text-slate-700">{t(analyzed.length ? 'No employees are currently classified as high risk.' : 'No prediction results are available for HR review.')}</p><p className="mt-2 text-sm leading-6 text-slate-500">{t(analyzed.length ? 'You can review all employees or continue tracking retention actions.' : 'Review profiles, collect survey responses and prepare period-based data. Results will appear here after the Data / AI Analyst runs predictions.')}</p><button onClick={() => navigate(analyzed.length ? '/employees' : '/preparation')} className="mt-4 text-sm font-bold text-orange-700">{t(analyzed.length ? 'View employees' : 'Prepare data')} →</button></div>}
+              {priority.length === 0 && <div className="px-5 py-8"><p className="font-semibold text-slate-700">{t(analyzed.length ? 'No employees are currently classified as high risk.' : 'No prediction results are available for HR review.')}</p><p className="mt-2 text-sm leading-6 text-slate-500">{t(analyzed.length ? 'You can review all employees or continue tracking retention actions.' : 'Review profiles and collect survey responses. Results will appear here after analysis data becomes available.')}</p><button onClick={() => navigate('/employees')} className="mt-4 text-sm font-bold text-orange-700">{t('View employees')} →</button></div>}
               {priority.map(employee => <button key={employee.id} onClick={() => navigate(`/employees/${employee.id}`, { state: { returnTo: '/dashboard' } })} className="flex min-h-[72px] w-full items-center gap-3 px-5 py-3 text-left transition hover:bg-orange-50/70"><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-orange-100 to-amber-100 text-xs font-bold text-orange-700">{employee.initials}</span><span className="min-w-0 flex-1"><b className="block truncate text-sm text-slate-900">{employee.name}</b><span className="mt-0.5 block truncate text-xs text-slate-500">{t(employee.department)} · {t(employee.role)}</span></span><RiskBadge level={employee.riskLevel} score={employee.riskScore} /><ArrowRight size={16} className="text-slate-300" /></button>)}
             </div>
           </Card>

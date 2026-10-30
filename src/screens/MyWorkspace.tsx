@@ -7,13 +7,22 @@ import { Button, Card, SectionHeader } from '../components/ui';
 import { useLanguage } from '../context/LanguageContext';
 import { useRole } from '../context/RoleContext';
 import { getApiErrorMessage, getOwnEmployeeData, type OwnEmployeeData } from '../services/api';
+import { useAutoDismissState } from '../hooks/useAutoDismissState';
+import { employeeDate } from '../utils/employeeDates';
+
+function profileDate(value: string | null | undefined, language: string) {
+  const date = employeeDate(value);
+  if (!date) return '—';
+  const [year, month, day] = date.split('-');
+  return language === 'vi' ? `${day}/${month}/${year}` : `${month}/${day}/${year}`;
+}
 
 export default function MyWorkspace({ mode }: { mode: 'dashboard' | 'profile' }) {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const { user } = useRole();
   const [data, setData] = useState<OwnEmployeeData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [error, setError] = useAutoDismissState(7000);
   const [reload, setReload] = useState(0);
 
   useEffect(() => {
@@ -36,8 +45,8 @@ export default function MyWorkspace({ mode }: { mode: 'dashboard' | 'profile' })
   ] : [];
   if (mode === 'profile' && employee) items.push(
     ['Employee code', employee.employeeCode], ['Phone', employee.phone || '—'],
-    ['Date of birth', employee.dateOfBirth || '—'], ['Address', employee.address || '—'],
-    ['Hire date', employee.hireDate], ['Employment type', employee.employmentType || '—'],
+    ['Date of birth', profileDate(employee.dateOfBirth, language)], ['Address', employee.address || '—'],
+    ['Hire date', profileDate(employee.hireDate, language)], ['Employment type', employee.employmentType || '—'],
     ['Employment status', t(statuses[employee.employmentStatus] || employee.employmentStatus)],
   );
 

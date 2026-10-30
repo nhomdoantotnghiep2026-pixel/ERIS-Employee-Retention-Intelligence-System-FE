@@ -7,14 +7,14 @@ import { useRole } from '../context/RoleContext';
 import type { WorkflowRequest } from '../services/employeeWorkflow';
 import { listEmployeeRequests, reviewEmployeeRequest, REQUESTS_EVENT } from '../workflows/employeeRequests';
 import { recordAudit } from '../workflows/audit';
+import { useAutoDismissFeedback } from '../hooks/useAutoDismissState';
 
 export default function EmployeeRequests() {
   const { t } = useLanguage();
   const { user } = useRole();
   const [requests, setRequests] = useState<WorkflowRequest[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [message, setMessage] = useState('');
+  const { error, message, setError, setMessage } = useAutoDismissFeedback();
   const [decision, setDecision] = useState<{ request: WorkflowRequest; status: 'Approved' | 'Rejected' } | null>(null);
   const [note, setNote] = useState('');
   const [saving, setSaving] = useState(false);

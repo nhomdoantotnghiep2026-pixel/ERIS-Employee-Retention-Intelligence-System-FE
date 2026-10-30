@@ -3,6 +3,7 @@ import { AppShell } from '../components/AppShell';
 import { Button, Card, ConfirmationDialog, SectionHeader } from '../components/ui';
 import { ApiError, createUser, getApiErrorMessage, getUserById, listUsers, updateUserStatus, type ApiUser } from '../services/api';
 import { useLanguage } from '../context/LanguageContext';
+import { useAutoDismissFeedback } from '../hooks/useAutoDismissState';
 
 const CREATE_ROLE_OPTIONS = [{ id: 2, name: 'HR' }];
 const control = 'mt-2 w-full rounded-xl border border-slate-300 bg-white p-3 text-sm';
@@ -25,8 +26,7 @@ export default function ErdAccounts() {
   const [editStatus, setEditStatus] = useState('ACTIVE');
   const [loading, setLoading] = useState(true);
   const [directoryUnavailable, setDirectoryUnavailable] = useState(false);
-  const [error, setError] = useState('');
-  const [message, setMessage] = useState('');
+  const { error, message, setError, setMessage } = useAutoDismissFeedback();
   const [page, setPage] = useState(1);
   const [searchInput, setSearchInput] = useState('');
   const [filterRoleId, setFilterRoleId] = useState<number | undefined>();

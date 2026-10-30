@@ -7,6 +7,7 @@ import { useEmployees } from '../context/EmployeeContext';
 import { useRole } from '../context/RoleContext';
 import { useWorkflow } from '../context/WorkflowContext';
 import { snapshotIsCurrent } from '../workflows/domain';
+import { useAutoDismissState } from '../hooks/useAutoDismissState';
 
 export default function WorkforceSnapshot() {
   const { t } = useLanguage();
@@ -16,7 +17,7 @@ export default function WorkforceSnapshot() {
   const { employees } = useEmployees();
   const { snapshot, generateSnapshot } = useWorkflow();
   const [period, setPeriod] = useState({ start: snapshot?.start || '', end: snapshot?.end || '', scope: snapshot?.scope || '' });
-  const [error, setError] = useState('');
+  const [error, setError] = useAutoDismissState(7000);
   const current = snapshot && snapshotIsCurrent(snapshot, employees);
   const sameSelection = snapshot && snapshot.start === period.start && snapshot.end === period.end && snapshot.scope === period.scope;
   const ready = snapshot && current && sameSelection && !snapshot.issues.length;

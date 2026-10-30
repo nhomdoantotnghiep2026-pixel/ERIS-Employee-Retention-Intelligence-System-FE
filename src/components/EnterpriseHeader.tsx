@@ -5,6 +5,7 @@ import { useRole, type UserRole } from '../context/RoleContext';
 import { useLanguage } from '../context/LanguageContext';
 import { logout } from '../services/api';
 import { RoleJourney } from './RoleJourney';
+import { hasRoutePermission } from '../utils/rbacAccess';
 
 type Link = { label: string; to: string };
 type Props = { breadcrumb?: string[]; sidebarOpen: boolean; toggleSidebar: () => void; links: Record<UserRole, { items: Link[] }[]> };
@@ -26,7 +27,7 @@ export function EnterpriseHeader({ breadcrumb, sidebarOpen, toggleSidebar, links
   const root = useRef<HTMLElement>(null);
   const helpButton = useRef<HTMLButtonElement>(null);
   const pages = links[user.role].flatMap(group => group.items);
-  const notificationItems = notices[user.role];
+  const notificationItems = notices[user.role].filter(item => hasRoutePermission(user.role, item.to));
   const key = (i: number) => `${user.role}:${i}`;
   const unread = notificationItems.filter((_, i) => !read.includes(key(i))).length;
   const title = t((breadcrumb?.length ? breadcrumb[breadcrumb.length - 1] : pages.find(page => pathname.startsWith(page.to))?.label) || 'Workspace');

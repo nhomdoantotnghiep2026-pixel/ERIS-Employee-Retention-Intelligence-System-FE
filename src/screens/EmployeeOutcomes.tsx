@@ -7,6 +7,7 @@ import { useEmployees } from '../context/EmployeeContext';
 import { useWorkflow } from '../context/WorkflowContext';
 import { recordAudit } from '../workflows/audit';
 import { downloadTextFile, toCsv } from '../utils/demoActions';
+import { useAutoDismissState } from '../hooks/useAutoDismissState';
 interface Outcome { id: string; employee_id: string; prediction_result_id: string | null; observed_date: string; outcome: string; notes: string; created_at: string }
 function load(): Outcome[] { try { const value = JSON.parse(sessionStorage.getItem('eris-outcomes-v1') || '[]'); return Array.isArray(value) ? value : []; } catch { return []; } }
 export default function EmployeeOutcomes() {
@@ -18,7 +19,7 @@ export default function EmployeeOutcomes() {
   const [records, setRecords] = useState(load);
   const [draft, setDraft] = useState({ employee_id: params.get('employee') || '', observed_date: '', outcome: 'Retained', notes: '' });
   const [confirm, setConfirm] = useState(false);
-  const [message, setMessage] = useState('');
+  const [message, setMessage] = useAutoDismissState();
   const latest = runs.flatMap(run => run.results).find(result => result.employee_id === draft.employee_id);
   const submit = (event: FormEvent) => { event.preventDefault(); if (!employees.some(employee => employee.id === draft.employee_id)) { setMessage('Chọn nhân viên hợp lệ.'); return; } setConfirm(true); };
   const save = () => {

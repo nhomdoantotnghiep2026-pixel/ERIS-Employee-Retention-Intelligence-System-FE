@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Eye, EyeOff, LockKeyhole, Mail, ShieldCheck } from 'lucide-react';
 import { getApiErrorMessage, requestPasswordReset, resetPassword } from '../services/api';
 import { useLanguage } from '../context/LanguageContext';
+import { useAutoDismissFeedback } from '../hooks/useAutoDismissState';
 
 export default function ForgotPassword() {
   const { t } = useLanguage();
@@ -13,8 +14,7 @@ export default function ForgotPassword() {
   const [showPassword, setShowPassword] = useState(false);
   const [step, setStep] = useState<'email' | 'reset'>('email');
   const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState('');
-  const [error, setError] = useState('');
+  const { error, message, setError, setMessage } = useAutoDismissFeedback();
 
   async function sendOtp(event: React.FormEvent) {
     event.preventDefault(); setBusy(true); setError(''); setMessage('');

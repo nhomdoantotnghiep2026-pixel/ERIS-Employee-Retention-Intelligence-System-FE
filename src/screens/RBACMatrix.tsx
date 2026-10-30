@@ -14,7 +14,6 @@ export const defaultPermissionMatrix: { category: string; items: { label: string
     items: [
       { label: 'View Employee Directory', access: { 'HR': true, 'Data / AI Analyst': true, 'System Administrator': false, 'Employee / ESS': false } },
       { label: 'Edit Employee Records', access: { 'HR': true, 'Data / AI Analyst': true, 'System Administrator': false, 'Employee / ESS': false } },
-      { label: 'Prepare Workforce Snapshot', access: { 'HR': true, 'Data / AI Analyst': true, 'System Administrator': false, 'Employee / ESS': false } },
       { label: 'Record Employee Outcomes', access: { 'HR': true, 'Data / AI Analyst': false, 'System Administrator': false, 'Employee / ESS': false } },
       { label: 'Export Employee Data', access: { 'HR': true, 'Data / AI Analyst': false, 'System Administrator': false, 'Employee / ESS': false } },
     ],
@@ -48,13 +47,6 @@ export const defaultPermissionMatrix: { category: string; items: { label: string
     items: [
       { label: 'View Own Profile', access: { 'HR': false, 'Data / AI Analyst': false, 'System Administrator': false, 'Employee / ESS': true } },
       { label: 'Record Own Attendance', access: { 'HR': false, 'Data / AI Analyst': false, 'System Administrator': false, 'Employee / ESS': true } },
-    ],
-  },
-  {
-    category: 'Reports',
-    items: [
-      { label: 'View Executive Reports', access: { 'HR': true, 'Data / AI Analyst': false, 'System Administrator': false, 'Employee / ESS': false } },
-      { label: 'Generate & Export Reports', access: { 'HR': true, 'Data / AI Analyst': false, 'System Administrator': false, 'Employee / ESS': false } },
     ],
   },
   {

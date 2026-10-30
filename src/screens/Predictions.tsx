@@ -6,6 +6,7 @@ import { Button, Card, ConfirmationDialog, SectionHeader, RiskBadge } from '../c
 import { useWorkflow } from '../context/WorkflowContext';
 import { useEmployees } from '../context/EmployeeContext';
 import { snapshotIsCurrent } from '../workflows/domain';
+import { useAutoDismissState } from '../hooks/useAutoDismissState';
 
 export default function Predictions() {
   const { t } = useLanguage();
@@ -13,7 +14,7 @@ export default function Predictions() {
   const { snapshot, models, runs, generate } = useWorkflow();
   const { employees } = useEmployees();
   const [runId, setRunId] = useState('');
-  const [error, setError] = useState('');
+  const [error, setError] = useAutoDismissState(7000);
   const [confirm, setConfirm] = useState(false);
   const [detail, setDetail] = useState('');
   const active = models.find(model => model.status === 'Active');

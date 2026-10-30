@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
+import { useEffect, useState, type FormEvent, type MouseEvent, type ReactNode } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { BadgeCheck, BriefcaseBusiness, Building2, CalendarDays, CheckCircle2, IdCard, Mail, MapPin, Phone, Route, UserRound, WalletCards } from 'lucide-react';
 import { MotionConfig, motion } from 'motion/react';
@@ -7,6 +7,7 @@ import { AppShell } from '../components/AppShell';
 import { EmployeeCreateBackgroundFields, type CreateEducationDraft, type CreateExperienceDraft } from '../components/EmployeeCreateBackgroundFields';
 import { EmployeeApiHistory } from '../components/EmployeeApiHistory';
 import { employeeDate, jobChangeDateRestriction } from '../utils/employeeDates';
+import { useAutoDismissFeedback } from '../hooks/useAutoDismissState';
 import { Button, Card } from '../components/ui';
 import { useLanguage } from '../context/LanguageContext';
 import { createEmployeeProfile, deactivateEmployeeProfile, getEmployeeProfile, listEmployeeProfiles, updateEmployeeProfile,
@@ -56,7 +57,9 @@ export default function HrEmployees() {
   const [status, setStatus] = useState('ACTIVE');
   const [page, setPage] = useState(1), [total, setTotal] = useState(0), [pages, setPages] = useState(0);
   const [revision, setRevision] = useState(0), [loading, setLoading] = useState(true), [pending, setPending] = useState(false);
-  const [error, setError] = useState(''), [message, setMessage] = useState(''), [emailError, setEmailError] = useState('');
+  const { error, message, setError, setMessage } = useAutoDismissFeedback();
+  const [emailError, setEmailError] = useState('');
+
   const jobDateRestriction = detail ? jobChangeDateRestriction(detail.hireDate) : null;
   const jobDateMessage = jobDateRestriction === 'future'
     ? text(`Chưa thể đổi phòng ban/vị trí vì ngày vào làm (${dateOnly(detail?.hireDate)}) chưa đến. Bạn vẫn có thể cập nhật các thông tin khác.`, `Department/position changes are unavailable before the hire date (${dateOnly(detail?.hireDate)}). Other information can still be updated.`)
@@ -194,7 +197,11 @@ export default function HrEmployees() {
     finally { setPending(false); }
   }
 
-  function beginInlineEdit() {
+  function beginInlineEdit(event: MouseEvent<HTMLButtonElement>) {
+    // This control lives inside the employee form, but entering edit mode must
+    // never be interpreted as a save attempt.
+    event.preventDefault();
+    event.stopPropagation();
     if (!detail) return;
     setShowAddressSuggestions(false);
     setAddressSuggestions([]);
@@ -350,11 +357,9 @@ export default function HrEmployees() {
               <div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><h2 className="break-words text-2xl font-bold tracking-[-0.02em] text-slate-950">{editing ? form.fullName || detail.fullName : detail.fullName}</h2><span className={`inline-flex min-h-7 items-center gap-1.5 rounded-full border px-2.5 text-xs font-semibold ${detail.employmentStatus === 'ACTIVE' ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-slate-200 bg-slate-100 text-slate-600'}`}><span className={`size-1.5 rounded-full ${detail.employmentStatus === 'ACTIVE' ? 'bg-emerald-500' : 'bg-slate-400'}`} />{active(detail.employmentStatus)}</span>{editing && <span className="inline-flex min-h-7 items-center rounded-full bg-orange-50 px-2.5 text-xs font-semibold text-orange-700 ring-1 ring-orange-200">{text('Đang chỉnh sửa', 'Editing')}</span>}</div>
                 <p className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-slate-600"><span className="font-semibold text-slate-800">{detail.employeeCode}</span><span aria-hidden="true">·</span><span>{editing ? departments.find(item => String(item.id) === form.departmentId)?.name || detailDepartment : detailDepartment}</span><span aria-hidden="true">·</span><span>{editing ? positions.find(item => String(item.id) === form.positionId)?.name || detailPosition : detailPosition}</span></p></div>
             </div>
-            {detail.employmentStatus !== 'INACTIVE' && <div className="flex shrink-0 flex-wrap gap-2">{editing ? <><Button className="text-sm" disabled={pending || !!catalogError}>{text(pending ? 'Đang lưu...' : 'Lưu thay đổi', pending ? 'Saving...' : 'Save changes')}</Button><Button type="button" className="text-sm" variant="secondary" disabled={pending} onClick={cancelInlineEdit}>{text('Hủy', 'Cancel')}</Button></> : <><Button type="button" className="text-sm" onClick={beginInlineEdit}>{text('Chỉnh sửa hồ sơ', 'Edit profile')}</Button><Button type="button" className="text-sm border-red-200 text-red-700 hover:border-red-300 hover:bg-red-50 hover:text-red-800" variant="secondary" disabled={pending} onClick={() => void deactivate(detail)}>{text('Ngừng hoạt động', 'Deactivate')}</Button></>}</div>}
+            {detail.employmentStatus !== 'INACTIVE' && <div className="flex shrink-0 flex-wrap gap-2">{editing ? <><Button type="submit" className="text-sm" disabled={pending || !!catalogError}>{text(pending ? 'Đang lưu...' : 'Lưu thay đổi', pending ? 'Saving...' : 'Save changes')}</Button><Button type="button" className="text-sm" variant="secondary" disabled={pending} onClick={cancelInlineEdit}>{text('Hủy', 'Cancel')}</Button></> : <><Button type="button" className="text-sm" onClick={beginInlineEdit}>{text('Chỉnh sửa hồ sơ', 'Edit profile')}</Button><Button type="button" className="text-sm border-red-200 text-red-700 hover:border-red-300 hover:bg-red-50 hover:text-red-800" variant="secondary" disabled={pending} onClick={() => void deactivate(detail)}>{text('Ngừng hoạt động', 'Deactivate')}</Button></>}</div>}
           </div>
         </Card></motion.div>
-
-        {editing && <motion.p variants={createItemMotion} className="rounded-2xl border border-orange-100 bg-orange-50/70 px-4 py-3 text-sm leading-6 text-slate-700"><span className="font-semibold text-orange-800">{text('Chỉnh sửa tại chỗ. ', 'Edit in place. ')}</span>{text('Email, ngày sinh và ngày vào làm được giữ ở chế độ chỉ đọc để bảo toàn tài khoản và lịch sử nhân sự.', 'Email, date of birth and hire date remain read-only to preserve account and employment history integrity.')}</motion.p>}
 
         <div className="grid gap-5 lg:grid-cols-3">
           <motion.section variants={createItemMotion} whileHover={{ y: -2 }} className="rounded-[20px] border border-white/80 bg-white p-5 shadow-[0_8px_28px_rgba(30,41,59,0.06)] transition-shadow duration-300 hover:shadow-[0_14px_38px_rgba(30,41,59,0.09)]">

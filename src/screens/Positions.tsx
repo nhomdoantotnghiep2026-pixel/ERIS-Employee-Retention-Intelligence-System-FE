@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { AppShell } from '../components/AppShell';
 import { Button, Card, SectionHeader } from '../components/ui';
 import { useLanguage } from '../context/LanguageContext';
+import { useAutoDismissFeedback } from '../hooks/useAutoDismissState';
 import { createPosition, deactivatePosition, getApiErrorMessage, getPositionById, listPositions, updatePosition, POSITION_LEVELS, type ApiPosition } from '../services/api';
 
 const control = 'mt-2 w-full rounded-xl border border-slate-300 bg-white p-3 text-sm focus:outline-orange-500 disabled:opacity-60';
@@ -17,8 +18,7 @@ export default function Positions() {
   const [loading, setLoading] = useState(true);
   const [pending, setPending] = useState(false);
   const [listError, setListError] = useState('');
-  const [error, setError] = useState('');
-  const [message, setMessage] = useState('');
+  const { error, message, setError, setMessage } = useAutoDismissFeedback();
   const [revision, setRevision] = useState(0);
   const [editing, setEditing] = useState<ApiPosition | null>(null);
   const [name, setName] = useState('');

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { AppShell } from '../components/AppShell';
 import { Button, Card, SectionHeader } from '../components/ui';
 import { createDepartment, getApiErrorMessage, getDepartmentById, listDepartments, updateDepartment, type ApiDepartment } from '../services/api';
+import { useAutoDismissFeedback } from '../hooks/useAutoDismissState';
 
 const control = 'mt-2 w-full rounded-xl border border-slate-300 bg-white p-3 text-sm';
 
@@ -15,8 +16,7 @@ export default function ErdDepartments() {
   const [hasMore, setHasMore] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState('');
-  const [message, setMessage] = useState('');
+  const { error, message, setError, setMessage } = useAutoDismissFeedback();
   const [form, setForm] = useState({ code: '', name: '', description: '' });
 
   async function refresh() {

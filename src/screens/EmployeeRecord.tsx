@@ -7,6 +7,7 @@ import { useEmployees } from '../context/EmployeeContext';
 import { INPUT_FIELDS } from '../workflows/domain';
 import { employeeReferences } from '../workflows/references';
 import type { Employee } from '../data/mockData';
+import { useAutoDismissState } from '../hooks/useAutoDismissState';
 import { ErdEmployeeRelations } from '../components/ErdEmployeeRelations';
 import { useErd } from '../erd/useErd';
 
@@ -22,7 +23,7 @@ export default function EmployeeRecord() {
   const db = useErd();
   const master = db.employees.find(row => row.id === id);
   const [draft, setDraft] = useState<Partial<Employee>>(() => ({ ...employee,monthlyIncome:typeof master?.current_salary === 'number' ? master.current_salary:undefined }));
-  const [error, setError] = useState('');
+  const [error, setError] = useAutoDismissState(7000);
   const [confirm, setConfirm] = useState<'save' | 'archive' | null>(null);
   const set = (field: string, value: string | number | undefined) => { setDraft(previous => ({ ...previous, [field]: value })); setError(''); };
   if (!employee) return <AppShell breadcrumb={['Employees']}><Card className="p-6">{t("Employee not found.")}<Button onClick={() => navigate('/employees')}>{t("Employee directory")}</Button></Card></AppShell>;

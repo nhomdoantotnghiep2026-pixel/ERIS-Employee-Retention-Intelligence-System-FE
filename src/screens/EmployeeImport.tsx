@@ -4,6 +4,7 @@ import { AppShell } from '../components/AppShell';
 import { Button, Card, SectionHeader } from '../components/ui';
 import { importEmployees, getApiErrorMessage, type EmployeeImportResponse } from '../services/api';
 import { useLanguage } from '../context/LanguageContext';
+import { useAutoDismissFeedback } from '../hooks/useAutoDismissState';
 
 const REQUIRED_HEADERS = 'fullName,email,phone,dateOfBirth,gender,address,departmentId,positionId,hireDate,employmentType,currentSalary';
 
@@ -12,8 +13,7 @@ export default function EmployeeImport() {
   const navigate = useNavigate();
   const [file, setFile] = useState<File | null>(null);
   const [pending, setPending] = useState(false);
-  const [message, setMessage] = useState('');
-  const [error, setError] = useState('');
+  const { error, message, setError, setMessage } = useAutoDismissFeedback();
   const [result, setResult] = useState<EmployeeImportResponse | null>(null);
 
   function selectFile(nextFile: File | null) {

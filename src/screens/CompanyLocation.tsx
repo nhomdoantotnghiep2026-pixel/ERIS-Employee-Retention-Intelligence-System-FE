@@ -7,6 +7,7 @@ import {
 import { AppShell } from '../components/AppShell';
 import { Button, Card, SectionHeader } from '../components/ui';
 import { useLanguage } from '../context/LanguageContext';
+import { useAutoDismissFeedback } from '../hooks/useAutoDismissState';
 import {
   getApiErrorMessage, getCompanyLocation, searchPlaces, updateCompanyLocation,
   type PlaceSuggestion,
@@ -38,8 +39,7 @@ export default function CompanyLocationScreen() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [locating, setLocating] = useState(false);
-  const [error, setError] = useState('');
-  const [message, setMessage] = useState('');
+  const { error, message, setError, setMessage } = useAutoDismissFeedback();
   const [confirmed, setConfirmed] = useState(false);
   const [positionReady, setPositionReady] = useState(true);
   const [suggestions, setSuggestions] = useState<PlaceSuggestion[]>([]);

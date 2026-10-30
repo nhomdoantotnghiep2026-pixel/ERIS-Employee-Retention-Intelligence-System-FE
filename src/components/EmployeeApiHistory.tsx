@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from 'react';
 import { BriefcaseBusiness, Building2, CalendarDays, GraduationCap, Pencil, Power, Trash2 } from 'lucide-react';
 import { Button, Card } from './ui';
 import { useLanguage } from '../context/LanguageContext';
+import { useAutoDismissFeedback } from '../hooks/useAutoDismissState';
 import {
   createEmployeeEducation, createEmployeeWorkExperience, deactivateEmployeeEducation, deactivateEmployeeWorkExperience, getApiErrorMessage, getCurrentUser,
   listEmployeeEducation, listEmployeeJobHistory, listOwnEducation, listOwnJobHistory,
@@ -54,11 +55,10 @@ export function EmployeeApiHistory({ employeeId, employeeEmail, dateOfBirth, own
   const [workExperiences, setWorkExperiences] = useState<EmployeeWorkExperience[]>(initialWorkExperiences);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState('');
+  const { error, message: notice, setError, setMessage: setNotice } = useAutoDismissFeedback();
   const [educationError, setEducationError] = useState('');
   const [historyError, setHistoryError] = useState('');
   const [workExperienceError, setWorkExperienceError] = useState('');
-  const [notice, setNotice] = useState('');
   const [revision, setRevision] = useState(0);
   const [editing, setEditing] = useState<EmployeeEducation | null>(null);
   const [showEducationForm, setShowEducationForm] = useState(false);

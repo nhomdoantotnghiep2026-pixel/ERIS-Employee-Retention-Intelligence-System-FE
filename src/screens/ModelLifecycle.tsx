@@ -4,12 +4,13 @@ import { useNavigate } from 'react-router-dom';
 import { AppShell } from '../components/AppShell';
 import { Button, Card, ConfirmationDialog, SectionHeader, StatusBadge } from '../components/ui';
 import { useWorkflow } from '../context/WorkflowContext';
+import { useAutoDismissState } from '../hooks/useAutoDismissState';
 
 export default function ModelLifecycle() {
   const { t, language } = useLanguage();
   const navigate = useNavigate();
   const { models, evaluate, activate } = useWorkflow();
-  const [error, setError] = useState('');
+  const [error, setError] = useAutoDismissState(7000);
   const [pending, setPending] = useState<string | null>(null);
   return <AppShell breadcrumb={['AI Models', 'Evaluate & activate']}>
     <SectionHeader title={t("Đánh giá và kích hoạt phiên bản model")} description={t("Đánh giá trên bộ kiểm thử có nhãn → xem kết quả → xác nhận kích hoạt. Chỉ một phiên bản Active.")}><Button variant="secondary" onClick={() => navigate('/predictions')}>{t("Chạy dự đoán")}</Button></SectionHeader>

@@ -45,8 +45,9 @@ test('stored admin policy can restrict access inside the permitted role routes',
   assert.equal(hasRoutePermission('Data / AI Analyst', '/employees'), true);
   storage.clear();
 });
-test('new snapshot and outcome permissions use the corrected role defaults', () => {
-  assert.equal(hasRoutePermission('HR', '/preparation'), true);
+test('unsupported snapshot routes stay closed while outcome permissions keep their role defaults', () => {
+  assert.equal(hasRoutePermission('HR', '/preparation'), false);
+  assert.equal(hasRoutePermission('Data / AI Analyst', '/preparation'), false);
   assert.equal(hasRoutePermission('HR', '/outcomes'), true);
   assert.equal(hasRoutePermission('Data / AI Analyst', '/outcomes'), false);
   assert.equal(hasRoutePermission('Data / AI Analyst', '/predictions'), true);

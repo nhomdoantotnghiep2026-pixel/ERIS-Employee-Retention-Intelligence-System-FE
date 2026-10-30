@@ -3,14 +3,14 @@ import { readSidebarGroups, saveSidebarGroups } from '../utils/sidebarGroups';
 import { type ReactNode, useEffect, useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import {
-  LayoutDashboard, Users, BarChart3, Database,
+  LayoutDashboard, Users, BarChart3,
   Settings, ChevronDown, Bell, Search, HelpCircle, LogOut,
   User, Shield, Activity, GitBranch, AlertTriangle,
   BarChart2, ServerCog, Network, UserPlus, Target, MessageSquare,
-  FileBarChart2, Workflow, Sliders, Table2, BrainCircuit,
+  Workflow, Sliders, Table2, BrainCircuit,
   TrendingUp, History, ScrollText, Zap, ClipboardList,
-  HeartPulse, Download, MonitorCheck, KeyRound, X, Leaf, ChevronLeft, Upload, RefreshCw,
-  CalendarClock, WalletCards, ClipboardCheck, DoorOpen, MapPinned
+  HeartPulse, Download, MonitorCheck, KeyRound, X, Leaf, ChevronLeft, Upload,
+  ClipboardCheck, MapPinned
 } from 'lucide-react';
 import { useRole, type UserRole } from '../context/RoleContext';
 import { useLanguage } from '../context/LanguageContext';
@@ -34,16 +34,11 @@ const NAV_BY_ROLE: Record<UserRole, NavGroup[]> = {
         { label: 'Employee Directory', icon: Users, to: '/employees' },
         { label: 'Add Employee', icon: UserPlus, to: '/employees/new' },
         { label: 'Import Employees', icon: Upload, to: '/employees/import' },
-        { label: 'Bulk Update', icon: RefreshCw, to: '/employees/bulk-update' },
-        { label: 'Workforce Snapshot', icon: Database, to: '/preparation' },
         { label: 'Departments', icon: Network, to: '/departments' },
         { label: 'Positions', icon: ClipboardList, to: '/positions' },
-        { label: 'Employee Requests', icon: ClipboardList, to: '/employee-requests' },
         { label: 'Attendance History', icon: Activity, to: '/attendance' },
         { label: 'Company Location', icon: MapPinned, to: '/company-location' },
         { label: 'Education & Job History', icon: History, to: '/employee-history' },
-        { label: 'Org Chart', icon: Network, to: '/org-chart' },
-        { label: 'Onboarding & Offboarding', icon: UserPlus, to: '/onboarding' },
       ],
     },
     {
@@ -60,12 +55,6 @@ const NAV_BY_ROLE: Record<UserRole, NavGroup[]> = {
         { label: 'Engagement Surveys', icon: MessageSquare, to: '/engagement' },
       ],
     },
-    {
-      group: 'Reports',
-      items: [
-        { label: 'Executive Reports', icon: FileBarChart2, to: '/executive-reports' },
-      ],
-    },
   ],
   'Employee / ESS': [
     {
@@ -79,10 +68,6 @@ const NAV_BY_ROLE: Record<UserRole, NavGroup[]> = {
       group: 'Self Service',
       items: [
         { label: 'My Attendance', icon: Activity, to: '/my-attendance' },
-        { label: 'Requests & Approvals', icon: CalendarClock, to: '/my-requests' },
-        { label: 'My Payslips', icon: WalletCards, to: '/my-payroll' },
-        { label: 'Goals & Review', icon: ClipboardCheck, to: '/my-performance' },
-        { label: 'Offboarding', icon: DoorOpen, to: '/my-offboarding' },
         { label: 'My Surveys', icon: HeartPulse, to: '/my-surveys' },
       ],
     },
@@ -99,7 +84,6 @@ const NAV_BY_ROLE: Record<UserRole, NavGroup[]> = {
       items: [
         { label: 'Employee Directory', icon: Users, to: '/employees' },
         { label: 'Add Employee', icon: UserPlus, to: '/employees/new' },
-        { label: 'Data Preparation', icon: Workflow, to: '/preparation' },
         { label: 'Schema & Mapping', icon: Table2, to: '/schema' },
       ],
     },
@@ -148,7 +132,7 @@ const NAV_BY_ROLE: Record<UserRole, NavGroup[]> = {
 function SidebarLink({ to, icon: Icon, label, onNavigate, collapsed = false, nested = false }: NavItem & { onNavigate?: () => void; collapsed?: boolean; nested?: boolean }) {
   const { pathname } = useLocation();
   const { t } = useLanguage();
-  const employeeOperation = ['/employees/new', '/employees/import', '/employees/bulk-update'].some(route => pathname.startsWith(route));
+  const employeeOperation = ['/employees/new', '/employees/import'].some(route => pathname.startsWith(route));
   const isActive = pathname === to || (to === '/employees' ? pathname.startsWith('/employees/') && !employeeOperation : pathname.startsWith(to + '/'));
   return (
     <NavLink

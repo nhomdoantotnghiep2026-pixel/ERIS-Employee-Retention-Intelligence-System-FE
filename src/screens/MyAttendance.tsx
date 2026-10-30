@@ -6,6 +6,7 @@ import { useLanguage } from '../context/LanguageContext';
 import { useRole } from '../context/RoleContext';
 import { ApiError, getApiErrorMessage, getAttendanceConfig, getTodayAttendance, recordAttendance, type AttendanceResult, type TodayAttendance } from '../services/api';
 import { getAttendanceLocation } from '../utils/attendanceLocation';
+import { useAutoDismissFeedback } from '../hooks/useAutoDismissState';
 
 function attendanceError(error: unknown) {
   if (error instanceof ApiError) {
@@ -31,8 +32,7 @@ export default function MyAttendance() {
   const [today, setToday] = useState<TodayAttendance | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState('');
-  const [notice, setNotice] = useState('');
+  const { error, message: notice, setError, setMessage: setNotice } = useAutoDismissFeedback();
   const [rejection, setRejection] = useState<AttendanceResult | null>(null);
   const [maximumAccuracy, setMaximumAccuracy] = useState(100);
   const [reload, setReload] = useState(0);

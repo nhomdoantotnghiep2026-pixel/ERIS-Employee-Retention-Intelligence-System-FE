@@ -8,6 +8,7 @@ import { Button, Card, ConfirmationDialog, EmptyState, SectionHeader } from '../
 import { useLanguage } from '../context/LanguageContext';
 import { useRole } from '../context/RoleContext';
 import { SurveyResultDetails, surveyScoreLabels } from '../components/SurveyResultDetails';
+import { useAutoDismissFeedback } from '../hooks/useAutoDismissState';
 import {
   ApiError, createSurvey, getApiErrorMessage, getMySurveyResponse, getSurveyForEmployee,
   getSurveyParticipants, getSurveyResults, listAvailableSurveys, listSurveys, publishSurvey, submitSurveyResponse,
@@ -25,9 +26,8 @@ export default function ErdSurveys() {
   const [surveys, setSurveys] = useState<SurveySummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [pending, setPending] = useState(false);
-  const [error, setError] = useState('');
+  const { error, message, setError, setMessage } = useAutoDismissFeedback();
   const [eligibilityBlocked, setEligibilityBlocked] = useState(false);
-  const [message, setMessage] = useState('');
   const [reload, setReload] = useState(0);
   const [draft, setDraft] = useState({ title: '', description: '', startDate: '', endDate: '' });
   const [activeSurvey, setActiveSurvey] = useState<number | null>(null);

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { AppShell } from '../components/AppShell';
 import { Button, Card, SectionHeader } from '../components/ui';
 import { useLanguage } from '../context/LanguageContext';
+import { useAutoDismissState } from '../hooks/useAutoDismissState';
 import {
   getApiErrorMessage, getAttendanceConfig, getAttendanceRecord, listAttendanceHistory,
   type AttendanceHistoryRecord,
@@ -16,7 +17,7 @@ export default function AttendanceHistory() {
   const [selected, setSelected] = useState<AttendanceHistoryRecord | null>(null);
   const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [error, setError] = useAutoDismissState(7000);
   const [reload, setReload] = useState(0);
 
   useEffect(() => {
