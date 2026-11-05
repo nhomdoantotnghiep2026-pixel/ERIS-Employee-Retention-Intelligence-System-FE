@@ -10,7 +10,7 @@ import { employeeDate, jobChangeDateRestriction } from '../utils/employeeDates';
 import { useAutoDismissFeedback } from '../hooks/useAutoDismissState';
 import { Button, Card } from '../components/ui';
 import { useLanguage } from '../context/LanguageContext';
-import { createEmployeeProfile, deactivateEmployeeProfile, getEmployeeProfile, listEmployeeProfiles, updateEmployeeProfile,
+import { createEmployeeProfile, deactivateEmployeeProfile, getEmployeeProfile, getCurrentUser, listEmployeeProfiles, updateEmployeeProfile,
   listDepartments, listPositions, searchPlaces, getApiErrorMessage, ApiError, type EmployeeProfile, type EmployeeInput, type EmployeeChanges, type PlaceSuggestion } from '../services/api';
 
 const control = 'mt-1 w-full rounded-xl border border-slate-300 bg-white p-3 text-sm focus:outline-orange-500 disabled:bg-slate-100';
@@ -41,6 +41,14 @@ export default function HrEmployees() {
   const showingRecord = Boolean(id), employeeId = Number(id);
   const [rows, setRows] = useState<EmployeeProfile[]>([]);
   const [detail, setDetail] = useState<EmployeeProfile | null>(null);
+  const [actorEmail, setActorEmail] = useState<string | null>(null);
+  const ownProfile = Boolean(detail?.email && actorEmail && detail.email.trim().toLowerCase() === actorEmail.trim().toLowerCase());
+  useEffect(() => {
+    if (!showingRecord) return;
+    const controller = new AbortController();
+    void getCurrentUser(controller.signal).then(user => setActorEmail(user.email)).catch(() => { if (!controller.signal.aborted) setActorEmail(null); });
+    return () => controller.abort();
+  }, [showingRecord, employeeId]);
   const [inlineEditing, setInlineEditing] = useState(false);
   const editing = routeEditing || inlineEditing;
   const [form, setForm] = useState<Form>(empty);
@@ -160,6 +168,10 @@ export default function HrEmployees() {
           if (changed) Object.assign(changes, { [key]: input[key] });
         }
         if (changes.address !== undefined && form.addressRefId) changes.addressRefId = form.addressRefId;
+        if (ownProfile && Object.keys(changes).some(key => !['phone', 'address', 'addressRefId'].includes(key))) {
+          setError(text('Bạn chỉ có thể tự sửa số điện thoại và địa chỉ. Vui lòng nhờ một nhân sự khác sửa các thông tin còn lại.', 'You can only edit your own phone number and address. Ask another HR user to change other fields.'));
+          return;
+        }
         if (jobDateRestriction && (changes.departmentId !== undefined || changes.positionId !== undefined)) {
           setError(jobDateMessage);
           return;
@@ -219,7 +231,7 @@ export default function HrEmployees() {
 
   const requiredLabel = (label: string, required: boolean) => <>{label.replace(/\s*\*\s*$/, '')}{required && <span aria-hidden="true" className="ml-1 font-semibold text-red-600">*</span>}</>;
   const createField = (key: keyof Form, label: string, type = 'text', required = false, placeholder = '') => <label className="block text-sm font-semibold leading-5 text-slate-700">{requiredLabel(label, required)}
-    <input className={createControl} type={type} required={required} value={form[key]} disabled={pending} placeholder={placeholder}
+    <input className={createControl} type={type} required={required} value={form[key]} disabled={pending || (editing && ownProfile && key !== 'phone')} placeholder={placeholder}
       autoComplete={key === 'email' ? 'email' : key === 'phone' ? 'tel' : key === 'fullName' ? 'name' : undefined}
       maxLength={key === 'fullName' ? 150 : key === 'phone' ? 30 : key === 'email' ? 255 : undefined}
       min={type === 'number' ? '0.01' : undefined} step={type === 'number' ? '0.01' : undefined}
@@ -361,6 +373,7 @@ export default function HrEmployees() {
           </div>
         </Card></motion.div>
 
+        {editing && ownProfile && <p role="status" className="rounded-xl bg-orange-50 p-4 text-sm text-orange-800">{text('Bạn chỉ có thể tự sửa số điện thoại và địa chỉ. Các thông tin khác cần một nhân sự khác chỉnh sửa.', 'You can only edit your own phone number and address. Ask another HR user to change other details.')}</p>}
         <div className="grid gap-5 lg:grid-cols-3">
           <motion.section variants={createItemMotion} whileHover={{ y: -2 }} className="rounded-[20px] border border-white/80 bg-white p-5 shadow-[0_8px_28px_rgba(30,41,59,0.06)] transition-shadow duration-300 hover:shadow-[0_14px_38px_rgba(30,41,59,0.09)]">
             <div className="mb-3 flex items-center gap-3"><span className="flex size-10 items-center justify-center rounded-xl bg-orange-50 text-orange-600 ring-1 ring-orange-100"><UserRound size={20} aria-hidden="true" /></span><div><p className="text-xs font-bold uppercase tracking-[0.12em] text-orange-600">01</p><h3 className="text-base font-semibold text-slate-950">{text('Thông tin cá nhân', 'Personal information')}</h3></div></div>

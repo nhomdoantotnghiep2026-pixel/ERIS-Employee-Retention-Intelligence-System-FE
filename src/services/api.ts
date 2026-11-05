@@ -504,6 +504,9 @@ export function getApiErrorMessage(error: unknown, fallback: string) {
   if (knownMessage) return knownMessage;
 
   const technicalMessage = error.message.toLowerCase();
+  if (error.status === 403 && /only update phone and address on your own profile/.test(technicalMessage)) {
+    return 'Bạn chỉ có thể tự sửa số điện thoại và địa chỉ. Vui lòng nhờ một nhân sự khác sửa các thông tin còn lại.';
+  }
   if (error.status === 409 && /số điện thoại|phone.*(?:already|duplicate|in use)/i.test(error.message)) {
     return 'Số điện thoại đã được sử dụng trong hồ sơ nhân viên khác. Vui lòng kiểm tra và nhập số khác.';
   }
