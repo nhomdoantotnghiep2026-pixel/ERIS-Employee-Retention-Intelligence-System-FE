@@ -22,7 +22,7 @@ export default function MyWorkspace({ mode }: { mode: 'dashboard' | 'profile' })
   const { user } = useRole();
   const [data, setData] = useState<OwnEmployeeData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useAutoDismissState(7000);
+  const [error, setError] = useAutoDismissState();
   const [reload, setReload] = useState(0);
 
   useEffect(() => {

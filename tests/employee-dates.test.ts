@@ -2,6 +2,16 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { employeeDate, jobChangeDateRestriction } from '../src/utils/employeeDates.ts';
 
+test('survey dates round-trip through UTC without changing the Vietnam calendar day', () => {
+  for (const day of ['2026-10-26', '2026-12-31', '2027-01-01']) {
+    const start = new Date(`${day}T00:00:00+07:00`).toISOString();
+    const end = new Date(`${day}T23:59:59+07:00`).toISOString();
+    assert.equal(employeeDate(start), day);
+    assert.equal(employeeDate(end), day);
+    assert.equal(employeeDate(day), day);
+  }
+});
+
 test('employee calendar dates are preserved and ISO timestamps use Vietnam date', () => {
   assert.equal(employeeDate('2027-07-10'), '2027-07-10');
   assert.equal(employeeDate('2027-07-09T17:00:00.000Z'), '2027-07-10');

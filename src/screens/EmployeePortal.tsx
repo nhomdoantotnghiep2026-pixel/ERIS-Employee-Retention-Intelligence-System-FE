@@ -1,3 +1,4 @@
+import { useAutoDismissState } from '../hooks/useAutoDismissState';
 import { useEffect, useState } from 'react';
 import { CalendarClock, CheckCircle2, DoorOpen, FileCheck2, GraduationCap, HeartPulse, Send, Target, WalletCards } from 'lucide-react';
 import { AppShell } from '../components/AppShell';
@@ -68,8 +69,8 @@ export default function EmployeePortal({ mode }: { mode: EmployeePortalMode }) {
     return () => controller.abort();
   }, [user.email, mode, accountReload]);
   const [requests, setRequests] = useState<EmployeeRequest[]>([]);
-  const [requestMessage, setRequestMessage] = useState('');
-  const [requestError, setRequestError] = useState('');
+  const [requestMessage, setRequestMessage] = useAutoDismissState();
+  const [requestError, setRequestError] = useAutoDismissState();
   const [submitting, setSubmitting] = useState(false);
   const [requestDraft, setRequestDraft] = useState({ type: 'Annual leave' as RequestType, date: new Date().toLocaleDateString('en-CA'), detail: '' });
   const [answers, setAnswers] = useState({ satisfaction: '', workload: '', comment: '' });

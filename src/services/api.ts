@@ -113,6 +113,44 @@ export function recordAttendance(action: 'check-in' | 'check-out', location: Att
   });
 }
 
+export interface LeaveHistory { id: number; fromStatus: string | null; toStatus: string; note: string | null; actorName: string | null; actorRole: string | null; createdAt: string }
+export interface LeaveRequest { id: number; employeeId: number; employeeCode?: string; fullName?: string; fromDate: string; toDate: string; reason: string; status: string; effectiveStatus: string | null; histories: LeaveHistory[] }
+export interface AttendanceHoliday { date: string; name: string }
+export function listLeaveRequests(own: boolean, signal?: AbortSignal) {
+  return request<{data: LeaveRequest[]}>(`/v1/attendance/leave-requests${own ? '/me' : ''}`, { signal, cache: 'no-store' });
+}
+export function createLeaveRequest(input: {fromDate: string; toDate: string; reason: string}) {
+  return request<{data: LeaveRequest}>('/v1/attendance/leave-requests', { method: 'POST', body: JSON.stringify(input) });
+}
+export function getLeaveHistory(id: number) {
+  return request<{data: LeaveRequest}>(`/v1/attendance/leave-requests/${id}/history`, { cache: 'no-store' });
+}
+export function reviewLeaveRequest(id: number, decision: 'APPROVED' | 'REJECTED', reviewNote: string, cancellation = false) {
+  return request(`/v1/attendance/leave-requests/${id}${cancellation ? '/cancellation' : ''}`, { method: 'PATCH', body: JSON.stringify({decision, reviewNote}) });
+}
+export function cancelLeaveRequest(id: number, reason: string) {
+  return request(`/v1/attendance/leave-requests/${id}/cancellation`, { method: 'POST', body: JSON.stringify({reason}) });
+}
+export function listAttendanceHolidays(signal?: AbortSignal) {
+  return request<{data: AttendanceHoliday[]}>('/v1/attendance/holidays', { signal, cache: 'no-store' });
+}
+export function createAttendanceHoliday(input: AttendanceHoliday) {
+  return request('/v1/attendance/holidays', { method: 'POST', body: JSON.stringify(input) });
+}
+export function closeAttendanceDay(date: string) {
+  return request<{date: string; created: number}>('/v1/attendance/close-day', { method: 'POST', body: JSON.stringify({date}) });
+}
+
+export interface RetentionPolicy { id: number; code: string; name: string; description: string | null; targetFactor: string | null; status: string }
+export interface PolicyRecommendation { id: number; predictionResultId: number; employee: { id: number; employeeCode: string; fullName: string }; policy: RetentionPolicy; reason: string; priority: string; status: string; dataSource: string }
+export interface PolicyPrediction { id: number; employee: PolicyRecommendation['employee']; attritionProbability: number; riskLevel: string; dataSource: string; explanationScale?: string; explanations: Array<{ id: number; featureName: string; impactValue: number | null; impactDirection: string }>; recommendations: PolicyRecommendation[] }
+export function createPolicyDemo(employeeIds: number[]) { return request<{dataSource: string; modelInvoked: boolean; results: PolicyPrediction[]}>('/prediction-results/demo', {method:'POST', body:JSON.stringify({employeeIds})}); }
+export function getPolicyPrediction(id: number) { return request<{data: PolicyPrediction}>(`/prediction-results/${id}`, {cache:'no-store'}); }
+export function listRetentionPolicies() { return request<{data: RetentionPolicy[]}>('/retention-policies', {cache:'no-store'}); }
+export function getRetentionPolicy(id: number) { return request<{data: RetentionPolicy}>(`/retention-policies/${id}`, {cache:'no-store'}); }
+export function listPolicyRecommendations() { return request<{data: PolicyRecommendation[]}>('/policy-recommendations', {cache:'no-store'}); }
+export function getPolicyRecommendation(id: number) { return request<{data: PolicyRecommendation}>(`/policy-recommendations/${id}`, {cache:'no-store'}); }
+
 export interface EmployeeEducation {
   id: number;
   employeeId: number;
@@ -200,11 +238,13 @@ export interface SurveyResponse {
   responseId: number;
   surveyId: number;
   submittedAt: string;
+  satisfactionScore: number;
 }
 
 export interface SurveyParticipantResponse {
   responseId: number;
   submittedAt: string;
+  satisfactionScore?: number | null;
   employee: {
     id: number;
     employeeCode: string;
@@ -238,7 +278,7 @@ export interface SurveyResults {
     }>;
     answerCount: number;
     averageScore: number | null;
-    scoreDistribution: Record<1 | 2 | 3 | 4, number>;
+    scoreDistribution: Record<1 | 2 | 3 | 4 | 5, number>;
   }>;
 }
 
@@ -265,6 +305,18 @@ export function publishSurvey(id: number) {
   return request<{ message: string; data: SurveySummary }>(`/surveys/${id}/publish`, { method: 'POST' });
 }
 
+export function updateSurvey(id: number, input: Partial<Pick<SurveySummary, 'title' | 'description' | 'startDate' | 'endDate'>>) {
+  return request<{ data: SurveySummary }>(`/surveys/${id}`, { method: 'PATCH', body: JSON.stringify(input) });
+}
+
+export function closeSurvey(id: number) {
+  return request<{ data: SurveySummary }>(`/surveys/${id}/close`, { method: 'POST' });
+}
+
+export function getSurveyResponse(id: number, responseId: number, signal?: AbortSignal) {
+  return request<{ data: { survey: SurveySummary; response: SurveyParticipantResponse & { satisfactionScore: number | null } } }>(`/surveys/${id}/responses/${responseId}`, { signal, cache: 'no-store' });
+}
+
 export function getSurveyResults(id: number, signal?: AbortSignal) {
   return request<{ data: SurveyResults }>(`/surveys/${id}/results`, { signal, cache: 'no-store' });
 }
@@ -277,7 +329,7 @@ export function getMySurveyResponse(id: number, signal?: AbortSignal) {
   return request<{
     data: {
       survey: { id: number; title: string };
-      response: { id: number; status: 'SUBMITTED' | 'DRAFT'; submittedAt: string | null };
+      response: { id: number; status: 'SUBMITTED' | 'DRAFT'; submittedAt: string | null; satisfactionScore: number | null };
       answers: Array<{
         questionId: number;
         questionText: string;
@@ -754,10 +806,10 @@ export async function getUserById(id: number) {
   return userWithRoleId('data' in result ? result.data : result);
 }
 
-export async function createUser(input: { email: string; roleId: number }) {
+export async function createUser(input: { email: string; fullName: string; hireDate: string; roleId: number }) {
   const result = await request<(ApiUser & { emailDelivery?: string }) | { message: string; data: ApiUser & { emailDelivery?: string } }>('/auth/user_register', {
     method: 'POST',
-    body: JSON.stringify({ email: input.email, roleId: input.roleId }),
+    body: JSON.stringify({ email: input.email, full_name: input.fullName.trim(), hireDate: input.hireDate, roleId: input.roleId }),
   });
   const account = 'data' in result ? result.data : result;
   return { ...userWithRoleId(account), emailDelivery: account.emailDelivery };

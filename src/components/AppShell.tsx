@@ -37,6 +37,7 @@ const NAV_BY_ROLE: Record<UserRole, NavGroup[]> = {
         { label: 'Departments', icon: Network, to: '/departments' },
         { label: 'Positions', icon: ClipboardList, to: '/positions' },
         { label: 'Attendance History', icon: Activity, to: '/attendance' },
+        { label: 'Employee Requests', icon: ClipboardList, to: '/employee-requests' },
         { label: 'Company Location', icon: MapPinned, to: '/company-location' },
         { label: 'Education & Job History', icon: History, to: '/employee-history' },
       ],
@@ -46,6 +47,7 @@ const NAV_BY_ROLE: Record<UserRole, NavGroup[]> = {
       items: [
         { label: 'Attrition Risk Analytics', icon: AlertTriangle, to: '/attrition-risk' },
         { label: 'Retention Interventions', icon: Target, to: '/interventions' },
+        { label: 'Policy demo', icon: Target, to: '/policy-demo' },
         { label: 'Employee Outcomes', icon: ClipboardCheck, to: '/outcomes' },
       ],
     },
@@ -68,6 +70,7 @@ const NAV_BY_ROLE: Record<UserRole, NavGroup[]> = {
       group: 'Self Service',
       items: [
         { label: 'My Attendance', icon: Activity, to: '/my-attendance' },
+        { label: 'My Requests', icon: ClipboardList, to: '/my-requests' },
         { label: 'My Surveys', icon: HeartPulse, to: '/my-surveys' },
       ],
     },

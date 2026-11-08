@@ -43,10 +43,11 @@ test('merged account filtering, nested roles, HR creation, upload and address su
     response = Response.json({ message: 'User status updated successfully.', data: { ...user, status: 'INACTIVE' } });
     assert.equal((await api.updateUserStatus(9, 'INACTIVE')).status, 'INACTIVE');
     response = Response.json({ data: user }, { status: 201 });
-    assert.equal((await api.createUser({ email: user.email, roleId: 2 })).id, 9);
-    assert.deepEqual(JSON.parse(String(calls.at(-1)!.init?.body)), { email: user.email, roleId: 2 });
+    const hrInput = { email: user.email, fullName: 'Nguyễn Văn A', hireDate: '2026-11-07', roleId: 2 };
+    assert.equal((await api.createUser(hrInput)).id, 9);
+    assert.deepEqual(JSON.parse(String(calls.at(-1)!.init?.body)), { email: user.email, full_name: hrInput.fullName, hireDate: hrInput.hireDate, roleId: 2 });
     response = Response.json(user, { status: 201 });
-    assert.equal((await api.createUser({ email: user.email, roleId: 2 })).id, 9, 'also accepts a bare user response');
+    assert.equal((await api.createUser(hrInput)).id, 9, 'also accepts a bare user response');
     response = Response.json({ places: [{ refId: 'home', display: 'Matched address' }] });
     assert.equal((await api.searchPlaces('  21/2 + Street  ')).places[0].refId, 'home');
     assert.equal(calls.at(-1)!.url.pathname, '/api/distance/places');

@@ -5,10 +5,10 @@ export const ROLE_HOME: Record<string, string> = {
 };
 const sharedData = ['/employees', '/employees/new', '/employees/:id', '/employees/:id/edit'];
 export const ROLE_ROUTES: Record<string, string[]> = {
-  HR: [...sharedData, '/employees/import', '/departments', '/positions', '/dashboard', '/org-overview', '/workforce-risk', '/attendance', '/company-location', '/employee-history', '/attrition-risk', '/interventions', '/outcomes', '/engagement', '/employees/:id/risk'],
+  HR: [...sharedData, '/employees/import', '/departments', '/positions', '/dashboard', '/org-overview', '/workforce-risk', '/attendance', '/employee-requests', '/company-location', '/employee-history', '/attrition-risk', '/interventions', '/policy-demo', '/outcomes', '/engagement', '/employees/:id/risk'],
   'Data / AI Analyst': [...sharedData, '/data-overview', '/data', '/import', '/schema', '/data-pipelines', '/model', '/ai-config', '/model/eval', '/model-performance', '/feature-importance', '/model-history', '/audit-logs', '/predictions'],
   'System Administrator': ['/admin-overview', '/users', '/roles', '/rbac', '/system', '/activity', '/system-health'],
-  'Employee / ESS': ['/employee-dashboard', '/my-profile', '/my-attendance', '/my-surveys'],
+  'Employee / ESS': ['/employee-dashboard', '/my-profile', '/my-attendance', '/my-requests', '/my-surveys'],
 };
 export function canAccessRoute(role: string, pathname: string) {
   const normalizedPath = pathname.replace(/\/$/, '') || '/';

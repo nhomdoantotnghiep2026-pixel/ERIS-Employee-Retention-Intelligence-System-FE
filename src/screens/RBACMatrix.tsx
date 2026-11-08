@@ -1,3 +1,4 @@
+import { useAutoDismissState } from '../hooks/useAutoDismissState';
 import { useLanguage } from '../context/LanguageContext';
 import { AppShell } from '../components/AppShell';
 import { Card, Button, ConfirmationDialog } from '../components/ui';
@@ -97,7 +98,7 @@ export function PermissionMatrixPanel() {
   });
   const [draft, setDraft] = useState<PermissionMatrix>(() => cloneMatrix(matrix));
   const [editing, setEditing] = useState(false);
-  const [saved, setSaved] = useState(false);
+  const [saved, setSaved] = useAutoDismissState();
   const [confirm, setConfirm] = useState<{ title: string; description: string; action: () => void; tone?: 'default' | 'danger'; confirmLabel?: string } | null>(null);
   const activeMatrix = editing ? draft : matrix;
 
@@ -121,14 +122,13 @@ export function PermissionMatrixPanel() {
   const startEditing = () => {
     setDraft(cloneMatrix(matrix));
     setEditing(true);
-    setSaved(false);
+    setSaved('');
   };
 
   const applySaveChanges = () => {
     setMatrix(cloneMatrix(draft));
     setEditing(false);
-    setSaved(true);
-    window.setTimeout(() => setSaved(false), 2000);
+    setSaved('saved');
   };
 
   const saveChanges = () => {
@@ -149,8 +149,7 @@ export function PermissionMatrixPanel() {
     setMatrix(cloneMatrix(defaultPermissionMatrix));
     setDraft(cloneMatrix(defaultPermissionMatrix));
     setEditing(false);
-    setSaved(true);
-    window.setTimeout(() => setSaved(false), 2000);
+    setSaved('saved');
   };
 
   const resetDefaults = () => {

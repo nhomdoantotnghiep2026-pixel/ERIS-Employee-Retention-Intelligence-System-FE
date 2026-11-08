@@ -1,3 +1,4 @@
+import { useAutoDismissState } from '../hooks/useAutoDismissState';
 import { AppShell } from '../components/AppShell';
 import { Card, SectionHeader, Button, AIAdvisoryBanner } from '../components/ui';
 import { FileBarChart2, Download, Eye, Calendar, X, Clock } from 'lucide-react';
@@ -39,7 +40,7 @@ export default function ExecutiveReports() {
   const [preview, setPreview] = useState<(typeof reports)[number] | null>(null);
   const [generated, setGenerated] = useState(reports);
   const [showSchedule, setShowSchedule] = useState(false);
-  const [scheduleError, setScheduleError] = useState('');
+  const [scheduleError, setScheduleError] = useAutoDismissState();
   const [scheduledReports, setScheduledReports] = useState([
     { title: 'Monthly Attrition Dashboard', frequency: 'Monthly', nextRun: futureDisplayDate(7), recipients: 'hr-leads@eris.com' },
     { title: 'Q4 Workforce Retention Report', frequency: 'Quarterly', nextRun: futureDisplayDate(30), recipients: 'executives@eris.com' },

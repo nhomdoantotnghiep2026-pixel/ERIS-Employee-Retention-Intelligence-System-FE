@@ -10,7 +10,7 @@ export default function ModelLifecycle() {
   const { t, language } = useLanguage();
   const navigate = useNavigate();
   const { models, evaluate, activate } = useWorkflow();
-  const [error, setError] = useAutoDismissState(7000);
+  const [error, setError] = useAutoDismissState();
   const [pending, setPending] = useState<string | null>(null);
   return <AppShell breadcrumb={['AI Models', 'Evaluate & activate']}>
     <SectionHeader title={t("Đánh giá và kích hoạt phiên bản model")} description={t("Đánh giá trên bộ kiểm thử có nhãn → xem kết quả → xác nhận kích hoạt. Chỉ một phiên bản Active.")}><Button variant="secondary" onClick={() => navigate('/predictions')}>{t("Chạy dự đoán")}</Button></SectionHeader>

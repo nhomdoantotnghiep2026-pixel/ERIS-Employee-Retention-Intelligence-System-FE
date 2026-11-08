@@ -17,7 +17,7 @@ export default function WorkforceSnapshot() {
   const { employees } = useEmployees();
   const { snapshot, generateSnapshot } = useWorkflow();
   const [period, setPeriod] = useState({ start: snapshot?.start || '', end: snapshot?.end || '', scope: snapshot?.scope || '' });
-  const [error, setError] = useAutoDismissState(7000);
+  const [error, setError] = useAutoDismissState();
   const current = snapshot && snapshotIsCurrent(snapshot, employees);
   const sameSelection = snapshot && snapshot.start === period.start && snapshot.end === period.end && snapshot.scope === period.scope;
   const ready = snapshot && current && sameSelection && !snapshot.issues.length;

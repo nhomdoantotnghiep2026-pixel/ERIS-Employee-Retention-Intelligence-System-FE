@@ -1,3 +1,4 @@
+import { useAutoDismissState } from '../hooks/useAutoDismissState';
 import { useMemo, useState, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AlertCircle, ArrowLeft, ArrowRight, CheckCircle2, Download, FileSpreadsheet, RefreshCw, Upload, UserPlus } from 'lucide-react';
@@ -61,7 +62,7 @@ export default function EmployeeDataManagement({ mode }: { mode: EmployeeDataMod
   const jobTitles = useMemo(() => [...new Set([...baseJobs, ...employees.map(item => item.role)])].sort(), [employees]);
   const nextId = useMemo(() => `EMP-${String(Math.max(0, ...employees.map(item => Number(item.employeeId.match(/\d+/)?.[0] || 0))) + 1).padStart(3, '0')}`, [employees]);
   const [step, setStep] = useState(0), [confirm, setConfirm] = useState(false), [saved, setSaved] = useState(false);
-  const [message, setMessage] = useState('');
+  const [message, setMessage] = useAutoDismissState();
   const [employee, setEmployee] = useState({ firstName: '', lastName: '', employeeId: nextId, department: '', jobTitle: '', supervisor: '', email: '' });
   const [fileName, setFileName] = useState(''), [importRows, setImportRows] = useState<EmployeeInput[]>([]), [importErrors, setImportErrors] = useState<string[]>([]), [importedCount, setImportedCount] = useState<number | null>(null);
   const [bulk, setBulk] = useState({ department: '', jobTitle: '', field: 'Department', value: '' });

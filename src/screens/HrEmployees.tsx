@@ -1,3 +1,4 @@
+import { useAutoDismissState } from '../hooks/useAutoDismissState';
 import { useEffect, useState, type FormEvent, type MouseEvent, type ReactNode } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { BadgeCheck, BriefcaseBusiness, Building2, CalendarDays, CheckCircle2, IdCard, Mail, MapPin, Phone, Route, UserRound, WalletCards } from 'lucide-react';
@@ -66,7 +67,7 @@ export default function HrEmployees() {
   const [page, setPage] = useState(1), [total, setTotal] = useState(0), [pages, setPages] = useState(0);
   const [revision, setRevision] = useState(0), [loading, setLoading] = useState(true), [pending, setPending] = useState(false);
   const { error, message, setError, setMessage } = useAutoDismissFeedback();
-  const [emailError, setEmailError] = useState('');
+  const [emailError, setEmailError] = useAutoDismissState();
 
   const jobDateRestriction = detail ? jobChangeDateRestriction(detail.hireDate) : null;
   const jobDateMessage = jobDateRestriction === 'future'

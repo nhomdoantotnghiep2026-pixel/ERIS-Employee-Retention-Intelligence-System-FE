@@ -1,3 +1,4 @@
+import { useAutoDismissState } from '../hooks/useAutoDismissState';
 import { useRecordAudit } from '../workflows/useRecordAudit';
 import { useEffect, useState } from 'react';
 import { AppShell } from '../components/AppShell';
@@ -33,7 +34,7 @@ export default function Users() {
   const [viewingId, setViewingId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState({ name: '', email: '', role: roles[0] });
-  const [formError, setFormError] = useState('');
+  const [formError, setFormError] = useAutoDismissState();
   const [confirm, setConfirm] = useState<{ title: string; description: string; action: () => void; tone?: 'default' | 'danger'; confirmLabel?: string } | null>(null);
   const [page, setPage] = useState(1);
   const perPage = 8;

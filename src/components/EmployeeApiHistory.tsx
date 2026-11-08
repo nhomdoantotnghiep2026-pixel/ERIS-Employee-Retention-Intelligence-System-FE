@@ -1,3 +1,4 @@
+import { useAutoDismissState } from '../hooks/useAutoDismissState';
 import { useEffect, useState, type FormEvent } from 'react';
 import { BriefcaseBusiness, Building2, CalendarDays, GraduationCap, Pencil, Power, Trash2 } from 'lucide-react';
 import { Button, Card } from './ui';
@@ -71,7 +72,7 @@ export function EmployeeApiHistory({ employeeId, employeeEmail, dateOfBirth, own
   const [searching, setSearching] = useState(false);
   const [educationPermission, setCanManageEducation] = useState(false);
   const canManageEducation = editable && !own && educationPermission;
-  const [editPermissionError, setEditPermissionError] = useState('');
+  const [editPermissionError, setEditPermissionError] = useAutoDismissState();
 
   useEffect(() => {
     const controller = new AbortController();

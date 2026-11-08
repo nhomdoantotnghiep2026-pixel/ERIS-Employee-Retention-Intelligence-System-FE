@@ -23,7 +23,7 @@ export default function EmployeeRecord() {
   const db = useErd();
   const master = db.employees.find(row => row.id === id);
   const [draft, setDraft] = useState<Partial<Employee>>(() => ({ ...employee,monthlyIncome:typeof master?.current_salary === 'number' ? master.current_salary:undefined }));
-  const [error, setError] = useAutoDismissState(7000);
+  const [error, setError] = useAutoDismissState();
   const [confirm, setConfirm] = useState<'save' | 'archive' | null>(null);
   const set = (field: string, value: string | number | undefined) => { setDraft(previous => ({ ...previous, [field]: value })); setError(''); };
   if (!employee) return <AppShell breadcrumb={['Employees']}><Card className="p-6">{t("Employee not found.")}<Button onClick={() => navigate('/employees')}>{t("Employee directory")}</Button></Card></AppShell>;

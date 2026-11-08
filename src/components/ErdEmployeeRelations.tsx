@@ -1,3 +1,4 @@
+import { useAutoDismissState } from '../hooks/useAutoDismissState';
 import { useLanguage } from '../context/LanguageContext';
 import { useState } from 'react';
 import { Button, Card } from './ui';
@@ -13,7 +14,7 @@ export function ErdEmployeeRelations({ employeeId, editable = true }: { employee
   const [table,setTable] = useState<RelatedTable>('employee_educations');
   const [editing,setEditing] = useState<string | null>(null);
   const [values,setValues] = useState<Record<string,FieldValue>>({});
-  const [error,setError] = useState('');
+  const [error,setError] = useAutoDismissState();
   const fields = Object.entries(ERD_SCHEMA[table]).filter(([field]) => !['id','employee_id','created_at','updated_at'].includes(field));
   const save = () => {
     try {

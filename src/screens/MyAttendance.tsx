@@ -95,7 +95,7 @@ export default function MyAttendance() {
   }
   const statusLabels: Record<string, string> = { PRESENT: 'On time', LATE: 'Late', ON_LEAVE: 'On leave', HOLIDAY: 'Holiday', ABSENT: 'Absent' };
   const status = today?.attendance?.attendanceStatus;
-  const phase = today?.checkedOut ? 'Workday completed' : today?.checkedIn ? 'Currently checked in' : 'Not checked in';
+  const phase = status === 'ON_LEAVE' ? 'Ngày nghỉ phép' : status === 'HOLIDAY' ? 'Ngày nghỉ lễ' : today?.checkedOut ? 'Workday completed' : today?.checkedIn ? 'Currently checked in' : 'Not checked in';
   const date = today?.date && Number.isFinite(Date.parse(today.date))
     ? new Intl.DateTimeFormat(locale, { dateStyle: 'full', timeZone: 'Asia/Ho_Chi_Minh' }).format(new Date(`${today.date}T12:00:00+07:00`)) : '—';
 
@@ -126,6 +126,7 @@ export default function MyAttendance() {
             {[[t('Check-in'), time(today.checkedInAt)], [t('Check-out'), time(today.checkedOutAt)], [t('Working minutes'), today.attendance?.workingMinutes ?? '—'], [t('Overtime minutes'), today.attendance?.overtimeMinutes ?? '—']].map(([label, value]) => <div key={label} className="rounded-xl bg-slate-50 p-4"><dt className="text-sm text-slate-500">{label}</dt><dd className="mt-1 text-xl font-bold text-slate-900">{value}</dd></div>)}
           </dl>
           {status && <p className="mt-4 text-sm text-slate-600">{t('Status')}: <strong>{t(statusLabels[status] || status)}</strong></p>}
+          {status === 'ON_LEAVE' && <p className="mt-4 text-sm text-slate-600">Giờ hiển thị được hệ thống ghi nhận theo nghỉ phép, không phải chấm công GPS.</p>}
           {!today.workday && <p className="mt-4 text-sm text-slate-600">{t('Attendance is not available for this work date.')}</p>}
         </>}
         <div className="mt-6 flex flex-wrap gap-3">

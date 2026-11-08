@@ -29,6 +29,8 @@ import ForgotPassword from './screens/ForgotPassword';
 import AttendanceHistory from './screens/AttendanceHistory';
 import EmployeeHistory from './screens/EmployeeHistory';
 import CompanyLocationScreen from './screens/CompanyLocation';
+import LeaveRequests from './screens/LeaveRequests';
+import PolicyDemo from './screens/PolicyDemo';
 
 // HR
 import Dashboard from './screens/Dashboard';
@@ -106,6 +108,7 @@ export default function App() {
           <Route path="/workforce-risk" element={<RoleGuard><Navigate to="/org-overview" replace /></RoleGuard>} />
           <Route path="/attrition-risk" element={<RoleGuard><RiskWorkspace /></RoleGuard>} />
           <Route path="/interventions" element={<RoleGuard><RetentionInterventions /></RoleGuard>} />
+          <Route path="/policy-demo" element={<RoleGuard><PolicyDemo /></RoleGuard>} />
           <Route path="/outcomes" element={<RoleGuard><EmployeeOutcomes /></RoleGuard>} />
           <Route path="/engagement" element={<RoleGuard><ErdSurveys /></RoleGuard>} />
 
@@ -117,6 +120,7 @@ export default function App() {
           <Route path="/employees/:id/edit" element={<RoleGuard><EmployeeWorkspace mode="edit" /></RoleGuard>} />
           <Route path="/employees/:id/risk" element={<RoleGuard><RiskAnalysis /></RoleGuard>} />
           <Route path="/attendance" element={<RoleGuard><AttendanceHistory /></RoleGuard>} />
+          <Route path="/employee-requests" element={<RoleGuard><LeaveRequests own={false} /></RoleGuard>} />
           <Route path="/company-location" element={<RoleGuard><CompanyLocationScreen /></RoleGuard>} />
           <Route path="/employee-history" element={<RoleGuard><EmployeeHistory /></RoleGuard>} />
 
@@ -124,6 +128,7 @@ export default function App() {
           <Route path="/employee-dashboard" element={<RoleGuard><EmployeePortal mode="dashboard" /></RoleGuard>} />
           <Route path="/my-profile" element={<RoleGuard><ErdOwnProfile /></RoleGuard>} />
           <Route path="/my-attendance" element={<RoleGuard><EmployeePortal mode="attendance" /></RoleGuard>} />
+          <Route path="/my-requests" element={<RoleGuard><LeaveRequests own /></RoleGuard>} />
           <Route path="/my-surveys" element={<RoleGuard><ErdSurveys /></RoleGuard>} />
 
           {/* Data / AI Analyst */}

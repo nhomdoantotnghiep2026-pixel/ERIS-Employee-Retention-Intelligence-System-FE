@@ -1,3 +1,4 @@
+import { useAutoDismissState } from '../hooks/useAutoDismissState';
 import { AppShell } from '../components/AppShell';
 import { Card, SectionHeader, Button, Tabs, StatusBadge, AIAdvisoryBanner } from '../components/ui';
 import { useState } from 'react';
@@ -40,7 +41,7 @@ function loadModelConfig() {
 
 export default function AIModelConfig() {
   const [tab, setTab] = useState('Model Versions');
-  const [saved, setSaved] = useState(false);
+  const [saved, setSaved] = useAutoDismissState();
   const initialConfig = useState(loadModelConfig)[0];
   const [versions, setVersions] = useState(initialConfig.versions);
   const [thresholdRows, setThresholdRows] = useState(initialConfig.thresholdRows);
@@ -52,8 +53,7 @@ export default function AIModelConfig() {
   const handleSave = () => {
     if (!thresholdsValid) return;
     localStorage.setItem(MODEL_CONFIG_STORAGE_KEY, JSON.stringify({ versions, thresholdRows }));
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
+    setSaved('saved');
   };
 
   const retrain = () => {
@@ -69,18 +69,18 @@ export default function AIModelConfig() {
       notes: 'Retrained from current demo dataset with refreshed engagement and overtime features.',
     };
     setVersions(current => [next, ...current]);
-    setSaved(false);
+    setSaved('');
     setTab('Model Versions');
   };
 
   const deploy = (version: string) => {
     setVersions(rows => rows.map(row => ({ ...row, deployed: row.version === version })));
-    setSaved(false);
+    setSaved('');
   };
 
   const updateThreshold = (label: string, value: number) => {
     setThresholdRows(rows => rows.map(row => row.label === label ? { ...row, value } : row));
-    setSaved(false);
+    setSaved('');
   };
 
   return (

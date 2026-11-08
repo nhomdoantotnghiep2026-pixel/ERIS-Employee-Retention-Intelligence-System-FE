@@ -14,7 +14,7 @@ export default function Predictions() {
   const { snapshot, models, runs, generate } = useWorkflow();
   const { employees } = useEmployees();
   const [runId, setRunId] = useState('');
-  const [error, setError] = useAutoDismissState(7000);
+  const [error, setError] = useAutoDismissState();
   const [confirm, setConfirm] = useState(false);
   const [detail, setDetail] = useState('');
   const active = models.find(model => model.status === 'Active');

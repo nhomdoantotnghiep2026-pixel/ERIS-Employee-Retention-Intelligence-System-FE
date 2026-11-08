@@ -22,7 +22,7 @@ export default function EmployeeHistory() {
   const [query, setQuery] = useState('');
   const [tab, setTab] = useState<'education' | 'experience' | 'jobs'>('education');
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useAutoDismissState(7000);
+  const [error, setError] = useAutoDismissState();
   const [reload, setReload] = useState(0);
 
   useEffect(() => {
