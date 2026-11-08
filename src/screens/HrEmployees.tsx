@@ -20,7 +20,7 @@ const EMPLOYEE_DRAFT_KEY = 'eris.employee-create-draft.v2';
 type Form = { fullName: string; email: string; hireDate: string; departmentId: string; positionId: string;
   phone: string; dateOfBirth: string; gender: string; address: string; addressRefId: string; employmentType: string; currentSalary: string };
 const empty: Form = { fullName: '', email: '', hireDate: '', departmentId: '', positionId: '', phone: '', dateOfBirth: '', gender: '', address: '', addressRefId: '', employmentType: '', currentSalary: '' };
-const initialEducation: CreateEducationDraft = { id: 1, educationLevel: '2', fieldOfStudy: '', graduationYear: '', institution: '', institutionRefId: '' };
+const initialEducation: CreateEducationDraft = { id: 1, educationLevel: 'Bachelor', fieldOfStudy: '', graduationYear: '', institution: '', institutionRefId: '' };
 const createContainerMotion = { hidden: {}, visible: { transition: { staggerChildren: 0.07, delayChildren: 0.04 } } };
 const createItemMotion = {
   hidden: { opacity: 0, y: 18, scale: 0.992 },
@@ -59,7 +59,7 @@ export default function HrEmployees() {
   const [showAddressSuggestions, setShowAddressSuggestions] = useState(false);
   const [addressLoading, setAddressLoading] = useState(false);
   const [departments, setDepartments] = useState<Array<{ id: number; name: string }>>([]);
-  const [positions, setPositions] = useState<Array<{ id: number; name: string; departmentId?: number | null }>>([]);
+  const [positions, setPositions] = useState<Array<{ id: number; name: string; code: string; jobLevel: number; departmentId?: number | null }>>([]);
   const [catalogError, setCatalogError] = useState('');
   const [query, setQuery] = useState(''), [search, setSearch] = useState('');
   const [departmentId, setDepartmentId] = useState(''), [positionId, setPositionId] = useState('');
@@ -91,7 +91,9 @@ export default function HrEmployees() {
         const savedDraft = window.localStorage.getItem(EMPLOYEE_DRAFT_KEY);
         const parsed = savedDraft ? JSON.parse(savedDraft) as { form?: Partial<Form>; educations?: CreateEducationDraft[]; experiences?: CreateExperienceDraft[] } : null;
         setForm(parsed?.form ? { ...empty, ...parsed.form } : empty);
-        setEducations(parsed?.educations?.length ? parsed.educations : [initialEducation]);
+        setEducations(parsed?.educations?.length ? parsed.educations.map(row => ({ ...row,
+          educationLevel: ({ '1': '', '2': 'Bachelor', '3': 'Master', '4': 'PhD' } as Record<string, string>)[row.educationLevel] ?? row.educationLevel,
+        })) : [initialEducation]);
         setExperiences(parsed?.experiences || []);
       } catch {
         setForm(empty);
@@ -127,8 +129,8 @@ export default function HrEmployees() {
       setError(text('Hãy chọn trường/cơ sở đào tạo từ danh sách gợi ý trước khi lưu.', 'Select every institution from the verified suggestions before saving.'));
       return;
     }
-    if (creating && experiences.some(row => row.endDate && row.endDate < row.startDate)) {
-      setError(text('Tháng kết thúc kinh nghiệm không được trước tháng bắt đầu.', 'An experience end month cannot be before its start month.'));
+    if (creating && experiences.length) {
+      setError(text('Hiện chưa thể lưu kinh nghiệm khi tạo hồ sơ. Hãy lưu lại thông tin kinh nghiệm của bạn, bỏ các mục kinh nghiệm ở đây và thêm lại trong hồ sơ sau khi tạo.', 'Experience cannot be saved during profile creation. Keep a copy, remove the experience entries here, then add them to the profile after creation.'));
       return;
     }
     setPending(true);
@@ -143,15 +145,11 @@ export default function HrEmployees() {
         currentSalary: form.currentSalary === '' ? null : Number(form.currentSalary),
         ...(creating ? {
           educations: educations.map(row => ({
-            educationLevel: Number(row.educationLevel),
+            educationLevel: row.educationLevel,
             fieldOfStudy: row.fieldOfStudy.trim() || null,
             institution: row.institution.trim(),
             institutionRefId: row.institutionRefId,
             graduationYear: row.graduationYear ? Number(row.graduationYear) : null,
-          })),
-          workExperiences: experiences.map(row => ({
-            companyName: row.companyName.trim(), positionTitle: row.positionTitle.trim(),
-            startDate: row.startDate, endDate: row.endDate || null,
           })),
         } : {}),
       };
@@ -247,7 +245,7 @@ export default function HrEmployees() {
       invalidText={text('Vui lòng chọn một mục trong danh sách.', 'Please select an existing item.')} />;
   const active = (value: string) => value === 'ACTIVE' ? text('Đang hoạt động', 'Active') : value === 'INACTIVE' ? text('Ngừng hoạt động', 'Inactive') : value;
   const createPositions = form.departmentId
-    ? positions.filter(position => position.departmentId === Number(form.departmentId))
+    ? positions.filter(position => position.departmentId === Number(form.departmentId)).map(position => ({ ...position, name: `${position.name} · ${position.code || text('Chưa có mã', 'No code')} · ${text('Cấp', 'Level')} ${position.jobLevel}` }))
     : [];
   const detailItem = (icon: ReactNode, label: string, value: unknown) => <div className="flex min-w-0 items-start gap-3 rounded-xl px-1 py-2.5">
     <span className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-xl bg-slate-50 text-slate-500 ring-1 ring-slate-100">{icon}</span>
@@ -355,7 +353,7 @@ export default function HrEmployees() {
         </fieldset>
         <motion.aside variants={createItemMotion} className="xl:sticky xl:top-5">
           <Card className="p-5 sm:p-6"><p className="text-xs font-bold uppercase tracking-[0.12em] text-orange-600">{text('Trước khi lưu', 'Before saving')}</p><h2 className="mt-2 text-lg font-semibold text-slate-950">{text('Hồ sơ nhân viên mới', 'New employee profile')}</h2>
-            <ol className="mt-4 space-y-3 text-sm leading-6 text-slate-600"><li className="flex gap-2"><span className="font-bold text-orange-600">1.</span>{text('Hồ sơ và tài khoản chờ kích hoạt qua email.', 'Profile and account wait for email activation.')}</li><li className="flex gap-2"><span className="font-bold text-orange-600">2.</span>{text('Học vấn và kinh nghiệm được lưu cùng hồ sơ.', 'Education and experience are saved with the profile.')}</li><li className="flex gap-2"><span className="font-bold text-orange-600">3.</span>{text('Quãng đường được tính khi tạo.', 'Commute distance is calculated on creation.')}</li></ol>
+            <ol className="mt-4 space-y-3 text-sm leading-6 text-slate-600"><li className="flex gap-2"><span className="font-bold text-orange-600">1.</span>{text('Hồ sơ và tài khoản chờ kích hoạt qua email.', 'Profile and account wait for email activation.')}</li><li className="flex gap-2"><span className="font-bold text-orange-600">2.</span>{text('Học vấn được lưu cùng hồ sơ; bổ sung kinh nghiệm sau khi tạo.', 'Education is saved with the profile; add experience after creation.')}</li><li className="flex gap-2"><span className="font-bold text-orange-600">3.</span>{text('Quãng đường được tính khi tạo.', 'Commute distance is calculated on creation.')}</li></ol>
             <div className="my-5 border-t border-slate-200" /><dl className="space-y-3 text-sm"><div><dt className="text-slate-500">{text('Phòng ban', 'Department')}</dt><dd className="mt-1 font-semibold text-slate-900">{departments.find(item => String(item.id) === form.departmentId)?.name || text('Chưa chọn', 'Not selected')}</dd></div><div><dt className="text-slate-500">{text('Học vấn / Kinh nghiệm', 'Education / Experience')}</dt><dd className="mt-1 font-semibold tabular-nums text-slate-900">{educations.length} / {experiences.length}</dd></div></dl>
             <div className="mt-6 grid gap-2"><Button disabled={pending || !!catalogError}>{text(pending ? 'Đang xác minh và lưu...' : 'Tạo hồ sơ nhân viên', pending ? 'Verifying and saving...' : 'Create employee profile')}</Button><Button type="button" variant="secondary" onClick={() => navigate('/employees')}>{text('Hủy', 'Cancel')}</Button></div>
           </Card>

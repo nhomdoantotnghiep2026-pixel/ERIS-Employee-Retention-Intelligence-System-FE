@@ -100,7 +100,7 @@ function EducationCard({ value, index, dateOfBirth, disabled, removable, text, o
 
   const minimumGraduationYear = dateOfBirth && /^\d{4}-\d{2}-\d{2}$/.test(dateOfBirth)
 
-    ? Number(dateOfBirth.slice(0, 4)) + 21
+    ? Number(dateOfBirth.slice(0, 4)) + (value.educationLevel === 'High School' ? 18 : 21)
 
     : 1900;
 
@@ -122,7 +122,7 @@ function EducationCard({ value, index, dateOfBirth, disabled, removable, text, o
 
       setSearching(true); setSearchError('');
 
-      void searchEducationInstitutions(query, Number(value.educationLevel), controller.signal)
+      void searchEducationInstitutions(query, value.educationLevel || undefined, controller.signal)
 
         .then(result => { if (!controller.signal.aborted) { setSuggestions(result.data); setOpen(true); } })
 
@@ -164,13 +164,15 @@ function EducationCard({ value, index, dateOfBirth, disabled, removable, text, o
 
           onChange={event => onChange({ ...value, educationLevel: event.target.value, institutionRefId: '' })}>
 
-          <option value="1">{text('Cao đẳng', 'College')}</option>
+          <option value="">{text('Chọn trình độ', 'Select education level')}</option>
 
-          <option value="2">{text('Cử nhân', 'Bachelor')}</option>
+          <option value="High School">{text('Trung học phổ thông', 'High School')}</option>
 
-          <option value="3">{text('Thạc sĩ', 'Master')}</option>
+          <option value="Bachelor">{text('Cử nhân', 'Bachelor')}</option>
 
-          <option value="4">{text('Tiến sĩ', 'Doctorate')}</option>
+          <option value="Master">{text('Thạc sĩ', 'Master')}</option>
+
+          <option value="PhD">{text('Tiến sĩ', 'Doctorate')}</option>
 
         </select>
 
@@ -296,7 +298,7 @@ export function EmployeeCreateBackgroundFields({ educations, experiences, dateOf
 
         <Button type="button" size="sm" variant="secondary" disabled={disabled || educations.length >= 20}
 
-          onClick={() => onEducationsChange([...educations, { id: nextId(educations), educationLevel: '2', fieldOfStudy: '', graduationYear: '', institution: '', institutionRefId: '' }])}>
+          onClick={() => onEducationsChange([...educations, { id: nextId(educations), educationLevel: 'Bachelor', fieldOfStudy: '', graduationYear: '', institution: '', institutionRefId: '' }])}>
 
           <Plus size={16} aria-hidden="true" />{text('Thêm bằng cấp', 'Add education')}
 
@@ -324,11 +326,11 @@ export function EmployeeCreateBackgroundFields({ educations, experiences, dateOf
 
           <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-orange-50 text-orange-600 ring-1 ring-orange-100"><BriefcaseBusiness size={20} aria-hidden="true" /></span>
 
-          <div><p className="text-xs font-bold uppercase tracking-[0.12em] text-orange-600">05</p><h3 className="mt-1 text-lg font-semibold text-slate-950">{text('Kinh nghiệm làm việc', 'Work experience')}</h3><p className="mt-1 text-sm leading-6 text-slate-500">{text('Khai báo công việc trước đây; có thể bỏ qua nếu chưa có kinh nghiệm.', 'Add previous roles, or leave this section empty.')}</p></div>
+          <div><p className="text-xs font-bold uppercase tracking-[0.12em] text-orange-600">05</p><h3 className="mt-1 text-lg font-semibold text-slate-950">{text('Kinh nghiệm làm việc', 'Work experience')}</h3><p className="mt-1 text-sm leading-6 text-slate-500">{text('Thêm kinh nghiệm trong trang chi tiết sau khi tạo hồ sơ.', 'Add experience on the employee details page after creating the profile.')}</p></div>
 
         </div>
 
-        <Button type="button" size="sm" variant="secondary" disabled={disabled || experiences.length >= 50}
+        <Button type="button" size="sm" variant="secondary" disabled
 
           onClick={() => onExperiencesChange([...experiences, { id: nextId(experiences), companyName: '', positionTitle: '', startDate: '', endDate: '' }])}>
 

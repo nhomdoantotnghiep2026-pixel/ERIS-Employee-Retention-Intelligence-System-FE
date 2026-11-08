@@ -366,7 +366,7 @@ export function listEducationEmployees(signal?: AbortSignal) {
   return request<{ data: Array<{ id: number; employeeCode: string; fullName: string; dateOfBirth: string | null; employmentStatus: string }> }>('/employee-educations/employees', { signal, cache: 'no-store' });
 }
 
-export function searchEducationInstitutions(name: string, educationLevel?: number, signal?: AbortSignal) {
+export function searchEducationInstitutions(name: string, educationLevel?: number | string, signal?: AbortSignal) {
   const query = new URLSearchParams({ name });
   if (educationLevel !== undefined) query.set('educationLevel', String(educationLevel));
   return request<{ data: EducationInstitution[]; source: string; manualEntryAllowed: boolean }>(`/employee-educations/institutions?${query}`, { signal });
@@ -476,7 +476,7 @@ export interface EmployeeInput {
   phone?: string | null; dateOfBirth?: string | null; gender?: string | null;
   address?: string | null; addressRefId?: string | null; employmentType?: string | null; currentSalary?: number | null;
   educations?: Array<{
-    educationLevel: number; fieldOfStudy?: string | null; institution: string;
+    educationLevel: number | string; fieldOfStudy?: string | null; institution: string;
     institutionRefId: string; graduationYear?: number | null;
   }>;
   workExperiences?: Array<{
