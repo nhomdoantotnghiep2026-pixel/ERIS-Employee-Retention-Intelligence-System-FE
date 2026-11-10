@@ -33,6 +33,7 @@ import CompanyLocationScreen from './screens/CompanyLocation';
 import LeaveRequests from './screens/LeaveRequests';
 import PolicyDemo from './screens/PolicyDemo';
 import AiAnalysis from './screens/AiAnalysis';
+import PortalHub from './screens/PortalHub';
 
 // HR
 import Dashboard from './screens/Dashboard';
@@ -104,6 +105,7 @@ export default function App() {
 
           {/* HR */}
           <Route path="/dashboard" element={<RoleGuard><Dashboard /></RoleGuard>} />
+          <Route path="/portal" element={<RoleGuard><PortalHub /></RoleGuard>} />
           <Route path="/org-overview" element={<RoleGuard><RiskWorkspace /></RoleGuard>} />
           <Route path="/departments" element={<RoleGuard><Departments /></RoleGuard>} />
           <Route path="/positions" element={<RoleGuard><Positions /></RoleGuard>} />

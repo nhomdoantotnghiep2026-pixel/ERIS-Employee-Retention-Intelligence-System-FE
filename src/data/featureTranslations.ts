@@ -1,5 +1,13 @@
 // Display copy only. Stored identifiers, enum values and user-entered content are unchanged.
 export const featureVietnamese: Record<string, string> = {
+  'Portal': 'Cổng chức năng',
+  'One place to access the HR workflows provided by the backend portal APIs.': 'Nơi truy cập tập trung các quy trình HR được cung cấp bởi API portal của backend.',
+  'Open feature': 'Mở chức năng',
+  'Review employee snapshots, run predictions and generate policy recommendations.': 'Xem dữ liệu chụp nhân viên, chạy dự đoán và tạo đề xuất chính sách.',
+  'Explore retention policies and recommendations created from prediction results.': 'Khám phá chính sách giữ chân và đề xuất được tạo từ kết quả dự đoán.',
+  'Create surveys, publish them and review employee responses.': 'Tạo, phát hành khảo sát và xem phản hồi của nhân viên.',
+  'Review leave requests, cancellations and approval history.': 'Xem đơn nghỉ phép, yêu cầu hủy và lịch sử phê duyệt.',
+  'Create schedule templates and assign working schedules to employees.': 'Tạo mẫu lịch và phân công lịch làm việc cho nhân viên.',
   'AI analysis': 'Phân tích AI',
   'Create a work schedule': 'Tạo lịch làm việc',
   'Assign schedules and view employee history': 'Gán lịch và xem lịch sử nhân viên',
@@ -1147,6 +1155,8 @@ export const featureEnglish: Record<string, string> = {
   'Chốt vắng mặt': 'Finalize absences',
   'Chốt vắng mặt cho ngày này? Hệ thống sẽ ghi vắng mặt cho nhân viên đủ điều kiện.': 'Finalize absences for this date? Eligible employees will be marked absent.',
   'Chọn ngày đã qua để ghi vắng mặt cho nhân viên đủ điều kiện chưa có chấm công; không áp dụng cho ngày lễ.': 'Select a past date to mark eligible employees without attendance as absent; holidays are excluded.',
+  'Đã chốt ngày {date}. Đã tạo {created} bản ghi vắng mặt.': 'Closed {date}. Created {created} absence records.',
+  'Không chốt được ngày công.': 'Could not close the attendance day.',
   'Ngày lễ đã bắt đầu, không thể sửa hoặc xóa.': 'This holiday has started and cannot be edited or deleted.',
   'Xóa ngày lễ này? Ngày lễ sẽ không còn được áp dụng.': 'Delete this holiday? It will no longer apply.',
   'Đã xóa ngày lễ.': 'Holiday deleted.',

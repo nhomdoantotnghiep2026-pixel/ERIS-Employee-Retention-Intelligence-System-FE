@@ -1,6 +1,6 @@
 import { EnterpriseHeader } from './EnterpriseHeader';
 import { readSidebarGroups, saveSidebarGroups } from '../utils/sidebarGroups';
-import { type ReactNode, useEffect, useState } from 'react';
+import { type ReactNode, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, Users, BarChart3,
@@ -47,6 +47,7 @@ const NAV_BY_ROLE: Record<UserRole, NavGroup[]> = {
     {
       group: 'Retention',
       items: [
+        { label: 'Portal', icon: Zap, to: '/portal' },
         { label: 'Attrition Risk Analytics', icon: AlertTriangle, to: '/attrition-risk' },
         { label: 'Retention Interventions', icon: Target, to: '/interventions' },
         { label: 'Policy demo', icon: Target, to: '/policy-demo' },
@@ -165,6 +166,8 @@ function Sidebar({ onNavigate, collapsed, onToggle }: { onNavigate?: () => void;
   const [positionsOpen, setPositionsOpen] = useState(() => pathname.startsWith('/positions'));
   const [schedulesOpen, setSchedulesOpen] = useState(() => pathname.startsWith('/work-schedules'));
   const [historyOpen, setHistoryOpen] = useState(() => ['/employee-history', '/employee-education', '/employee-job-history'].includes(pathname));
+  const navigationRef = useRef<HTMLElement>(null);
+  const scrollStorageKey = `eris-sidebar-scroll:${user.role}`;
   const [, setPermissionRevision] = useState(0);
   const navGroups = NAV_BY_ROLE[user.role].map(group => ({
     ...group,
@@ -185,6 +188,16 @@ function Sidebar({ onNavigate, collapsed, onToggle }: { onNavigate?: () => void;
     window.addEventListener(RBAC_UPDATED_EVENT, refresh);
     return () => window.removeEventListener(RBAC_UPDATED_EVENT, refresh);
   }, []);
+
+  useLayoutEffect(() => {
+    const navigation = navigationRef.current;
+    if (!navigation) return;
+    const savedPosition = Number(sessionStorage.getItem(scrollStorageKey));
+    if (Number.isFinite(savedPosition) && savedPosition > 0) navigation.scrollTop = savedPosition;
+    return () => {
+      sessionStorage.setItem(scrollStorageKey, String(navigation.scrollTop));
+    };
+  }, [scrollStorageKey]);
 
   return (
     <aside aria-label="Main navigation" className={`fixed inset-y-0 left-0 z-50 flex h-dvh max-w-[88vw] flex-shrink-0 flex-col overflow-visible rounded-br-[40px] bg-white shadow-2xl transition-[width,transform] duration-300 ease-out lg:sticky lg:top-0 lg:z-40 lg:translate-x-0 lg:shadow-[5px_0_26px_rgba(30,41,59,0.10)] ${collapsed ? '-translate-x-full w-[292px] lg:w-[96px]' : 'w-[320px] translate-x-0 lg:w-[292px]'}`}>
@@ -217,7 +230,7 @@ function Sidebar({ onNavigate, collapsed, onToggle }: { onNavigate?: () => void;
       </div>
 
       {/* Role-specific nav */}
-      <nav className={`flex-1 overflow-y-auto py-3 ${collapsed ? 'space-y-2 px-0' : 'space-y-1 px-3'}`}>
+      <nav ref={navigationRef} onScroll={event => sessionStorage.setItem(scrollStorageKey, String(event.currentTarget.scrollTop))} className={`flex-1 overflow-y-auto py-3 ${collapsed ? 'space-y-2 px-0' : 'space-y-1 px-3'}`}>
         {collapsed ? visibleGroups.map((group, index) => {
           const groupKey = group.group || `group-${index}`;
           if (!group.group || group.items.length === 1) return group.items.map(item => <SidebarLink key={item.to} {...item} collapsed onNavigate={onNavigate} />);

@@ -1,5 +1,21 @@
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || '/api').replace(/\/$/, '');
+const BACKEND_ROOT_URL = API_BASE_URL.replace(/\/api$/, '');
 const ADMIN_API_BASE_URL = (import.meta.env.VITE_ADMIN_API_BASE_URL || '').replace(/\/$/, '');
+export const SESSION_EXPIRED_EVENT = 'eris:session-expired';
+let lastExpiredAccessToken: string | null = null;
+
+function notifySessionExpired(accessToken: string) {
+  if (lastExpiredAccessToken === accessToken) return;
+  lastExpiredAccessToken = accessToken;
+  try {
+    sessionStorage.removeItem?.('eris-user');
+    sessionStorage.removeItem?.('eris-access-token');
+  } catch {
+    // Session cleanup must never replace the original API error.
+  }
+  if (typeof window !== 'undefined') window.dispatchEvent(new Event(SESSION_EXPIRED_EVENT));
+}
+
 const isAdminAccount = (user?: ApiUser) => {
   const role = (typeof user?.role === 'string' ? user.role : user?.role?.name)?.trim().toUpperCase();
   return role ? role === 'ADMIN' || role === 'SYSTEM ADMINISTRATOR' : user?.roleId === 1;
@@ -146,6 +162,10 @@ export function deleteAttendanceHoliday(id: number) {
 }
 export function closeAttendanceDay(date: string) {
   return request<{date: string; created: number}>('/v1/attendance/close-day', { method: 'POST', body: JSON.stringify({date}) });
+}
+
+export function getBackendHealth(signal?: AbortSignal) {
+  return request<{ status: string }>('/health', { signal, cache: 'no-store' }, BACKEND_ROOT_URL);
 }
 
 export interface RetentionPolicy { id: number; code: string; name: string; description: string | null; targetFactor: string | null; status: string }
@@ -660,6 +680,7 @@ async function request<T>(path: string, init?: RequestInit, baseOverride?: strin
 
   const body = await response.json().catch(() => null) as { message?: string; code?: string; error?: { code?: string; message?: string } } | null;
   if (!response.ok) {
+    if (response.status === 401 && token && path !== '/auth/logout') notifySessionExpired(token);
     throw new ApiError(body?.message || body?.error?.message || `Request failed with status ${response.status}.`, response.status, body?.code || body?.error?.code);
   }
 
@@ -716,7 +737,10 @@ export async function login(email: string, password: string) {
     throw new Error(result.message || 'Tài khoản cần hoàn tất đổi mật khẩu trước khi đăng nhập.');
   }
 
-  if (result.accessToken) sessionStorage.setItem('eris-access-token', result.accessToken);
+  if (result.accessToken) {
+    lastExpiredAccessToken = null;
+    sessionStorage.setItem('eris-access-token', result.accessToken);
+  }
   return result;
 }
 

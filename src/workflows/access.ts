@@ -5,7 +5,7 @@ export const ROLE_HOME: Record<string, string> = {
 };
 const sharedData = ['/employees', '/employees/new', '/employees/:id', '/employees/:id/edit'];
 export const ROLE_ROUTES: Record<string, string[]> = {
-  HR: [...sharedData, '/employees/import', '/departments', '/positions', '/positions/:id', '/positions/:id/edit', '/dashboard', '/org-overview', '/workforce-risk', '/attendance', '/holidays', '/work-schedules', '/work-schedules/assign', '/work-schedules/list', '/employee-requests', '/company-location', '/employee-history', '/employee-education', '/employee-job-history', '/attrition-risk', '/ai-analysis', '/interventions', '/policy-demo', '/outcomes', '/engagement', '/employees/:id/risk'],
+  HR: [...sharedData, '/employees/import', '/departments', '/positions', '/positions/:id', '/positions/:id/edit', '/dashboard', '/portal', '/org-overview', '/workforce-risk', '/attendance', '/holidays', '/work-schedules', '/work-schedules/assign', '/work-schedules/list', '/employee-requests', '/company-location', '/employee-history', '/employee-education', '/employee-job-history', '/attrition-risk', '/ai-analysis', '/interventions', '/policy-demo', '/outcomes', '/engagement', '/employees/:id/risk'],
   'Data / AI Analyst': [...sharedData, '/data-overview', '/data', '/import', '/schema', '/data-pipelines', '/model', '/ai-config', '/model/eval', '/model-performance', '/feature-importance', '/model-history', '/audit-logs', '/predictions'],
   'System Administrator': ['/admin-overview', '/users', '/roles', '/rbac', '/system', '/activity', '/system-health'],
   'Employee / ESS': ['/employee-dashboard', '/my-profile', '/my-attendance', '/my-requests', '/my-surveys'],

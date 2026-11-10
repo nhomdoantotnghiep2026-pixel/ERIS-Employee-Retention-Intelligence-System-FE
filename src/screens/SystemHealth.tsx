@@ -2,7 +2,8 @@ import { useLanguage } from '../context/LanguageContext';
 import { AppShell } from '../components/AppShell';
 import { Card, SectionHeader, Button } from '../components/ui';
 import { MonitorCheck, RefreshCw, CheckCircle, AlertCircle, Clock } from 'lucide-react';
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+import { getBackendHealth } from '../services/api';
 
 type HealthStatus = 'Operational' | 'Degraded' | 'Outage';
 
@@ -79,20 +80,45 @@ export default function SystemHealth() {
   const { t, language } = useLanguage();
   const [serviceRows, setServiceRows] = useState(services);
   const [updatedAt, setUpdatedAt] = useState('just now');
+  const [checking, setChecking] = useState(false);
   const operational = serviceRows.filter(s => s.status === 'Operational').length;
   const degraded = serviceRows.filter(s => s.status === 'Degraded').length;
   const overall: HealthStatus = degraded > 0 ? 'Degraded' : 'Operational';
   const overallCfg = statusConfig[overall];
 
-  const refreshHealth = () => {
-    setUpdatedAt(new Date().toLocaleTimeString(language === 'vi' ? 'vi-VN' : 'en-US'));
-    setServiceRows(rows => rows.map(row => ({ ...row, lastChecked: 'now' })));
-  };
+  const refreshHealth = useCallback(async (signal?: AbortSignal) => {
+    const startedAt = performance.now();
+    setChecking(true);
+    try {
+      const health = await getBackendHealth(signal);
+      if (signal?.aborted) return;
+      const latency = `${Math.max(1, Math.round(performance.now() - startedAt))}ms`;
+      setServiceRows(rows => rows.map(row => row.service === 'ERIS Core API'
+        ? { ...row, status: health.status === 'ok' ? 'Operational' : 'Degraded', latency, lastChecked: 'now' }
+        : row));
+    } catch {
+      if (signal?.aborted) return;
+      setServiceRows(rows => rows.map(row => row.service === 'ERIS Core API'
+        ? { ...row, status: 'Outage', latency: '—', lastChecked: 'now' }
+        : row));
+    } finally {
+      if (!signal?.aborted) {
+        setUpdatedAt(new Date().toLocaleTimeString(language === 'vi' ? 'vi-VN' : 'en-US'));
+        setChecking(false);
+      }
+    }
+  }, [language]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    void refreshHealth(controller.signal);
+    return () => controller.abort();
+  }, [refreshHealth]);
 
   return (
     <AppShell breadcrumb={['System Operations', 'System Health Monitor']}>
       <SectionHeader title={t("System Health Monitor")} description={t("Real-time status of all ERIS services and integrations")}>
-        <Button variant="secondary" size="sm" onClick={refreshHealth}><RefreshCw size={13} /> {t("Refresh")}</Button>
+        <Button variant="secondary" size="sm" disabled={checking} onClick={() => void refreshHealth()}><RefreshCw size={13} className={checking ? 'animate-spin' : ''} /> {t("Refresh")}</Button>
       </SectionHeader>
 
       {/* Overall status banner */}
