@@ -318,7 +318,7 @@ export function EmployeeCreateBackgroundFields({ educations, experiences, dateOf
 
 
 
-    <motion.section variants={sectionMotion} whileHover={{ y: -2 }} transition={{ duration: 0.22 }} className="rounded-[20px] border border-slate-200 bg-white p-5 shadow-sm transition-shadow duration-300 hover:shadow-[0_14px_38px_rgba(30,41,59,0.09)] sm:p-6">
+    {experiences.length > 0 && <motion.section variants={sectionMotion} whileHover={{ y: -2 }} transition={{ duration: 0.22 }} className="rounded-[20px] border border-slate-200 bg-white p-5 shadow-sm transition-shadow duration-300 hover:shadow-[0_14px_38px_rgba(30,41,59,0.09)] sm:p-6">
 
       <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
 
@@ -364,7 +364,7 @@ export function EmployeeCreateBackgroundFields({ educations, experiences, dateOf
 
       </motion.article>)}</AnimatePresence></div>
 
-    </motion.section>
+    </motion.section>}
 
   </>;
 

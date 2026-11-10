@@ -8,6 +8,7 @@ import { AppShell } from '../components/AppShell';
 import { EmployeeCreateBackgroundFields, type CreateEducationDraft, type CreateExperienceDraft } from '../components/EmployeeCreateBackgroundFields';
 import { EmployeeApiHistory } from '../components/EmployeeApiHistory';
 import { employeeDate, jobChangeDateRestriction } from '../utils/employeeDates';
+import { positionSelection } from '../utils/positionSelection';
 import { useAutoDismissFeedback } from '../hooks/useAutoDismissState';
 import { Button, Card } from '../components/ui';
 import { useLanguage } from '../context/LanguageContext';
@@ -53,6 +54,7 @@ export default function HrEmployees() {
   const [inlineEditing, setInlineEditing] = useState(false);
   const editing = routeEditing || inlineEditing;
   const [form, setForm] = useState<Form>(empty);
+  const [selectedPositionTitle, setSelectedPositionTitle] = useState('');
   const [educations, setEducations] = useState<CreateEducationDraft[]>([initialEducation]);
   const [experiences, setExperiences] = useState<CreateExperienceDraft[]>([]);
   const [addressSuggestions, setAddressSuggestions] = useState<PlaceSuggestion[]>([]);
@@ -87,10 +89,11 @@ export default function HrEmployees() {
     const controller = new AbortController();
     setError(''); setLoading(true); setDetail(null);
     if (creating) {
+      setSelectedPositionTitle('');
       try {
         const savedDraft = window.localStorage.getItem(EMPLOYEE_DRAFT_KEY);
         const parsed = savedDraft ? JSON.parse(savedDraft) as { form?: Partial<Form>; educations?: CreateEducationDraft[]; experiences?: CreateExperienceDraft[] } : null;
-        setForm(parsed?.form ? { ...empty, ...parsed.form } : empty);
+        setForm(parsed?.form ? { ...empty, ...parsed.form, departmentId: '', positionId: '' } : empty);
         setEducations(parsed?.educations?.length ? parsed.educations.map(row => ({ ...row,
           educationLevel: ({ '1': '', '2': 'Bachelor', '3': 'Master', '4': 'PhD' } as Record<string, string>)[row.educationLevel] ?? row.educationLevel,
         })) : [initialEducation]);
@@ -247,6 +250,9 @@ export default function HrEmployees() {
   const createPositions = form.departmentId
     ? positions.filter(position => position.departmentId === Number(form.departmentId)).map(position => ({ ...position, name: `${position.name} · ${position.code || text('Chưa có mã', 'No code')} · ${text('Cấp', 'Level')} ${position.jobLevel}` }))
     : [];
+  const currentPositionTitle = selectedPositionTitle || positions.find(position => String(position.id) === form.positionId && String(position.departmentId) === form.departmentId)?.name.trim() || '';
+  const creationPositionOptions = positionSelection(positions, form.departmentId, currentPositionTitle);
+  const levelNames: Record<number, string> = { 1: 'Entry', 2: 'Junior', 3: 'Intermediate', 4: 'Senior', 5: 'Expert / Leadership' };
   const detailItem = (icon: ReactNode, label: string, value: unknown) => <div className="flex min-w-0 items-start gap-3 rounded-xl px-1 py-2.5">
     <span className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-xl bg-slate-50 text-slate-500 ring-1 ring-slate-100">{icon}</span>
     <div className="min-w-0"><dt className="text-[13px] font-medium leading-5 text-slate-500">{label}</dt><dd className="mt-0.5 whitespace-pre-wrap break-words text-[15px] font-semibold leading-6 text-slate-950">{value == null || value === '' ? '—' : String(value)}</dd></div>
@@ -323,10 +329,10 @@ export default function HrEmployees() {
               <div><p className="text-xs font-bold uppercase tracking-[0.12em] text-orange-600">02</p><h3 className="mt-1 text-lg font-semibold text-slate-950">{text('Công việc hiện tại', 'Current employment')}</h3><p className="mt-1 text-sm leading-6 text-slate-500">{text('Chọn phòng ban trước để hiển thị đúng vị trí liên kết.', 'Choose a department first to show its linked positions.')}</p></div>
             </div>
             <div className="grid gap-4 md:grid-cols-2">
-              {catalogSelect(text('Phòng ban *', 'Department *'), form.departmentId, value => setForm(current => ({ ...current, departmentId: value, positionId: '' })), departments, true)}
-              {catalogSelect(text('Chức danh / Vị trí *', 'Position *'), form.positionId, value => setForm(current => ({ ...current, positionId: value })), createPositions, true, !form.departmentId || !createPositions.length)}
-              {!form.departmentId && <p className="-mt-2 text-xs leading-5 text-slate-500 md:col-start-2">{text('Chọn phòng ban trước.', 'Select a department first.')}</p>}
+              {catalogSelect(text('Phòng ban *', 'Department *'), form.departmentId, value => { setSelectedPositionTitle(''); setForm(current => ({ ...current, departmentId: value, positionId: '' })); }, departments, true)}
+              <label className="block text-sm font-semibold leading-5 text-slate-700">{requiredLabel(text('Chức danh / Vị trí', 'Position'), true)}<select required className={createControl} value={currentPositionTitle} disabled={pending || !form.departmentId || !creationPositionOptions.titles.length} onChange={event => { setSelectedPositionTitle(event.target.value); setForm(current => ({ ...current, positionId: '' })); }}><option value="">{text('Chọn chức danh / vị trí', 'Select a position')}</option>{creationPositionOptions.titles.map(title => <option key={title} value={title}>{title}</option>)}</select>{!form.departmentId && <span className="mt-1.5 block text-xs font-normal text-slate-500">{text('Chọn phòng ban trước.', 'Select a department first.')}</span>}</label>
               {form.departmentId && !createPositions.length && <p className="-mt-2 text-xs font-medium leading-5 text-amber-700 md:col-start-2">{text('Phòng ban này chưa có vị trí đang hoạt động.', 'This department has no active positions.')}</p>}
+              {form.departmentId && currentPositionTitle && <label className="block text-sm font-semibold leading-5 text-slate-700">{requiredLabel(text('Cấp độ công việc', 'Job level'), true)}<select required className={createControl} value={form.positionId} disabled={pending} onChange={event => setForm(current => ({ ...current, positionId: event.target.value }))}><option value="">{text('Chọn cấp độ công việc', 'Select job level')}</option>{creationPositionOptions.levels.map(position => <option key={position.id} value={position.id}>{levelNames[position.jobLevel] || `${text('Cấp', 'Level')} ${position.jobLevel}`}{creationPositionOptions.levels.filter(item => item.jobLevel === position.jobLevel).length > 1 ? ` · ${position.code || `#${position.id}`}` : ''}</option>)}</select></label>}
               {createField('hireDate', text('Ngày vào làm', 'Hire date'), 'date', true)}
               <label className="block text-sm font-semibold leading-5 text-slate-700">{requiredLabel(text('Loại hợp đồng', 'Employment type'), true)}<select required className={createControl} value={form.employmentType} onChange={event => setForm(value => ({ ...value, employmentType: event.target.value }))}><option value="">{text('Chọn loại hợp đồng', 'Select employment type')}</option><option value="FULL_TIME">{text('Toàn thời gian', 'Full time')}</option><option value="PART_TIME">{text('Bán thời gian', 'Part time')}</option><option value="CONTRACT">{text('Hợp đồng', 'Contract')}</option><option value="INTERNSHIP">{text('Thực tập', 'Internship')}</option></select></label>
               <div className="md:col-span-2">{createField('currentSalary', text('Lương hiện tại (VNĐ)', 'Current salary (VND)'), 'number', true, '18000000')}</div>
@@ -353,8 +359,8 @@ export default function HrEmployees() {
         </fieldset>
         <motion.aside variants={createItemMotion} className="xl:sticky xl:top-5">
           <Card className="p-5 sm:p-6"><p className="text-xs font-bold uppercase tracking-[0.12em] text-orange-600">{text('Trước khi lưu', 'Before saving')}</p><h2 className="mt-2 text-lg font-semibold text-slate-950">{text('Hồ sơ nhân viên mới', 'New employee profile')}</h2>
-            <ol className="mt-4 space-y-3 text-sm leading-6 text-slate-600"><li className="flex gap-2"><span className="font-bold text-orange-600">1.</span>{text('Hồ sơ và tài khoản chờ kích hoạt qua email.', 'Profile and account wait for email activation.')}</li><li className="flex gap-2"><span className="font-bold text-orange-600">2.</span>{text('Học vấn được lưu cùng hồ sơ; bổ sung kinh nghiệm sau khi tạo.', 'Education is saved with the profile; add experience after creation.')}</li><li className="flex gap-2"><span className="font-bold text-orange-600">3.</span>{text('Quãng đường được tính khi tạo.', 'Commute distance is calculated on creation.')}</li></ol>
-            <div className="my-5 border-t border-slate-200" /><dl className="space-y-3 text-sm"><div><dt className="text-slate-500">{text('Phòng ban', 'Department')}</dt><dd className="mt-1 font-semibold text-slate-900">{departments.find(item => String(item.id) === form.departmentId)?.name || text('Chưa chọn', 'Not selected')}</dd></div><div><dt className="text-slate-500">{text('Học vấn / Kinh nghiệm', 'Education / Experience')}</dt><dd className="mt-1 font-semibold tabular-nums text-slate-900">{educations.length} / {experiences.length}</dd></div></dl>
+            <ol className="mt-4 space-y-3 text-sm leading-6 text-slate-600"><li className="flex gap-2"><span className="font-bold text-orange-600">1.</span>{text('Hồ sơ và tài khoản chờ kích hoạt qua email.', 'Profile and account wait for email activation.')}</li><li className="flex gap-2"><span className="font-bold text-orange-600">2.</span>{text('Học vấn được lưu cùng hồ sơ.', 'Education is saved with the profile.')}</li><li className="flex gap-2"><span className="font-bold text-orange-600">3.</span>{text('Quãng đường được tính khi tạo.', 'Commute distance is calculated on creation.')}</li></ol>
+            <div className="my-5 border-t border-slate-200" /><dl className="space-y-3 text-sm"><div><dt className="text-slate-500">{text('Phòng ban', 'Department')}</dt><dd className="mt-1 font-semibold text-slate-900">{departments.find(item => String(item.id) === form.departmentId)?.name || text('Chưa chọn', 'Not selected')}</dd></div><div><dt className="text-slate-500">{text('Học vấn', 'Education')}</dt><dd className="mt-1 font-semibold tabular-nums text-slate-900">{educations.length}</dd></div></dl>
             <div className="mt-6 grid gap-2"><Button disabled={pending || !!catalogError}>{text(pending ? 'Đang xác minh và lưu...' : 'Tạo hồ sơ nhân viên', pending ? 'Verifying and saving...' : 'Create employee profile')}</Button><Button type="button" variant="secondary" onClick={() => navigate('/employees')}>{text('Hủy', 'Cancel')}</Button></div>
           </Card>
         </motion.aside>

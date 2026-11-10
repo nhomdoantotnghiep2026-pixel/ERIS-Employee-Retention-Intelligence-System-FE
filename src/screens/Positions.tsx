@@ -3,7 +3,7 @@ import { AppShell } from '../components/AppShell';
 import { Button, Card, SectionHeader } from '../components/ui';
 import { useLanguage } from '../context/LanguageContext';
 import { useAutoDismissFeedback } from '../hooks/useAutoDismissState';
-import { createPosition, deactivatePosition, getApiErrorMessage, getPositionById, listPositions, updatePosition, POSITION_LEVELS, type ApiPosition } from '../services/api';
+import { createPosition, deactivatePosition, getApiErrorMessage, getPositionById, listDepartments, listPositions, updatePosition, POSITION_LEVELS, type ApiDepartment, type ApiPosition } from '../services/api';
 
 const control = 'mt-2 w-full rounded-xl border border-slate-300 bg-white p-3 text-sm focus:outline-orange-500 disabled:opacity-60';
 const pageSize = 20;
@@ -11,6 +11,9 @@ const pageSize = 20;
 export default function Positions() {
   const { t } = useLanguage();
   const [positions, setPositions] = useState<ApiPosition[]>([]);
+  const [departments, setDepartments] = useState<ApiDepartment[]>([]);
+  const [departmentError, setDepartmentError] = useState(false);
+  const [departmentId, setDepartmentId] = useState('');
   const [hasMore, setHasMore] = useState(false);
   const [page, setPage] = useState(1);
   const [query, setQuery] = useState('');
@@ -31,6 +34,20 @@ export default function Positions() {
   const [detailError, setDetailError] = useState('');
   const [detailRevision, setDetailRevision] = useState(0);
   const detailHeading = useRef<HTMLHeadingElement>(null);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    setDepartmentError(false);
+    void listDepartments(controller.signal, { limit: Number.MAX_SAFE_INTEGER })
+      .then(result => { if (!controller.signal.aborted) setDepartments(result.data); })
+      .catch(() => { if (!controller.signal.aborted) setDepartmentError(true); });
+    return () => controller.abort();
+  }, [revision]);
+
+  function departmentName(id?: number | null) {
+    if (!id) return '—';
+    return departments.find(department => department.id === Number(id))?.name || `#${id}`;
+  }
 
   useEffect(() => {
     if (detailId === null) return;
@@ -64,12 +81,13 @@ export default function Positions() {
   }, [revision, page, search]);
 
   function resetForm() {
-    setEditing(null); setName(''); setDescription(''); setJobLevel('');
+    setEditing(null); setName(''); setDescription(''); setJobLevel(''); setDepartmentId('');
   }
 
   function edit(position: ApiPosition) {
     setEditing(position); setName(position.name); setDescription(position.description || '');
     setJobLevel(String(position.jobLevel));
+    setDepartmentId(position.departmentId ? String(position.departmentId) : '');
     setError(''); setMessage(''); nameInput.current?.focus();
   }
 
@@ -79,11 +97,12 @@ export default function Positions() {
     setError(''); setMessage('');
     if (!name.trim()) { setError('Enter a position name.'); nameInput.current?.focus(); return; }
     if (!POSITION_LEVELS.some(level => level.value === Number(jobLevel))) { setError('Select a position level.'); return; }
+    if (!editing && !departments.some(department => department.id === Number(departmentId))) { setError('Select department'); return; }
     setPending(true);
     try {
       const input = { name: name.trim(), jobLevel: Number(jobLevel), description: description.trim() || null };
       if (editing) await updatePosition(editing.id, input);
-      else await createPosition(input);
+      else await createPosition({ ...input, departmentId: Number(departmentId) });
       setMessage(editing ? 'Position updated.' : 'Position created.');
       resetForm();
       if (!editing) setPage(1);
@@ -135,18 +154,24 @@ export default function Positions() {
         </div>
         {detailLoading ? <p role="status" className="py-5 text-sm text-slate-600">{t('Loading position details...')}</p>
           : detailError ? <div role="alert" className="mt-4 rounded-xl bg-red-50 p-4 text-sm text-red-800"><p>{t(detailError)}</p><Button className="mt-3" variant="secondary" onClick={() => setDetailRevision(value => value + 1)}>{t('Retry positions')}</Button></div>
-          : detail && <dl className="mt-4 grid gap-x-6 gap-y-4 sm:grid-cols-2 lg:grid-cols-4">
-            <div><dt className="text-sm text-slate-500">{t('Position code')}</dt><dd className="mt-1 break-words font-medium">{detail.code || '—'}</dd></div>
-            <div><dt className="text-sm text-slate-500">{t('Position name')}</dt><dd className="mt-1 break-words font-medium">{detail.name}</dd></div>
-            <div><dt className="text-sm text-slate-500">{t('Position level')}</dt><dd className="mt-1 font-medium">{t(POSITION_LEVELS.find(level => level.value === Number(detail.jobLevel))?.label || 'Unknown level')}</dd></div>
-            <div><dt className="text-sm text-slate-500">{t('Position status')}</dt><dd className="mt-1 font-medium">{t(detail.status === 'INACTIVE' ? 'Position inactive' : 'Position active')}</dd></div>
-            <div className="min-w-0 border-t border-slate-100 pt-3 sm:col-span-2 lg:col-span-4"><dt className="text-sm text-slate-500">{t('Position description')}</dt><dd className="mt-1 whitespace-pre-wrap break-words">{detail.description || '—'}</dd></div>
+          : detail && <dl className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            <div className="min-w-0 rounded-xl bg-slate-50 p-4"><dt className="text-sm text-slate-500">{t('Position name')}</dt><dd className="mt-1 break-words font-medium text-slate-900">{detail.name}</dd></div>
+            <div className="min-w-0 rounded-xl bg-slate-50 p-4"><dt className="text-sm text-slate-500">{t('Department')}</dt><dd className="mt-1 break-words font-medium text-slate-900">{departmentName(detail.departmentId)}</dd></div>
+            <div className="min-w-0 rounded-xl bg-slate-50 p-4"><dt className="text-sm text-slate-500">{t('Position level')}</dt><dd className="mt-1 font-medium text-slate-900">{t(POSITION_LEVELS.find(level => level.value === Number(detail.jobLevel))?.label || 'Unknown level')}</dd></div>
+            <div className="min-w-0 rounded-xl bg-slate-50 p-4"><dt className="text-sm text-slate-500">{t('Position code')}</dt><dd className="mt-1 break-words font-medium text-slate-900">{detail.code || '—'}</dd></div>
+            <div className="min-w-0 rounded-xl bg-slate-50 p-4"><dt className="text-sm text-slate-500">{t('Position status')}</dt><dd className="mt-1 font-medium text-slate-900">{t(detail.status === 'INACTIVE' ? 'Position inactive' : 'Position active')}</dd></div>
+            <div className="min-w-0 rounded-xl bg-slate-50 p-4"><dt className="text-sm text-slate-500">{t('Position description')}</dt><dd className="mt-1 whitespace-pre-wrap break-words text-slate-900">{detail.description || '—'}</dd></div>
           </dl>}
       </section>
     </Card>}
     <Card className="mb-5 p-5 sm:p-6">
       <h2 className="text-lg font-bold text-slate-900">{t(editing ? 'Edit position' : 'Add position')}</h2>
       <form onSubmit={save} className="mt-4 grid gap-4 lg:grid-cols-2">
+        <label className="text-sm font-medium text-slate-700">{t('Department')} *<select required={!editing} value={departmentId} disabled={pending || !!editing || departmentError} onChange={event => setDepartmentId(event.target.value)} className={control}>
+          <option value="">{t('Select department')}</option>
+          {editing && departmentId && !departments.some(department => department.id === Number(departmentId)) && <option value={departmentId}>{departmentName(Number(departmentId))}</option>}
+          {departments.map(department => <option key={department.id} value={department.id}>{department.name}</option>)}
+        </select>{editing && <span className="mt-1 block text-xs text-slate-500">{t('The department cannot be changed when editing a position.')}</span>}{departmentError && <span role="alert" className="mt-1 block text-red-700">{t('Could not load departments. Please try again.')} <button type="button" className="underline" onClick={() => setRevision(value => value + 1)}>{t('Retry')}</button></span>}</label>
         <label className="text-sm font-medium text-slate-700">{t('Position name')}<input ref={nameInput} required maxLength={150} value={name} disabled={pending} onChange={event => setName(event.target.value)} className={control} /></label>
         <label className="text-sm font-medium text-slate-700">{t('Position level')}<select aria-label={t('Position level')} required value={jobLevel} disabled={pending} onChange={event => setJobLevel(event.target.value)} className={control}>
           <option value="">{t('Select a position level.')}</option>
@@ -171,10 +196,10 @@ export default function Positions() {
       {loading ? <p role="status" className="py-6 text-sm text-slate-600">{t('Loading positions...')}</p> : listError ? <div role="alert" className="rounded-xl bg-red-50 p-4 text-sm text-red-800"><p>{t(listError)}</p><Button className="mt-3" variant="secondary" onClick={() => setRevision(value => value + 1)}>{t('Retry positions')}</Button></div> : <>
         {!positions.length ? <p role="status" className="py-6 text-sm text-slate-600">{t('No positions found.')}</p> : <div className="overflow-x-auto"><table className="w-full text-left text-sm">
           <caption className="sr-only">{t('Position list')}</caption>
-          <thead><tr className="border-b text-slate-500"><th scope="col" className="p-3">{t('Position code')}</th><th scope="col" className="p-3">{t('Position name')}</th><th scope="col" className="p-3">{t('Position level')}</th><th scope="col" className="p-3">{t('Position status')}</th><th scope="col" className="p-3">{t('Position actions')}</th></tr></thead>
+          <thead><tr className="border-b text-slate-500"><th scope="col" className="p-3">{t('Position name')}</th><th scope="col" className="p-3">{t('Department')}</th><th scope="col" className="p-3">{t('Position level')}</th><th scope="col" className="p-3">{t('Position status')}</th><th scope="col" className="p-3">{t('Position actions')}</th></tr></thead>
           <tbody>{positions.map(position => <tr key={position.id} className="border-b border-slate-100">
-            <td className="p-3">{position.code || '—'}</td>
             <th scope="row" className="max-w-64 break-words p-3 font-medium text-slate-800">{position.name}</th>
+            <td className="p-3">{departmentName(position.departmentId)}</td>
             <td className="p-3">{t(POSITION_LEVELS.find(level => level.value === Number(position.jobLevel))?.label || 'Unknown level')}</td>
             <td className="p-3">{t(position.status === 'INACTIVE' ? 'Position inactive' : 'Position active')}</td>
             <td className="w-px p-3"><div className="flex flex-nowrap gap-2">

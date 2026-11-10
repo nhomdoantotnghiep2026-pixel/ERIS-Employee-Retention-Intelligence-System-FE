@@ -39,6 +39,8 @@ const permissionByRoute: Array<[string, string]> = [
   ['/employees', 'View Employee Directory'],
   ['/employee-requests', 'Review Employee Requests'],
   ['/attendance', 'View Attendance History'],
+  ['/holidays', 'View Attendance History'],
+  ['/work-schedules', 'View Attendance History'],
   ['/company-location', 'View Attendance History'],
   ['/org-overview', 'View Org-Level Risk'],
   ['/workforce-risk', 'View Org-Level Risk'],

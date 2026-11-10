@@ -2,6 +2,32 @@
 @import 'tailwindcss';
 @source './**/*.{js,ts,jsx,tsx}';
 
+.login-ambience {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  background: radial-gradient(ellipse at 10% 8%, rgba(255, 237, 213, .48), transparent 38%),
+    radial-gradient(ellipse at 85% 90%, rgba(255, 237, 213, .35), transparent 36%);
+}
+.login-ambience__glow, .login-ambience__ring, .login-ambience__dot { position: absolute; border-radius: 9999px; }
+.login-ambience__glow { filter: blur(10px); animation: login-drift 17s ease-in-out infinite alternate; }
+.login-ambience__glow--top { width: 290px; height: 290px; top: -150px; left: -90px; background: radial-gradient(circle, rgba(251, 146, 60, .22), transparent 70%); }
+.login-ambience__glow--bottom { width: 360px; height: 360px; bottom: -190px; right: 2%; background: radial-gradient(circle, rgba(249, 115, 22, .18), transparent 70%); animation-delay: -8s; }
+.login-ambience__ring { border: 1.5px solid rgba(234, 88, 12, .35); background: radial-gradient(circle at 30% 25%, rgba(255,255,255,.72), rgba(255, 205, 151, .22) 48%, rgba(249, 115, 22, .13)); box-shadow: inset 0 2px 12px rgba(255,255,255,.65), 0 8px 22px rgba(234,88,12,.09); animation: login-float 10s ease-in-out infinite alternate; }
+.login-ambience__ring--one { width: 116px; height: 116px; left: 5%; top: 22%; }
+.login-ambience__ring--two { width: 66px; height: 66px; right: 7%; top: 12%; animation-delay: -6s; }
+.login-ambience__ring--three { width: 160px; height: 160px; left: 7%; bottom: -45px; animation-delay: -10s; }
+.login-ambience__ring--four { width: 55px; height: 55px; left: 16%; top: 63%; animation-delay: -3s; }
+.login-ambience__ring--five { width: 90px; height: 90px; right: 4%; bottom: 27%; animation-delay: -7s; }
+.login-ambience__ring--six { width: 37px; height: 37px; left: 23%; top: 8%; animation-delay: -5s; }
+.login-ambience__dot { width: 9px; height: 9px; background: rgba(249, 115, 22, .5); box-shadow: 0 0 20px rgba(249,115,22,.3); animation: login-float 11s ease-in-out infinite alternate; }
+.login-ambience__dot--one { left: 13%; top: 57%; }
+.login-ambience__dot--two { right: 13%; bottom: 18%; width: 6px; height: 6px; animation-delay: -5s; }
+@keyframes login-float { from { transform: translate3d(0, 0, 0); } to { transform: translate3d(16px, -22px, 0); } }
+@keyframes login-drift { from { transform: translate3d(0, 0, 0) scale(1); } to { transform: translate3d(35px, 25px, 0) scale(1.12); } }
+@media (prefers-reduced-motion: reduce) { .login-ambience__glow, .login-ambience__ring, .login-ambience__dot { animation: none; } }
+
 @font-face {
   font-family: 'Inter:Regular';
   font-style: normal;

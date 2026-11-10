@@ -22,7 +22,7 @@ test('five POS requests follow team BE contracts and hide inactive records', asy
     assert.equal((await api.getPositionById(4)).jobLevel, 2);
     assert.equal(calls.at(-1)?.path, '/api/positions/4');
     assert.equal(calls.at(-1)?.init?.body, undefined);
-    const input = { name: 'Developer', jobLevel: 2, description: 'Team' };
+    const input = { name: 'Developer', jobLevel: 2, departmentId: 3, description: 'Team' };
     response = Response.json({ data: position }, { status: 201 });
     await api.createPosition(input);
     assert.equal(calls.at(-1)?.init?.method, 'POST');

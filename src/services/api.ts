@@ -115,7 +115,8 @@ export function recordAttendance(action: 'check-in' | 'check-out', location: Att
 
 export interface LeaveHistory { id: number; fromStatus: string | null; toStatus: string; note: string | null; actorName: string | null; actorRole: string | null; createdAt: string }
 export interface LeaveRequest { id: number; employeeId: number; employeeCode?: string; fullName?: string; fromDate: string; toDate: string; reason: string; status: string; effectiveStatus: string | null; histories: LeaveHistory[] }
-export interface AttendanceHoliday { date: string; name: string }
+export interface AttendanceHoliday { id: number; name: string; start_date: string; end_date: string; status: string }
+export type AttendanceHolidayInput = Pick<AttendanceHoliday, 'name' | 'start_date' | 'end_date'>;
 export function listLeaveRequests(own: boolean, signal?: AbortSignal) {
   return request<{data: LeaveRequest[]}>(`/v1/attendance/leave-requests${own ? '/me' : ''}`, { signal, cache: 'no-store' });
 }
@@ -134,8 +135,14 @@ export function cancelLeaveRequest(id: number, reason: string) {
 export function listAttendanceHolidays(signal?: AbortSignal) {
   return request<{data: AttendanceHoliday[]}>('/v1/attendance/holidays', { signal, cache: 'no-store' });
 }
-export function createAttendanceHoliday(input: AttendanceHoliday) {
+export function createAttendanceHoliday(input: AttendanceHolidayInput) {
   return request('/v1/attendance/holidays', { method: 'POST', body: JSON.stringify(input) });
+}
+export function updateAttendanceHoliday(id: number, input: AttendanceHolidayInput) {
+  return request(`/v1/attendance/holidays/${id}`, { method: 'PUT', body: JSON.stringify(input) });
+}
+export function deleteAttendanceHoliday(id: number) {
+  return request<void>(`/v1/attendance/holidays/${id}`, { method: 'DELETE' });
 }
 export function closeAttendanceDay(date: string) {
   return request<{date: string; created: number}>('/v1/attendance/close-day', { method: 'POST', body: JSON.stringify({date}) });
@@ -922,7 +929,7 @@ export async function getPositionById(id: number, signal?: AbortSignal) {
 }
 
 type PositionInput = Pick<ApiPosition, 'name' | 'jobLevel' | 'description'>;
-export async function createPosition(input: PositionInput) {
+export async function createPosition(input: PositionInput & { departmentId: number }) {
   return (await request<{ data: ApiPosition }>('/positions', { method: 'POST', body: JSON.stringify(input) })).data;
 }
 
@@ -973,3 +980,15 @@ export function importEmployees(file: File) {
     body,
   });
 }
+
+export interface WorkSchedule { id: number; name: string; start_time: string; end_time: string; break_start: string; break_end: string; working_days: number[]; status: 'ACTIVE' | 'INACTIVE'; is_default: boolean }
+export type WorkScheduleInput = Omit<WorkSchedule, 'id' | 'is_default'>;
+export interface ScheduleAssignment extends WorkSchedule { employee_id: number; schedule_id: number; effective_from: string; effective_to: string | null }
+export const listWorkSchedules = () => request<{data: WorkSchedule[]}>('/work-schedules', {cache: 'no-store'});
+export const createWorkSchedule = (input: WorkScheduleInput, mode: 'template' | 'default') => request<{data: WorkSchedule & {effective_from?: string}}>('/work-schedules' + (mode === 'default' ? '/default' : ''), {method: 'POST', body: JSON.stringify(input)});
+export const createIndividualSchedule = (input: WorkScheduleInput & {employee_id: number; effective_from: string; effective_to: string}) => request('/work-schedules/individual', {method: 'POST', body: JSON.stringify(input)});
+export const updateWorkSchedule = (id: number, input: Partial<WorkScheduleInput>) => request('/work-schedules/' + id, {method: 'PATCH', body: JSON.stringify(input)});
+export const setDefaultSchedule = (id: number) => request('/work-schedules/' + id + '/default', {method: 'PATCH'});
+export const listScheduleAssignments = (employeeId: number) => request<{data: ScheduleAssignment[]}>('/employees/' + employeeId + '/schedule-assignments', {cache: 'no-store'});
+export const assignWorkSchedule = (employeeId: number, input: {schedule_id: number; effective_from: string; effective_to: string | null}) => request('/employees/' + employeeId + '/schedule-assignments', {method: 'POST', body: JSON.stringify(input)});
+export const deleteScheduleAssignment = (employeeId: number, id: number) => request('/employees/' + employeeId + '/schedule-assignments/' + id, {method: 'DELETE'});

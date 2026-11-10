@@ -249,8 +249,20 @@ export default function Login() {
         </div>
       </aside>
 
-      <section className="relative z-10 flex min-h-dvh w-full items-center px-5 py-8 sm:px-8 lg:w-[69%] lg:px-12 xl:w-[66%]">
-        <div className="mx-auto w-full max-w-[590px]">
+      <section className="relative z-10 flex min-h-dvh w-full items-center overflow-hidden px-5 py-8 sm:px-8 lg:w-[69%] lg:px-12 xl:w-[66%]">
+        <div className="login-ambience" aria-hidden="true">
+          <span className="login-ambience__glow login-ambience__glow--top" />
+          <span className="login-ambience__glow login-ambience__glow--bottom" />
+          <span className="login-ambience__ring login-ambience__ring--one" />
+          <span className="login-ambience__ring login-ambience__ring--two" />
+          <span className="login-ambience__ring login-ambience__ring--three" />
+          <span className="login-ambience__ring login-ambience__ring--four" />
+          <span className="login-ambience__ring login-ambience__ring--five" />
+          <span className="login-ambience__ring login-ambience__ring--six" />
+          <span className="login-ambience__dot login-ambience__dot--one" />
+          <span className="login-ambience__dot login-ambience__dot--two" />
+        </div>
+        <div className="relative z-10 mx-auto w-full max-w-[590px]">
           <Link
             to="/"
             aria-label={t('Quay về trang giới thiệu ERIS')}

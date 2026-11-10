@@ -156,8 +156,8 @@ export default function CompanyLocationScreen() {
     {message && <p role="status" className="mb-4 flex items-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800"><CheckCircle2 size={18}/>{t(message)}</p>}
 
     <MotionConfig reducedMotion="user">
-      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25 }} className="grid items-start gap-5 xl:grid-cols-[minmax(0,0.92fr)_minmax(480px,1.08fr)]">
-        <form onSubmit={save} className="space-y-5">
+      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25 }} className="grid gap-5 xl:grid-cols-[minmax(0,0.92fr)_minmax(480px,1.08fr)]">
+        <form onSubmit={save} className="flex flex-col gap-5">
           <Card className="overflow-visible p-5 sm:p-6">
             <div className="flex items-start justify-between gap-4">
               <div className="flex items-start gap-3"><span className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-orange-50 text-orange-600 ring-1 ring-orange-100"><Building2 size={22}/></span><div><h2 className="text-lg font-semibold text-slate-950">{t('Office attendance point')}</h2><p className="mt-1 text-sm leading-6 text-slate-600">{t('Choose a verified address and coordinate pair for attendance validation.')}</p></div></div>
@@ -182,17 +182,17 @@ export default function CompanyLocationScreen() {
 
           <Card className="p-5 sm:p-6">
             <div className="flex items-start gap-3"><span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100"><ShieldCheck size={20}/></span><div><h2 className="font-semibold text-slate-950">{t('Verify before applying')}</h2><p className="mt-1 text-sm leading-6 text-slate-600">{t('This change affects future employee check-ins immediately. Existing attendance records are not changed.')}</p></div></div>
-            <label className="mt-5 flex cursor-pointer items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm leading-6 text-slate-700 transition hover:border-orange-200 hover:bg-orange-50/40"><input type="checkbox" checked={confirmed} disabled={loading || saving || !hasValidCoordinates || !positionReady} onChange={event => setConfirmed(event.target.checked)} className="mt-1 size-4 accent-orange-500"/><span>{t('I have verified that the address and coordinates point to the correct company location.')}</span></label>
+            <label className="mt-5 flex cursor-pointer items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm leading-6 text-slate-700 transition hover:border-orange-200 hover:bg-orange-50/40"><input type="checkbox" checked={confirmed} disabled={loading || saving || !hasValidCoordinates || !positionReady} onChange={event => setConfirmed(event.target.checked)} className="size-4 shrink-0 accent-orange-500"/><span>{t('I have verified that the address and coordinates point to the correct company location.')}</span></label>
             <div className="mt-5 flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between"><p className="text-xs leading-5 text-slate-500">{t('Last update')}: {updatedLabel}</p><Button type="submit" disabled={loading || saving || !dirty || !confirmed}><Save size={17}/>{t(saving ? 'Saving location...' : 'Save company location')}</Button></div>
           </Card>
         </form>
 
-        <Card className="overflow-hidden xl:sticky xl:top-0">
+        <Card className="flex min-w-0 flex-col overflow-hidden">
           <div className="flex flex-col gap-3 border-b border-slate-100 p-5 sm:flex-row sm:items-center sm:justify-between sm:px-6">
             <div><h2 className="flex items-center gap-2 text-lg font-semibold text-slate-950"><Navigation size={20} className="text-orange-500"/>{t('Location preview')}</h2><p className="mt-1 text-sm text-slate-500">{t('Review the map marker before saving the attendance point.')}</p></div>
             <span className="inline-flex items-center gap-2 self-start rounded-full bg-orange-50 px-3 py-1.5 text-xs font-semibold text-orange-700 ring-1 ring-orange-200"><Crosshair size={15}/>{t('Allowed radius')}: {radius} m</span>
           </div>
-          <div className="relative min-h-[420px] bg-slate-100 sm:min-h-[540px]">
+          <div className="relative min-h-[320px] bg-slate-100 sm:min-h-[420px] xl:min-h-[320px] xl:flex-1">
             {previewUrl ? <iframe key={previewUrl} title={t('Company location map')} src={previewUrl} className="absolute inset-0 h-full w-full border-0" loading="lazy" referrerPolicy="no-referrer" /> : <div className="absolute inset-0 flex flex-col items-center justify-center p-8 text-center"><MapPinned size={42} className="text-slate-300"/><p className="mt-4 font-semibold text-slate-700">{t('Enter valid coordinates to preview the map.')}</p></div>}
             {loading && <div className="absolute inset-0 grid place-items-center bg-white/80 backdrop-blur-sm"><div className="text-center"><RefreshCw className="mx-auto animate-spin text-orange-500" size={28}/><p className="mt-3 text-sm font-medium text-slate-600">{t('Loading company location...')}</p></div></div>}
           </div>
