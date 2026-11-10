@@ -1,5 +1,6 @@
 // Display copy only. Stored identifiers, enum values and user-entered content are unchanged.
 export const featureVietnamese: Record<string, string> = {
+  'AI analysis': 'Phân tích AI',
   'Create a work schedule': 'Tạo lịch làm việc',
   'Assign schedules and view employee history': 'Gán lịch và xem lịch sử nhân viên',
   'Schedules': 'Danh sách lịch',
@@ -15,6 +16,9 @@ export const featureVietnamese: Record<string, string> = {
   'Holidays': 'Ngày nghỉ lễ',
   'Manage company holidays.': 'Quản lý ngày nghỉ lễ của công ty.',
   'Could not load departments. Please try again.': 'Không tải được danh sách phòng ban. Vui lòng thử lại.',
+  'Could not load employee history.': 'Không tải được lịch sử nhân viên.',
+  'Retry': 'Thử lại',
+  'Review profiles and collect survey responses. Results will appear here after analysis data becomes available.': 'Xem hồ sơ và thu thập phản hồi khảo sát. Kết quả sẽ xuất hiện tại đây khi có dữ liệu phân tích.',
   'The department cannot be changed when editing a position.': 'Không thể đổi phòng ban khi chỉnh sửa chức danh.',
   'Work schedules': 'Lịch làm việc',
   'My Requests': 'Đơn nghỉ phép của tôi',
@@ -167,6 +171,7 @@ export const featureVietnamese: Record<string, string> = {
   Details: 'Chi tiết',
   'No attendance records found.': 'Không tìm thấy bản ghi chấm công.',
   'Education and job history': 'Học vấn và lịch sử công việc',
+  'Education and internal job history in one place.': 'Tổng hợp học vấn và lịch sử công việc tại công ty.',
   'Qualifications, previous experience and internal role changes in one place.': 'Tổng hợp bằng cấp, kinh nghiệm trước đây và thay đổi vai trò nội bộ.',
   'Employee history': 'Lịch sử nhân viên',
   'Loading employee history...': 'Đang tải hồ sơ học vấn và công việc...',
@@ -213,6 +218,7 @@ export const featureVietnamese: Record<string, string> = {
   Company: 'Công ty',
   'Position title': 'Chức danh',
   Present: 'Hiện tại',
+  'Not ended': 'Chưa kết thúc',
   'Job level': 'Cấp bậc công việc',
   'Review employee education and job history across the workforce.': 'Xem học vấn và lịch sử công việc của nhân viên toàn công ty.',
   Employee: 'Nhân viên',
@@ -1131,6 +1137,7 @@ export const featureVietnamese: Record<string, string> = {
 };
 
 export const featureEnglish: Record<string, string> = {
+  'Xóa': 'Delete',
   'Thêm ngày lễ': 'Add holiday',
   'Chỉnh sửa ngày lễ': 'Edit holiday',
   'Ngày nghỉ lễ và chốt vắng mặt': 'Holidays and absence finalization',

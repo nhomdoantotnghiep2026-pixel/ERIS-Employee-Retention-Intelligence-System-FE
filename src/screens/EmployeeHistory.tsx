@@ -6,8 +6,8 @@ import { useLanguage } from '../context/LanguageContext';
 import { useAutoDismissState } from '../hooks/useAutoDismissState';
 import {
   getApiErrorMessage, listAllEmployeeEducation, listAllJobHistory,
-  listAllEmployeeWorkExperiences, listEducationEmployees, type EmployeeEducation,
-  type EmployeeJobHistory, type EmployeeWorkExperience,
+  listEducationEmployees, type EmployeeEducation,
+  type EmployeeJobHistory,
 } from '../services/api';
 
 type EducationRecord = EmployeeEducation & { employeeCode: string; fullName: string };
@@ -17,11 +17,9 @@ export default function EmployeeHistory() {
   const isEducation = useLocation().pathname !== '/employee-job-history';
   const [education, setEducation] = useState<EducationRecord[]>([]);
   const [jobHistory, setJobHistory] = useState<EmployeeJobHistory[]>([]);
-  const [workExperiences, setWorkExperiences] = useState<EmployeeWorkExperience[]>([]);
   const [employees, setEmployees] = useState<Array<{ id: number; employeeCode: string; fullName: string }>>([]);
   const [filterEmployee, setFilterEmployee] = useState('');
   const [query, setQuery] = useState('');
-  const [tab, setTab] = useState<'education' | 'experience' | 'jobs'>(isEducation ? 'education' : 'jobs');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useAutoDismissState();
   const [recordsFailed, setRecordsFailed] = useState(false);
@@ -30,12 +28,9 @@ export default function EmployeeHistory() {
   useEffect(() => {
     const controller = new AbortController();
     setLoading(true); setError(''); setRecordsFailed(false);
-    const activeTab = isEducation ? 'education' : tab === 'education' ? 'jobs' : tab;
-    const task = activeTab === 'education'
+    const task = isEducation
       ? listAllEmployeeEducation(controller.signal).then(result => setEducation(result.data))
-      : activeTab === 'experience'
-        ? listAllEmployeeWorkExperiences(controller.signal).then(result => setWorkExperiences(result.data))
-        : listAllJobHistory(controller.signal).then(result => setJobHistory(result.data));
+      : listAllJobHistory(controller.signal).then(result => setJobHistory(result.data));
     void task.catch(reason => {
       if (controller.signal.aborted) return;
       setRecordsFailed(true);
@@ -44,7 +39,7 @@ export default function EmployeeHistory() {
       if (!controller.signal.aborted) setLoading(false);
     });
     return () => controller.abort();
-  }, [reload, isEducation, tab]);
+  }, [reload, isEducation]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -54,7 +49,7 @@ export default function EmployeeHistory() {
     return () => controller.abort();
   }, [reload, isEducation]);
 
-  useEffect(() => { setTab(isEducation ? 'education' : 'jobs'); setFilterEmployee(''); setQuery(''); }, [isEducation]);
+  useEffect(() => { setFilterEmployee(''); setQuery(''); }, [isEducation]);
 
   const search = query.trim().toLocaleLowerCase();
   const visibleEducation = useMemo(() => education.filter(row =>
@@ -65,11 +60,6 @@ export default function EmployeeHistory() {
     (!filterEmployee || row.employeeId === Number(filterEmployee))
       && (!search || `${row.employeeCode || ''} ${row.employeeName || ''} ${row.departmentName || ''} ${row.positionName || ''} ${row.changeType}`
         .toLocaleLowerCase().includes(search))), [jobHistory, filterEmployee, search]);
-  const visibleWorkExperiences = useMemo(() => workExperiences.filter(row =>
-    (!filterEmployee || row.employeeId === Number(filterEmployee))
-      && (!search || `${row.employeeCode || ''} ${row.fullName || ''} ${row.companyName} ${row.positionTitle}`
-        .toLocaleLowerCase().includes(search))), [workExperiences, filterEmployee, search]);
-
   return <AppShell breadcrumb={['Workforce', isEducation ? 'Education' : 'Job history']}>
     <SectionHeader title={t(isEducation ? 'Education' : 'Job history')} description={t('Review employee education and job history across the workforce.')}>
       <Button variant="secondary" disabled={loading} onClick={() => setReload(value => value + 1)}>{t('Reload')}</Button>
@@ -87,14 +77,10 @@ export default function EmployeeHistory() {
           <input type="search" className="mt-1 w-full rounded-xl border border-slate-300 bg-white p-3 text-sm" value={query} onChange={event => setQuery(event.target.value)} />
         </label>
       </div>
-      {!isEducation && <div className="my-4 flex flex-wrap gap-2" role="tablist" aria-label={t('Employee records')}>
-        <Button type="button" size="sm" variant={tab === 'experience' ? 'primary' : 'secondary'} role="tab" aria-selected={tab === 'experience'} onClick={() => setTab('experience')}>{t('Work experience')}</Button>
-        <Button type="button" size="sm" variant={tab === 'jobs' ? 'primary' : 'secondary'} role="tab" aria-selected={tab === 'jobs'} onClick={() => setTab('jobs')}>{t('Job history')}</Button>
-      </div>}
-      {isEducation && <div className="mt-4" />}
+      <div className="mt-4" />
       {loading ? <p role="status" className="py-6 text-sm text-slate-500">{t('Loading employee history...')}</p>
         : recordsFailed ? <div role="alert" className="py-8 text-center text-sm text-slate-600">{t('Could not load employee history.')} <Button variant="secondary" size="sm" onClick={() => setReload(value => value + 1)}>{t('Retry')}</Button></div>
-        : tab === 'education' ? <div className="overflow-x-auto"><table className="w-full whitespace-nowrap text-left text-sm">
+        : isEducation ? <div className="overflow-x-auto"><table className="w-full whitespace-nowrap text-left text-sm">
           <thead className="bg-slate-50 text-slate-500"><tr>{['Employee', 'Employee code', 'Education level', 'Field of study', 'Institution', 'Graduation year'].map(label => <th key={label} className="p-3 font-medium">{t(label)}</th>)}</tr></thead>
           <tbody>{visibleEducation.map(row => <tr key={row.id} className="border-b border-slate-100">
             <td className="p-3"><Link className="font-medium text-orange-700 hover:underline" to={`/employees/${row.employeeId}`}>{row.fullName}</Link></td>
@@ -102,21 +88,13 @@ export default function EmployeeHistory() {
             <td className="p-3">{row.fieldOfStudy || '—'}</td><td className="p-3">{row.institution || '—'}</td><td className="p-3">{row.graduationYear ?? '—'}</td>
           </tr>)}</tbody>
         </table>{!visibleEducation.length && <p className="py-8 text-center text-sm text-slate-500">{t('No education records found.')}</p>}</div>
-          : tab === 'experience' ? <div className="overflow-x-auto"><table className="w-full whitespace-nowrap text-left text-sm">
-            <thead className="bg-slate-50 text-slate-500"><tr>{['Employee', 'Employee code', 'Company', 'Position title', 'Start date', 'End date'].map(label => <th key={label} className="p-3 font-medium">{t(label)}</th>)}</tr></thead>
-            <tbody>{visibleWorkExperiences.map(row => <tr key={row.id} className="border-b border-slate-100">
-              <td className="p-3"><Link className="font-medium text-orange-700 hover:underline" to={`/employees/${row.employeeId}`}>{row.fullName || '—'}</Link></td>
-              <td className="p-3">{row.employeeCode || '—'}</td><td className="p-3">{row.companyName || '—'}</td>
-              <td className="p-3">{row.positionTitle || '—'}</td><td className="p-3">{row.startDate}</td><td className="p-3">{row.endDate || t('Present')}</td>
-            </tr>)}</tbody>
-          </table>{!visibleWorkExperiences.length && <p className="py-8 text-center text-sm text-slate-500">{t('No active work experience records.')}</p>}</div>
           : <div className="overflow-x-auto"><table className="w-full whitespace-nowrap text-left text-sm">
             <thead className="bg-slate-50 text-slate-500"><tr>{['Employee', 'Employee code', 'Department', 'Position', 'Change type', 'Start date', 'End date'].map(label => <th key={label} className="p-3 font-medium">{t(label)}</th>)}</tr></thead>
             <tbody>{visibleJobHistory.map(row => <tr key={row.id} className="border-b border-slate-100">
               <td className="p-3"><Link className="font-medium text-orange-700 hover:underline" to={`/employees/${row.employeeId}`}>{row.employeeName || '—'}</Link></td>
               <td className="p-3">{row.employeeCode || '—'}</td><td className="p-3">{row.departmentName || '—'}</td>
               <td className="p-3">{row.positionName || '—'}</td><td className="p-3">{t(row.changeType)}</td>
-              <td className="p-3">{row.startDate}</td><td className="p-3">{row.endDate || t('Present')}</td>
+              <td className="p-3">{row.startDate}</td><td className="p-3">{row.endDate ? row.endDate.slice(0, 10).split('-').reverse().join('/') : t('Not ended')}</td>
             </tr>)}</tbody>
           </table>{!visibleJobHistory.length && <p className="py-8 text-center text-sm text-slate-500">{t('No job history records.')}</p>}</div>}
     </Card>

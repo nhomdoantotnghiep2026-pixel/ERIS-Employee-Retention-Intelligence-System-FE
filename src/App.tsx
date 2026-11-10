@@ -32,11 +32,12 @@ import EmployeeHistory from './screens/EmployeeHistory';
 import CompanyLocationScreen from './screens/CompanyLocation';
 import LeaveRequests from './screens/LeaveRequests';
 import PolicyDemo from './screens/PolicyDemo';
+import AiAnalysis from './screens/AiAnalysis';
 
 // HR
 import Dashboard from './screens/Dashboard';
 import Departments from './screens/Departments';
-import Positions from './screens/Positions';
+import Positions, { PositionDetail, PositionEdit } from './screens/Positions';
 import RetentionInterventions from './screens/RetentionInterventions';
 
 // Shared HR screens
@@ -106,10 +107,13 @@ export default function App() {
           <Route path="/org-overview" element={<RoleGuard><RiskWorkspace /></RoleGuard>} />
           <Route path="/departments" element={<RoleGuard><Departments /></RoleGuard>} />
           <Route path="/positions" element={<RoleGuard><Positions /></RoleGuard>} />
+          <Route path="/positions/:id/edit" element={<RoleGuard><PositionEdit /></RoleGuard>} />
+          <Route path="/positions/:id" element={<RoleGuard><PositionDetail /></RoleGuard>} />
           <Route path="/workforce-risk" element={<RoleGuard><Navigate to="/org-overview" replace /></RoleGuard>} />
           <Route path="/attrition-risk" element={<RoleGuard><RiskWorkspace /></RoleGuard>} />
           <Route path="/interventions" element={<RoleGuard><RetentionInterventions /></RoleGuard>} />
           <Route path="/policy-demo" element={<RoleGuard><PolicyDemo /></RoleGuard>} />
+          <Route path="/ai-analysis" element={<RoleGuard><AiAnalysis /></RoleGuard>} />
           <Route path="/outcomes" element={<RoleGuard><EmployeeOutcomes /></RoleGuard>} />
           <Route path="/engagement" element={<RoleGuard><ErdSurveys /></RoleGuard>} />
 

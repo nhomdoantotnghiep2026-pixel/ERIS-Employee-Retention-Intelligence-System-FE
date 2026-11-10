@@ -45,6 +45,7 @@ const permissionByRoute: Array<[string, string]> = [
   ['/org-overview', 'View Org-Level Risk'],
   ['/workforce-risk', 'View Org-Level Risk'],
   ['/attrition-risk', 'View Org-Level Risk'],
+  ['/ai-analysis', 'View Org-Level Risk'],
   ['/interventions', 'View Interventions'],
   ['/policy-demo', 'View Interventions'],
   ['/engagement', 'View Survey Results'],

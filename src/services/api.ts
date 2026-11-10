@@ -666,6 +666,38 @@ async function request<T>(path: string, init?: RequestInit, baseOverride?: strin
   return body as T;
 }
 
+export type AiEmployee = { id: number; employeeCode: string; fullName: string };
+export type AiSnapshot = { employee: AiEmployee; snapshotId: number | null; capturedAt: string; features: Record<string, string | number>; provenance: Record<string, string>; missingFeatures: string[]; invalidFeatures?: string[]; issues: string[]; ready: boolean; warning?: string };
+export type AiPrediction = { saved: boolean; predictionId?: number; preview: AiSnapshot; model: { model_id: string; score: number; contributions: Record<string, number> }; warning: string };
+type AiModelResponse = { data: { model_id: string; warning: string } };
+let aiModelRequest: Promise<AiModelResponse> | null = null;
+export const getAiModel = () => {
+  if (!aiModelRequest) {
+    aiModelRequest = request<AiModelResponse>('/ai/model').finally(() => {
+      aiModelRequest = null;
+    });
+  }
+  return aiModelRequest;
+};
+export const listAiEmployees = () => request<{ data: AiEmployee[] }>('/ai/employees');
+export const listAiSnapshots = (id: number) => request<{ data: AiSnapshot[] }>(`/ai/employees/${id}/snapshots`);
+export const getAiSnapshot = (id: number, snapshotId: number) => request<{ data: AiSnapshot }>(`/ai/employees/${id}/snapshots/${snapshotId}`);
+export type AiBatchResult = { total: number; succeeded: number; failed: number; warning: string; results: Array<{ employeeId: number; success: boolean; data?: AiPrediction; status?: number; message?: string }> };
+export const predictAiBatch = (employees: Array<{ employeeId: number; snapshotId: number; save: boolean }>) => request<{ data: AiBatchResult }>('/ai/predict-batch', { method: 'POST', body: JSON.stringify({ employees }) });
+export const previewAiEmployee = (id: number, body: { vndPerUsd?: number; supplementalFeatures?: Record<string, string | number> }) => request<{ data: AiSnapshot }>(`/ai/employees/${id}/preview`, { method: 'POST', body: JSON.stringify(body) });
+export const predictAiEmployee = (id: number, snapshotId: number, save: boolean) => request<{ data: AiPrediction }>(`/ai/employees/${id}/predict`, { method: 'POST', body: JSON.stringify({ snapshotId, save }) });
+export const getAiResult = (id: number) => request<{ data: AiPrediction }>(`/ai/results/${id}`);
+export interface AiPolicyRecommendations {
+  predictionId: number;
+  warning: string;
+  saved: boolean;
+  omittedCount: number;
+  recommendations: Array<{ rank: number; status: string; reason: string; policy: { id: number; name: string; description: string | null } | null; policyDraft: { name: string; description: string } | null; signals: Array<{ feature: string; value: number; impactPercentagePoints: number; source: string }> }>;
+  savedRecommendations?: Array<{ id: number; policyId: number; status: string; created: boolean }>;
+  requiresPolicyApproval?: boolean;
+}
+export const generateAiPolicyRecommendations = (id: number, save: boolean, limit = 3) => request<{ data: AiPolicyRecommendations }>(`/ai/results/${id}/policy-recommendations`, { method: 'POST', body: JSON.stringify({ save, limit }) });
+
 export async function login(email: string, password: string) {
   sessionStorage.setItem('eris-api-backend', 'primary');
   let result = await request<LoginResponse>('/auth/login', {

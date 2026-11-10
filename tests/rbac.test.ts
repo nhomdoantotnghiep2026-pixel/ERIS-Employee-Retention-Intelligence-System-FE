@@ -4,8 +4,10 @@ import { hasRoutePermission } from '../src/utils/rbacAccess.ts';
 const storage = new Map<string, string>();
 test('positions require HR, matching the team BE', () => {
   assert.equal(hasRoutePermission('HR', '/positions'), true);
+  assert.equal(hasRoutePermission('HR', '/positions/4/edit'), true);
   for (const role of ['System Administrator', 'Data / AI Analyst', 'Employee / ESS'] as const) {
     assert.equal(hasRoutePermission(role, '/positions'), false);
+    assert.equal(hasRoutePermission(role, '/positions/4/edit'), false);
   }
 });
 test('department management follows the team BE HR permission', () => {

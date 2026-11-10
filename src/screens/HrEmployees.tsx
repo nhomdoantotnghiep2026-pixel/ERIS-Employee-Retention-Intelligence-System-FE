@@ -1,7 +1,7 @@
 import { useAutoDismissState } from '../hooks/useAutoDismissState';
 import { useEffect, useState, type FormEvent, type MouseEvent, type ReactNode } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
-import { BadgeCheck, BriefcaseBusiness, Building2, CalendarDays, CheckCircle2, IdCard, Mail, MapPin, Phone, Route, UserRound, WalletCards } from 'lucide-react';
+import { BadgeCheck, BriefcaseBusiness, Building2, CalendarDays, CheckCircle2, IdCard, Mail, MapPin, Phone, Route, Search, SlidersHorizontal, UserRound, WalletCards, X } from 'lucide-react';
 import { MotionConfig, motion } from 'motion/react';
 import { SearchableSelect } from '../components/SearchableSelect';
 import { AppShell } from '../components/AppShell';
@@ -66,6 +66,10 @@ export default function HrEmployees() {
   const [query, setQuery] = useState(''), [search, setSearch] = useState('');
   const [departmentId, setDepartmentId] = useState(''), [positionId, setPositionId] = useState('');
   const [status, setStatus] = useState('ACTIVE');
+  const [draftDepartmentId, setDraftDepartmentId] = useState('');
+  const [draftPositionId, setDraftPositionId] = useState('');
+  const [draftStatus, setDraftStatus] = useState('ACTIVE');
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [page, setPage] = useState(1), [total, setTotal] = useState(0), [pages, setPages] = useState(0);
   const [revision, setRevision] = useState(0), [loading, setLoading] = useState(true), [pending, setPending] = useState(false);
   const { error, message, setError, setMessage } = useAutoDismissFeedback();
@@ -263,6 +267,11 @@ export default function HrEmployees() {
   const detailGender = detail?.gender === 'MALE' ? text('Nam', 'Male') : detail?.gender === 'FEMALE' ? text('Nữ', 'Female') : detail?.gender === 'OTHER' ? text('Khác', 'Other') : '—';
   const detailEmploymentType = detail?.employmentType === 'FULL_TIME' ? text('Toàn thời gian', 'Full time') : detail?.employmentType === 'PART_TIME' ? text('Bán thời gian', 'Part time') : detail?.employmentType === 'CONTRACT' ? text('Hợp đồng', 'Contract') : detail?.employmentType === 'INTERNSHIP' ? text('Thực tập', 'Internship') : detail?.employmentType || '—';
   const detailSalary = detail?.currentSalary == null ? '—' : new Intl.NumberFormat(language === 'vi' ? 'vi-VN' : 'en-US', { style: 'currency', currency: 'VND', maximumFractionDigits: 0 }).format(Number(detail.currentSalary));
+  const activeFilterCount = [search, departmentId, positionId, status !== 'ACTIVE' ? status : ''].filter(Boolean).length;
+  const appliedDepartment = departments.find(item => String(item.id) === departmentId)?.name;
+  const appliedPosition = positions.find(item => String(item.id) === positionId)?.name;
+  const pendingFilterChanges = query.trim() !== search || draftDepartmentId !== departmentId || draftPositionId !== positionId || draftStatus !== status;
+  const hasFilterValues = Boolean(query.trim() || search || draftDepartmentId || departmentId || draftPositionId || positionId || draftStatus !== 'ACTIVE' || status !== 'ACTIVE');
   useEffect(() => {
     const query = form.address.trim();
     if (!showAddressSuggestions || form.addressRefId || query.length < 3 || (showingRecord && !editing)) {
@@ -410,14 +419,53 @@ export default function HrEmployees() {
           </motion.section>
         </div>
       </motion.form></MotionConfig>
-      : !showingRecord && !creating && <Card className="@container p-6">
-        <form className="mb-5 grid items-end gap-x-3 gap-y-4 sm:grid-cols-2 @min-[760px]:grid-cols-4 @min-[1080px]:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)_minmax(0,1.15fr)_minmax(0,.9fr)_auto] [&>label]:min-w-0 [&_input]:h-10 [&_input]:py-2 [&_select]:h-10 [&_select]:py-2" onSubmit={e => { e.preventDefault(); setPage(1); setSearch(query.trim()); }}>
-          <label className="text-sm font-medium">{text('Tìm tên, mã hoặc email', 'Search name, code or email')}<input type="search" className={control} value={query} maxLength={100} onChange={e => { setQuery(e.target.value); if (!e.target.value.trim()) { setSearch(''); setPage(1); } }} /></label>
-          {catalogSelect(text('Phòng ban', 'Department'), departmentId, v => { setDepartmentId(v); setPage(1); }, departments)}
-          {catalogSelect(text('Chức danh / Vị trí', 'Position'), positionId, v => { setPositionId(v); setPage(1); }, positions)}
-          <label className="text-sm font-medium">{text('Trạng thái', 'Status')}<select className={control} value={status} onChange={e => { setStatus(e.target.value); setPage(1); }}><option value="ACTIVE">{text('Đang hoạt động', 'Active')}</option><option value="INACTIVE">{text('Ngừng hoạt động', 'Inactive')}</option><option value="">{text('Tất cả', 'All')}</option></select></label>
-          <div className="col-span-full flex flex-wrap justify-end gap-2 @min-[1080px]:col-span-1 @min-[1080px]:flex-nowrap"><Button>{text('Tìm kiếm', 'Search')}</Button><Button type="button" variant="secondary" onClick={() => { setQuery(''); setSearch(''); setDepartmentId(''); setPositionId(''); setStatus('ACTIVE'); setPage(1); setRevision(v => v + 1); }}>{text('Xóa bộ lọc', 'Clear filters')}</Button><Button type="button" variant="secondary" onClick={() => setRevision(v => v + 1)}>{text('Tải lại', 'Reload')}</Button></div>
+      : !showingRecord && !creating && <Card className="@container p-4 sm:p-5">
+        <form className="mb-4" onSubmit={e => { e.preventDefault(); setPage(1); setSearch(query.trim()); setDepartmentId(draftDepartmentId); setPositionId(draftPositionId); setStatus(draftStatus); }}>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <label className="relative min-w-0 flex-1">
+              <span className="sr-only">{text('Tìm tên, mã hoặc email', 'Search name, code or email')}</span>
+              <Search size={16} aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"/>
+              <input type="search" className={`${control} h-11 pl-10 pr-3`} value={query} maxLength={100} placeholder={text('Tìm tên, mã hoặc email', 'Search name, code or email')} onChange={e => setQuery(e.target.value)} />
+            </label>
+            <div className="grid grid-cols-2 gap-2 sm:flex sm:shrink-0">
+              <Button type="submit" className="w-full sm:w-auto"><Search size={15}/>{text('Tìm kiếm', 'Search')}</Button>
+              <Button type="button" variant="secondary" aria-expanded={filtersOpen} aria-controls="employee-advanced-filters" onClick={() => setFiltersOpen(open => !open)}>
+                <SlidersHorizontal size={15}/><span>{text('Bộ lọc', 'Filters')}</span>
+                {activeFilterCount > 0 && <span className="inline-flex min-w-5 items-center justify-center rounded-full bg-orange-100 px-1.5 py-0.5 text-xs font-bold text-orange-700">{activeFilterCount}</span>}
+              </Button>
+            </div>
+          </div>
+          {filtersOpen && <div id="employee-advanced-filters" className="mt-3 rounded-xl border border-slate-200 bg-slate-50/70 p-3 sm:p-4">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{text('Bộ lọc nâng cao', 'Advanced filters')}</p>
+              <div className="flex items-center gap-3">
+                {pendingFilterChanges && <span className="text-xs text-amber-700">{text('Chưa áp dụng', 'Not applied')}</span>}
+                {hasFilterValues && <button type="button" className="min-h-10 rounded-lg px-2 text-xs font-semibold text-orange-700 hover:bg-orange-50 focus-visible:outline-2 focus-visible:outline-orange-500" onClick={() => {
+                  setQuery(''); setSearch(''); setDraftDepartmentId(''); setDepartmentId(''); setDraftPositionId(''); setPositionId(''); setDraftStatus('ACTIVE'); setStatus('ACTIVE'); setPage(1);
+                }}>{text('Xóa bộ lọc', 'Clear filters')}</button>}
+              </div>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2 @min-[1080px]:grid-cols-3">
+              {catalogSelect(text('Phòng ban', 'Department'), draftDepartmentId, v => setDraftDepartmentId(v), departments)}
+              {catalogSelect(text('Chức danh / Vị trí', 'Position'), draftPositionId, v => setDraftPositionId(v), positions)}
+              <label className="block min-w-0 text-sm font-medium text-slate-700">{text('Trạng thái', 'Status')}
+                <select aria-label={text('Trạng thái', 'Status')} className={`${control} h-11 px-3 py-2`} value={draftStatus} onChange={e => setDraftStatus(e.target.value)}>
+                  <option value="ACTIVE">{text('Đang hoạt động', 'Active')}</option>
+                  <option value="INACTIVE">{text('Ngừng hoạt động', 'Inactive')}</option>
+                  <option value="">{text('Tất cả', 'All')}</option>
+                </select>
+              </label>
+            </div>
+            <div className="mt-3 flex justify-end"><Button type="submit" size="sm"><Search size={14}/>{text('Áp dụng bộ lọc', 'Apply filters')}</Button></div>
+          </div>}
         </form>
+        {activeFilterCount > 0 && <div className="mb-4 flex flex-wrap items-center gap-2" aria-label={text('Bộ lọc đang áp dụng', 'Applied filters')}>
+          <span className="text-xs font-medium text-slate-500">{text('Đang lọc:', 'Filtering:')}</span>
+          {search && <AppliedFilter label={`${text('Từ khóa', 'Search')}: ${search}`} onRemove={() => { setSearch(''); setQuery(''); setPage(1); }}/>}
+          {departmentId && <AppliedFilter label={`${text('Phòng ban', 'Department')}: ${appliedDepartment || departmentId}`} onRemove={() => { setDepartmentId(''); setDraftDepartmentId(''); setPage(1); }}/>}
+          {positionId && <AppliedFilter label={`${text('Chức danh', 'Position')}: ${appliedPosition || positionId}`} onRemove={() => { setPositionId(''); setDraftPositionId(''); setPage(1); }}/>}
+          {status !== 'ACTIVE' && <AppliedFilter label={`${text('Trạng thái', 'Status')}: ${status === 'INACTIVE' ? text('Ngừng hoạt động', 'Inactive') : text('Tất cả', 'All')}`} onRemove={() => { setStatus('ACTIVE'); setDraftStatus('ACTIVE'); setPage(1); }}/>}
+        </div>}
         {!error && <><div className="overflow-x-auto"><table className="w-full whitespace-nowrap text-left text-sm"><thead className="bg-slate-50 text-slate-500"><tr>{[text('Mã nhân viên', 'Employee code'), text('Họ và tên', 'Full name'), 'Email', text('Phòng ban', 'Department'), text('Chức danh', 'Position'), text('Trạng thái', 'Status'), text('Thao tác', 'Actions')].map(h => <th key={h} scope="col" className="p-3">{h}</th>)}</tr></thead><tbody>
           {rows.map(row => <tr key={row.id} className="border-b border-slate-100"><td className="p-3">{row.employeeCode}</td><td className="p-3 font-medium">{row.fullName}</td><td className="p-3">{row.email}</td><td className="p-3">{departments.find(d => d.id === row.departmentId)?.name || '—'}</td><td className="p-3">{positions.find(p => p.id === row.positionId)?.name || '—'}</td><td className="p-3">{active(row.employmentStatus)}</td><td className="w-px p-3"><div className="flex flex-nowrap items-center gap-2"><Link className="inline-flex h-10 items-center rounded-full border px-3 font-medium text-orange-700" to={'/employees/' + row.id}>{text('Xem chi tiết', 'View details')}</Link>{row.employmentStatus !== 'INACTIVE' && <><Button variant="secondary" disabled={pending} onClick={() => void deactivate(row)}>{text('Ngừng hoạt động', 'Deactivate')}</Button></>}</div></td></tr>)}
         </tbody></table>{!rows.length && <p className="py-8 text-center text-slate-500">{text('Không tìm thấy nhân viên.', 'No employees found.')}</p>}</div>
@@ -425,4 +473,10 @@ export default function HrEmployees() {
       </Card>}
     {showingRecord && detail && <EmployeeApiHistory employeeId={detail.id} employeeEmail={detail.email} dateOfBirth={detail.dateOfBirth} editable={editing && detail.employmentStatus === 'ACTIVE'} />}
   </AppShell>;
+}
+
+function AppliedFilter({ label, onRemove }: { label: string; onRemove: () => void }) {
+  return <button type="button" onClick={onRemove} className="inline-flex min-h-8 max-w-full items-center gap-1.5 rounded-full border border-orange-200 bg-orange-50 px-3 py-1 text-xs font-medium text-orange-800 hover:border-orange-300 hover:bg-orange-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-500">
+    <span className="min-w-0 break-words">{label}</span><X size={13} aria-hidden="true" className="shrink-0"/>
+  </button>;
 }

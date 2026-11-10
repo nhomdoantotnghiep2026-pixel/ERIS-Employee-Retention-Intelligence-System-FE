@@ -12,8 +12,8 @@ test('Data manages employee data but cannot read individual risk or HR reports',
   assert.equal(canAccessRoute('Data / AI Analyst', '/employees/1/risk'), false);
   assert.equal(canAccessRoute('Data / AI Analyst', '/reports'), false);
 });
-test('HR prepares workforce snapshots but cannot activate models or generate predictions', () => {
-  assert.equal(canAccessRoute('HR', '/preparation'), true);
+test('unsupported snapshot routes stay closed to HR', () => {
+  assert.equal(canAccessRoute('HR', '/preparation'), false);
   assert.equal(canAccessRoute('HR', '/predictions'), false);
   assert.equal(canAccessRoute('HR', '/model-history'), false);
 });
