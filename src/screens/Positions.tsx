@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { AppShell } from '../components/AppShell';
 import { Button, Card, SectionHeader } from '../components/ui';
 import { useLanguage } from '../context/LanguageContext';
-import { useAutoDismissFeedback } from '../hooks/useAutoDismissState';
+import { useAutoDismissState, useAutoDismissFeedback } from '../hooks/useAutoDismissState';
 import { createPosition, deactivatePosition, getApiErrorMessage, getPositionById, listDepartments, listPositions, updatePosition, POSITION_LEVELS, type ApiDepartment, type ApiPosition } from '../services/api';
 
 const control = 'mt-2 h-14 w-full rounded-xl border border-slate-300 bg-white p-3 text-sm focus:outline-orange-500 disabled:opacity-60';
@@ -180,7 +180,7 @@ export function PositionEdit() {
   const [pending, setPending] = useState(false);
   const [loadError, setLoadError] = useState('');
   const [departmentError, setDepartmentError] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useAutoDismissState();
   const [revision, setRevision] = useState(0);
   const nameInput = useRef<HTMLInputElement>(null);
 

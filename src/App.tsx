@@ -14,6 +14,8 @@ import Predictions from './screens/Predictions';
 import EmployeeImport from './screens/EmployeeImport';
 import EmployeeOutcomes from './screens/EmployeeOutcomes';
 import WorkflowActivity from './screens/WorkflowActivity';
+import AdminAuditLogs from './screens/AdminAuditLogs';
+import DepartmentPage from './screens/DepartmentPage';
 import DataWorkspace from './screens/DataWorkspace';
 import RiskWorkspace from './screens/RiskWorkspace';
 import ErdSurveys from './screens/ErdSurveys';
@@ -108,6 +110,8 @@ export default function App() {
           <Route path="/portal" element={<RoleGuard><PortalHub /></RoleGuard>} />
           <Route path="/org-overview" element={<RoleGuard><RiskWorkspace /></RoleGuard>} />
           <Route path="/departments" element={<RoleGuard><Departments /></RoleGuard>} />
+          <Route path="/departments/:id" element={<RoleGuard><DepartmentPage mode="detail" /></RoleGuard>} />
+          <Route path="/departments/:id/edit" element={<RoleGuard><DepartmentPage mode="edit" /></RoleGuard>} />
           <Route path="/positions" element={<RoleGuard><Positions /></RoleGuard>} />
           <Route path="/positions/:id/edit" element={<RoleGuard><PositionEdit /></RoleGuard>} />
           <Route path="/positions/:id" element={<RoleGuard><PositionDetail /></RoleGuard>} />
@@ -165,7 +169,7 @@ export default function App() {
           <Route path="/roles" element={<RoleGuard><Roles /></RoleGuard>} />
           <Route path="/rbac" element={<RoleGuard><Navigate to="/roles?tab=matrix" replace /></RoleGuard>} />
           <Route path="/system" element={<RoleGuard><SystemConfig /></RoleGuard>} />
-          <Route path="/activity" element={<RoleGuard><WorkflowActivity /></RoleGuard>} />
+          <Route path="/activity" element={<RoleGuard><AdminAuditLogs /></RoleGuard>} />
           <Route path="/system-health" element={<RoleGuard><SystemHealth /></RoleGuard>} />
 
           {/* Catch-all: redirect to role home */}

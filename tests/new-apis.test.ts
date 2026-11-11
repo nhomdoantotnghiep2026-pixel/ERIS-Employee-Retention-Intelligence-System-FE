@@ -24,9 +24,9 @@ test('new backend APIs use the published routes and payload contracts', async ()
     await api.listOwnEducation();
     await api.listAllEmployeeEducation();
     await api.listEducationEmployees();
-    await api.searchEducationInstitutions('University of Example', 2);
+    await api.searchEducationInstitutions('University of Example', 'Bachelor');
     await api.createEmployeeEducation(7, {
-      educationLevel: 2, fieldOfStudy: 'Computer science', institution: 'Example University',
+      educationLevel: 'Bachelor', fieldOfStudy: 'Computer science', institution: 'Example University',
       institutionRefId: 'https://ror.org/012345678',
     });
     await api.updateEmployeeEducation(7, 3, { graduationYear: 2020 });
@@ -61,7 +61,7 @@ test('new backend APIs use the published routes and payload contracts', async ()
       '/api/employees/me/educations',
       '/api/employee-educations',
       '/api/employee-educations/employees',
-      '/api/employee-educations/institutions?name=University+of+Example&educationLevel=2',
+      '/api/employee-educations/institutions?name=University+of+Example&educationLevel=Bachelor',
       '/api/employees/7/educations',
       '/api/employees/7/educations/3',
       '/api/employees/7/educations/3',
@@ -84,7 +84,7 @@ test('new backend APIs use the published routes and payload contracts', async ()
     ]);
     assert.equal(calls[8].init?.method, 'POST');
     assert.deepEqual(JSON.parse(String(calls[8].init?.body)), {
-      educationLevel: 2, fieldOfStudy: 'Computer science', institution: 'Example University',
+      educationLevel: 'Bachelor', fieldOfStudy: 'Computer science', institution: 'Example University',
       institutionRefId: 'https://ror.org/012345678',
     });
     assert.equal(calls[9].init?.method, 'PATCH');

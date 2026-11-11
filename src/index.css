@@ -135,6 +135,21 @@ table { border-collapse: separate; border-spacing: 0; width: 100%; }
   line-height: 1.45;
 }
 
+/* Keep request text and its fixed action column on the same type scale. */
+.leave-request-card {
+  font-family: 'Inter', Arial, sans-serif;
+}
+
+.leave-request-card button {
+  width: 100%;
+  min-height: 40px;
+  font-family: inherit;
+  font-size: 0.9375rem;
+  font-weight: 500;
+  line-height: 1.5;
+  white-space: normal;
+}
+
 aside[aria-label="Main navigation"] nav > div > button {
   font-size: 1rem;
   font-weight: 500;

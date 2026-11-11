@@ -5,14 +5,14 @@ import { Button, Card, SectionHeader } from '../components/ui';
 import { useLanguage } from '../context/LanguageContext';
 import { useAutoDismissState } from '../hooks/useAutoDismissState';
 import {
-  getApiErrorMessage, getAttendanceConfig, getAttendanceRecord, listAttendanceHistory, listAttendanceHolidays, createAttendanceHoliday, updateAttendanceHoliday, deleteAttendanceHoliday, closeAttendanceDay, type AttendanceHoliday,
+  getApiErrorMessage, getAttendanceConfig, getAttendanceRecord, listAttendanceHistory, listAttendanceHolidays, createAttendanceHoliday, updateAttendanceHoliday, deleteAttendanceHoliday, type AttendanceHoliday,
   type AttendanceHistoryRecord,
 } from '../services/api';
 
 type AttendanceConfig = Awaited<ReturnType<typeof getAttendanceConfig>>;
 
 export default function AttendanceHistory({ holidaysPage = false }: { holidaysPage?: boolean }) {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const [rows, setRows] = useState<AttendanceHistoryRecord[]>([]);
   const [config, setConfig] = useState<AttendanceConfig | null>(null);
   const [selected, setSelected] = useState<AttendanceHistoryRecord | null>(null);
@@ -29,14 +29,11 @@ export default function AttendanceHistory({ holidaysPage = false }: { holidaysPa
   const [holidayDate, setHolidayDate] = useState('');
   const [holidayEndDate, setHolidayEndDate] = useState('');
   const [holidayName, setHolidayName] = useState('');
-  const [closeDate, setCloseDate] = useState('');
   const [editingHoliday, setEditingHoliday] = useState<AttendanceHoliday | null>(null);
   const [notice, setNotice] = useAutoDismissState();
   const [saving, setSaving] = useState(false);
   const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Ho_Chi_Minh', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
-  const previousDay = new Date(`${today}T00:00:00Z`);
-  previousDay.setUTCDate(previousDay.getUTCDate() - 1);
-  const latestCloseDate = previousDay.toISOString().slice(0, 10);
+
 
   useEffect(() => {
     if (holidaysPage) return;
@@ -81,18 +78,6 @@ export default function AttendanceHistory({ holidaysPage = false }: { holidaysPa
     try { await deleteAttendanceHoliday(day.id); if (editingHoliday?.id === day.id) { setEditingHoliday(null); setHolidayDate(''); setHolidayEndDate(''); setHolidayName(''); } setNotice('Đã xóa ngày lễ.'); setReload(value => value + 1); }
     catch (cause) { setError(getApiErrorMessage(cause, 'Không xóa được ngày lễ.')); } finally { setSaving(false); }
   }
-  async function closeDay(event: React.FormEvent) {
-    event.preventDefault();
-    if (saving || !closeDate || closeDate > latestCloseDate
-      || !window.confirm(t('Chốt vắng mặt cho ngày này? Hệ thống sẽ ghi vắng mặt cho nhân viên đủ điều kiện.'))) return;
-    setSaving(true); setError(''); setNotice('');
-    try {
-      const result = await closeAttendanceDay(closeDate);
-      setNotice(t('Đã chốt ngày {date}. Đã tạo {created} bản ghi vắng mặt.', { date: result.date, created: result.created }));
-      setReload(value => value + 1);
-    } catch (cause) { setError(getApiErrorMessage(cause, t('Không chốt được ngày công.'))); }
-    finally { setSaving(false); }
-  }
   async function showDetails(id: number) {
     setError('');
     try {
@@ -112,7 +97,7 @@ export default function AttendanceHistory({ holidaysPage = false }: { holidaysPa
   const filtered = rows.filter(row => !invalidRange && (!start || row.workDate >= start) && (!end || row.workDate <= end)
     && `${row.employeeCode} ${row.fullName} ${row.workDate} ${row.attendanceStatus}`
       .toLocaleLowerCase().includes(query.trim().toLocaleLowerCase()));
-  const time = (value: string | null) => value ? new Intl.DateTimeFormat('vi-VN', {
+  const time = (value: string | null) => value ? new Intl.DateTimeFormat(language === 'vi' ? 'vi-VN' : 'en-US', {
     timeZone: 'Asia/Ho_Chi_Minh', hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
   }).format(new Date(value)) : '—';
 
@@ -121,7 +106,7 @@ export default function AttendanceHistory({ holidaysPage = false }: { holidaysPa
       <Button variant="secondary" disabled={holidaysPage ? holidaysLoading : loading} onClick={() => setReload(value => value + 1)}>{t('Reload')}</Button>
     </SectionHeader>
     {error && <p role="alert" className="mb-4 rounded-xl bg-red-50 p-4 text-sm text-red-700">{t(error)}</p>}
-    {notice && <p role="status" className="mb-4 rounded-xl bg-emerald-50 p-4 text-sm text-emerald-700">{notice}</p>}
+    {notice && <p role="status" className="mb-4 rounded-xl bg-emerald-50 p-4 text-sm text-emerald-700">{t(notice)}</p>}
     {holidaysPage && <Card className="mb-4 p-5 sm:p-6">
       <h2 className="text-base font-bold text-slate-900">{t('Holidays')}</h2>
       <div className="mt-5">
@@ -140,16 +125,7 @@ export default function AttendanceHistory({ holidaysPage = false }: { holidaysPa
             <div className="mt-4 flex flex-wrap gap-2"><Button disabled={saving}>{t(editingHoliday ? 'Lưu thay đổi' : 'Lưu ngày lễ')}</Button>{editingHoliday && <Button type="button" variant="secondary" onClick={() => { setEditingHoliday(null); setHolidayDate(''); setHolidayEndDate(''); setHolidayName(''); }}>{t('Hủy')}</Button>}</div>
           </form>
         </section>}
-        <section aria-labelledby="close-day-heading" className="mt-4 min-w-0 rounded-2xl border border-sky-100 bg-sky-50/40 p-4 sm:p-5">
-          <div className="flex items-start gap-3">
-            <span aria-hidden="true" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-sky-100 text-sky-700"><CalendarDays size={20} /></span>
-            <div><h3 id="close-day-heading" className="font-semibold text-slate-900">{t('Ngày nghỉ lễ và chốt vắng mặt')}</h3><p className="mt-1 text-sm leading-5 text-slate-500">{t('Chọn ngày đã qua để ghi vắng mặt cho nhân viên đủ điều kiện chưa có chấm công; không áp dụng cho ngày lễ.')}</p></div>
-          </div>
-          <form onSubmit={closeDay} className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-end">
-            <label className="min-w-0 flex-1 text-sm font-medium text-slate-700">{t('Ngày cần chốt vắng mặt')}<input required type="date" max={latestCloseDate} value={closeDate} onChange={event => setCloseDate(event.target.value)} className="mt-1.5 block w-full min-w-0 rounded-xl border border-slate-300 bg-white p-3 font-normal focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-100" /></label>
-            <Button disabled={saving || !closeDate || closeDate > latestCloseDate}>{t('Chốt vắng mặt')}</Button>
-          </form>
-        </section>
+
       </div>
       {holidaysPage && <section aria-labelledby="holidays-heading" className="mt-6 border-t border-slate-100 pt-5">
         <h3 id="holidays-heading" className="font-semibold text-slate-900">{t('Danh sách ngày lễ đã lưu')}</h3>

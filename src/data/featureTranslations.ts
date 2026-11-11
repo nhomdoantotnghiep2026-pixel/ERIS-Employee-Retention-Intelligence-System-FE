@@ -1,5 +1,15 @@
 // Display copy only. Stored identifiers, enum values and user-entered content are unchanged.
 export const featureVietnamese: Record<string, string> = {
+  'educationLevel must be High School, Bachelor, Master or PhD.': 'Vui lòng chọn trình độ học vấn hợp lệ.',
+  'Institution directory is temporarily unavailable. Please try again later.': 'Danh sách cơ sở đào tạo tạm thời không khả dụng. Vui lòng thử lại sau.',
+  'Selected institution no longer exists in its directory.': 'Cơ sở đào tạo đã chọn không còn trong danh sách. Vui lòng chọn lại.',
+  'Selected institution must be an active education organization in ROR.': 'Vui lòng chọn cơ sở đào tạo đang hoạt động từ danh sách gợi ý.',
+  'Selected Vietmap result is not a verifiable school place.': 'Không xác minh được cơ sở đào tạo đã chọn. Vui lòng chọn lại.',
+  'Select a valid institutionRefId from ROR or Vietmap suggestions.': 'Vui lòng chọn cơ sở đào tạo hợp lệ từ danh sách gợi ý.',
+  'graduationYear must be an integer from 1900 to the current year.': 'Năm tốt nghiệp phải là số nguyên từ 1900 đến năm hiện tại.',
+  'graduationYear must be at least {p0} for the selected education level.': 'Năm tốt nghiệp phải từ {p0} trở lên đối với trình độ đã chọn.',
+  'Graduation year must be at least {p0} (minimum graduation age: 18 by year).': 'Năm tốt nghiệp phải từ {p0} trở lên (độ tuổi tốt nghiệp tối thiểu là 18).',
+  'No institutions found. Try another name.': 'Không tìm thấy cơ sở đào tạo. Vui lòng thử tên khác.',
   'Portal': 'Cổng chức năng',
   'One place to access the HR workflows provided by the backend portal APIs.': 'Nơi truy cập tập trung các quy trình HR được cung cấp bởi API portal của backend.',
   'Open feature': 'Mở chức năng',

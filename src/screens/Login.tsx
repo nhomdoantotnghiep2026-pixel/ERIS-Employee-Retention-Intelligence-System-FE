@@ -15,7 +15,7 @@ import { useRole, type UserRole } from '../context/RoleContext';
 import { useLanguage } from '../context/LanguageContext';
 import { changePassword, getApiErrorMessage, getCurrentUser, login, logout } from '../services/api';
 import { isManualPasswordEdit } from '../utils/manualPassword';
-import { loginPortalForRole, mapApiRole, portalAllowsRole, workspaceRoleForPortal, type LoginPortal } from '../utils/loginPortal';
+import { mapApiRole, portalAllowsRole, workspaceRoleForPortal, type LoginPortal } from '../utils/loginPortal';
 
 const ROLE_HOME: Record<UserRole, string> = {
   HR: '/dashboard',
@@ -108,12 +108,7 @@ export default function Login() {
     return () => window.clearInterval(timer);
   }, []);
 
-  function portalErrorForRole(role: UserRole) {
-    if (loginPortalForRole(role) === null) return 'Vai trò Data/AI không còn được hỗ trợ đăng nhập trong hệ thống 3 role hiện tại.';
-    return loginPortal === 'management'
-      ? 'Đây là tài khoản nhân viên. Vui lòng chọn cổng Nhân viên / ESS.'
-      : 'Đây là tài khoản thuộc khối quản trị. Vui lòng chọn cổng HR & Quản trị.';
-  }
+  const portalError = 'Không thể đăng nhập. Vui lòng kiểm tra thông tin và thử lại.';
 
   async function handleSignIn(e: React.FormEvent) {
     e.preventDefault();
@@ -126,7 +121,7 @@ export default function Login() {
         if (pendingRole && !portalAllowsRole(loginPortal, pendingRole)) {
           sessionStorage.removeItem('eris-access-token');
           sessionStorage.removeItem('eris-api-backend');
-          setError(portalErrorForRole(pendingRole));
+          setError(portalError);
           return;
         }
         setPasswordChangeToken(loginResult.passwordChangeToken);
@@ -162,7 +157,7 @@ export default function Login() {
         sessionStorage.removeItem('eris-access-token');
         sessionStorage.removeItem('eris-api-backend');
         setPassword(''); setShowPass(false); setPasswordEditable(false);
-        setError(portalErrorForRole(nextUser.role));
+        setError(portalError);
         return;
       }
       setUser(nextUser);

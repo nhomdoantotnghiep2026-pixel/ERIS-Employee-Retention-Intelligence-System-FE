@@ -3,6 +3,13 @@ import assert from 'node:assert/strict';
 import { createTranslator } from '../src/utils/translateText.ts';
 import { featureEnglish, featureVietnamese } from '../src/data/featureTranslations.ts';
 
+test('education validation errors respect the selected language', () => {
+ const vi = createTranslator(featureVietnamese, 'vi');
+ assert.equal(vi('educationLevel must be High School, Bachelor, Master or PhD.'), 'Vui lòng chọn trình độ học vấn hợp lệ.');
+ assert.equal(vi('graduationYear must be at least 2024 for the selected education level.'), 'Năm tốt nghiệp phải từ 2024 trở lên đối với trình độ đã chọn.');
+ assert.equal(vi('Graduation year must be at least 2021 (minimum graduation age: 18 by year).'), 'Năm tốt nghiệp phải từ 2021 trở lên (độ tuổi tốt nghiệp tối thiểu là 18).');
+});
+
 test('known formatted UI messages translate with their parameters and escaped punctuation', () => {
  const vi=createTranslator(featureVietnamese,'vi'), en=createTranslator(featureEnglish,'en');
  assert.equal(vi('This change will update 12 employee records.'),'Thay đổi này sẽ cập nhật 12 hồ sơ nhân viên.');

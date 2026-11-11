@@ -1,3 +1,5 @@
+import EmployeeSurveyHistory from '../components/EmployeeSurveyHistory';
+import { rememberCompletedSurvey } from '../utils/completedSurveys';
 import { useEffect, useState, type FormEvent } from 'react';
 import {
   BarChart3, CalendarDays, CheckCircle2, ClipboardList, Clock3, Eye,
@@ -41,8 +43,6 @@ export default function ErdSurveys() {
   const [loadingResults, setLoadingResults] = useState(false);
   const [publishTarget, setPublishTarget] = useState<SurveySummary | null>(null);
   const [editSurvey, setEditSurvey] = useState<SurveySummary | null>(null);
-  const [ownSurveyId, setOwnSurveyId] = useState('');
-  const [ownResponse, setOwnResponse] = useState<Awaited<ReturnType<typeof getMySurveyResponse>>['data'] | null>(null);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -66,7 +66,7 @@ export default function ErdSurveys() {
       if (!controller.signal.aborted) setLoading(false);
     });
     return () => controller.abort();
-  }, [isHr, reload]);
+  }, [isHr, reload, user.email]);
 
   useEffect(() => {
     document.getElementById('main-content')?.scrollTo({ top: 0, behavior: 'smooth' });
@@ -176,6 +176,7 @@ export default function ErdSurveys() {
           comment: answer.comment.trim() || null,
         }] : [];
       }));
+      rememberCompletedSurvey(user.email, id);
       setActiveSurvey(null);
       setMessage(`Đã gửi khảo sát. Điểm hài lòng trung bình: ${response.data.satisfactionScore.toFixed(2)}/5.`);
       setReload(value => value + 1);
@@ -214,7 +215,7 @@ export default function ErdSurveys() {
       <Button className="mt-4" variant="secondary" onClick={() => setReload(value => value + 1)}>{t('Retry loading surveys')}</Button>
     </Card>}
 
-    {!isHr && <Card className="mb-5 p-5"><h2 className="font-bold">{t("Xem câu trả lời đã gửi")}</h2><p className="mt-1 text-sm text-slate-500">{t("Nhập mã khảo sát để xem lại câu trả lời của bạn, kể cả khi khảo sát đã đóng.")}</p><form className="mt-3 flex flex-wrap items-end gap-3" onSubmit={event => { event.preventDefault(); setError(''); setOwnResponse(null); void getMySurveyResponse(Number(ownSurveyId)).then(result => setOwnResponse(result.data)).catch(cause => setError(getApiErrorMessage(cause, 'Không tìm thấy câu trả lời.'))); }}><label className="text-sm">{t("Mã khảo sát")}<input required type="number" min="1" step="1" className={control} value={ownSurveyId} onChange={event => setOwnSurveyId(event.target.value)} /></label><Button>{t("Xem câu trả lời")}</Button></form>{ownResponse && <div className="mt-4"><h3 className="font-semibold">{ownResponse.survey.title} · {ownResponse.response.satisfactionScore ?? '—'}/5</h3>{ownResponse.answers.map(answer => <div key={answer.questionId} className="mt-3 rounded-xl bg-slate-50 p-3 text-sm"><p className="font-medium">{answer.questionText}</p><p className="mt-1">{answer.score == null ? '—' : t(scoreLabels[answer.score])}</p>{answer.comment && <p className="mt-1 whitespace-pre-wrap">{answer.comment}</p>}</div>)}</div>}</Card>}
+
 
     {isHr && <>
       <div className="mb-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -265,7 +266,7 @@ export default function ErdSurveys() {
       </form>
     </Card>}
 
-    {!eligibilityBlocked && (isHr || activeSurvey === null) && <><div className="mb-3 flex items-center justify-between gap-3"><div><h2 className="text-lg font-semibold text-slate-950">{t(isHr ? 'Survey list' : 'Available surveys')}</h2><p className="mt-1 text-sm text-slate-500">{t(isHr ? 'Review status, participation and results for every survey.' : 'Select a survey to begin your response.')}</p></div></div>
+    {!eligibilityBlocked && (isHr || activeSurvey === null) && <><div className="mb-3 flex items-center justify-between gap-3"><div><h2 className="text-lg font-semibold text-slate-950">{t(isHr ? 'Survey list' : 'Available surveys to complete')}</h2><p className="mt-1 text-sm text-slate-500">{t(isHr ? 'Review status, participation and results for every survey.' : 'Select a survey to begin your response.')}</p></div></div>
     {loading ? <Card className="p-8"><p role="status" className="text-center text-sm font-medium text-slate-500">{t('Loading surveys...')}</p></Card>
       : loadFailed ? <Card className="p-6"><p className="mb-3 text-sm text-slate-500">{t('Could not load surveys. Please retry.')}</p><Button variant="secondary" onClick={() => setReload(value => value + 1)}>{t('Retry loading surveys')}</Button></Card>
       : surveys.length === 0 ? <Card className="p-6"><EmptyState icon={<ClipboardList size={42} />} title={isHr ? 'No surveys have been created.' : 'No surveys are currently available.'} description={isHr ? 'Create the first survey draft using the form above.' : 'New surveys will appear here when HR publishes them.'} /></Card>
@@ -275,7 +276,7 @@ export default function ErdSurveys() {
           return <Card key={survey.id} className="overflow-hidden">
             <div className="p-5 sm:p-6">
               <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                <div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><span className={`inline-flex min-h-7 items-center rounded-full border px-2.5 py-1 text-xs font-semibold ${statusStyle(survey.status)}`}>{t(survey.status)}</span>{!isHr && <span className="inline-flex min-h-7 items-center rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700">{t(available.responseStatus === 'IN_PROGRESS' ? 'In progress' : 'Not started')}</span>}</div><h3 className="mt-3 break-words text-lg font-semibold leading-7 text-slate-950 [overflow-wrap:anywhere]">{survey.title}</h3>{isHr && <p className="mt-1 text-xs text-slate-500">Survey #{survey.id}</p>}{survey.description && <p className="mt-1 max-w-3xl break-words text-sm leading-6 text-slate-600 [overflow-wrap:anywhere]">{survey.description}</p>}
+                <div className="min-w-0"><div className="flex flex-wrap items-center gap-2">{isHr && <span className={`inline-flex min-h-7 items-center rounded-full border px-2.5 py-1 text-xs font-semibold ${statusStyle(survey.status)}`}>{t(survey.status)}</span>}{!isHr && <span className="inline-flex min-h-7 items-center rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700">{t(available.responseStatus === 'IN_PROGRESS' ? 'In progress' : 'Not started')}</span>}</div><h3 className="mt-3 break-words text-lg font-semibold leading-7 text-slate-950 [overflow-wrap:anywhere]">{survey.title}</h3>{isHr && <p className="mt-1 text-xs text-slate-500">{t('Survey')} #{survey.id}</p>}{survey.description && <p className="mt-1 max-w-3xl break-words text-sm leading-6 text-slate-600 [overflow-wrap:anywhere]">{survey.description}</p>}
                   <div className="mt-4 flex flex-wrap gap-x-5 gap-y-2 text-sm text-slate-500"><span className="inline-flex items-center gap-1.5"><CalendarDays size={16} />{dateLabel(survey.startDate)} – {dateLabel(survey.endDate)}</span><span className="inline-flex items-center gap-1.5"><ClipboardList size={16} />{survey.questionCount ?? available.questionCount ?? 0} {t('questions')}</span>{isHr && <span className="inline-flex items-center gap-1.5"><UsersRound size={16} />{survey.responseCount ?? 0} {t('responses')}</span>}{isHr && survey.createdByName && <span className="inline-flex items-center gap-1.5"><Clock3 size={16} />{t('Created by')} {survey.createdByName}</span>}</div>
                 </div>
                 {isHr ? <div className="flex shrink-0 flex-wrap gap-2">{survey.status === 'DRAFT' && <Button variant="secondary" disabled={pending} onClick={() => { setEditSurvey(survey); setDraft({ title: survey.title, description: survey.description || '', startDate: employeeDate(survey.startDate), endDate: employeeDate(survey.endDate) }); document.getElementById('main-content')?.scrollTo({ top: 0, behavior: 'smooth' }); }}>{t('Edit')}</Button>}{survey.status === 'ACTIVE' && <Button variant="secondary" disabled={pending} onClick={() => void finishSurvey(survey.id)}>{t('Close survey')}</Button>}{survey.status === 'DRAFT' && <Button disabled={pending} onClick={() => setPublishTarget(survey)}><PlayCircle size={16} />{t('Publish')}</Button>}<Button variant="secondary" disabled={loadingResults} onClick={() => void showResults(survey.id)}><Eye size={16} />{t(openResults === survey.id ? 'Hide results' : 'View results')}</Button><Button variant="secondary" disabled={loadingResults} onClick={() => void showResults(survey.id, true)}><Eye size={16} />{t('View result details')}</Button></div> : <Button disabled={activeSurvey === survey.id} onClick={() => void openSurvey(survey.id)}><PlayCircle size={16} />{t(available.responseStatus === 'IN_PROGRESS' ? 'Continue survey' : 'Start survey')}</Button>}
@@ -284,6 +285,8 @@ export default function ErdSurveys() {
             {isHr && openResults === survey.id && result && <div className="border-t border-slate-100 bg-slate-50/70 p-5 sm:p-6"><div className="mb-4 flex items-center gap-3"><span className="flex size-10 items-center justify-center rounded-xl bg-blue-50 text-blue-600"><BarChart3 size={20} /></span><div><h4 className="text-base font-semibold text-slate-950">{t('Survey results')}</h4><p className="text-sm text-slate-500">{t('Submitted responses')}: {result.responseCount}</p></div></div><div className="grid gap-3 xl:grid-cols-2">{result.questions.map(question => <div key={question.id} className="rounded-2xl border border-slate-200 bg-white p-4"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="break-words text-sm font-semibold leading-5 text-slate-900">{question.questionText}</p><p className="mt-1 text-xs font-medium uppercase tracking-wide text-slate-400">{question.dimensionCode} · {question.answerCount} {t('answers')}</p></div><span className="shrink-0 text-lg font-bold text-orange-600">{question.averageScore?.toFixed(1) ?? '—'}</span></div><div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-gradient-to-r from-orange-400 to-orange-600" style={{ width: `${question.averageScore == null ? 0 : (question.averageScore / 5) * 100}%` }} /></div><div className="mt-3 grid grid-cols-2 gap-2 text-center sm:grid-cols-5">{[1, 2, 3, 4, 5].map(score => <div key={score} className="rounded-lg bg-slate-50 px-1 py-2"><span className="block text-xs leading-5 text-slate-600">{t(scoreLabels[score])}</span><strong className="text-sm text-slate-700">{question.scoreDistribution[score as 1 | 2 | 3 | 4 | 5]}</strong></div>)}</div></div>)}</div></div>}
           </Card>;
         })}</div>}</>}
+
+    {!isHr && activeSurvey === null && <EmployeeSurveyHistory account={user.email} revision={reload} />}
 
     {isHr && detailResult && <SurveyResultDetails result={detailResult.result} participants={detailResult.participants} onClose={() => setDetailResult(null)} />}
     <ConfirmationDialog open={Boolean(publishTarget)} title="Publish survey?" description="Employees will be able to see and answer this survey during its scheduled period." confirmLabel="Publish" onCancel={() => setPublishTarget(null)} onConfirm={() => { const target = publishTarget; setPublishTarget(null); if (target) void publish(target.id); }} />

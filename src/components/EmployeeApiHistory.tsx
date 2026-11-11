@@ -17,7 +17,7 @@ type EducationDraft = {
   graduationYear: string;
 };
 
-const emptyDraft: EducationDraft = { educationLevel: '2', fieldOfStudy: '', graduationYear: '' };
+const emptyDraft: EducationDraft = { educationLevel: 'Bachelor', fieldOfStudy: '', graduationYear: '' };
 const inputClass = 'mt-1 w-full rounded-xl border border-slate-300 bg-white p-3 text-sm font-medium text-slate-800 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-orange-400 focus:ring-4 focus:ring-orange-100';
 const sectionTitleClass = 'text-[20px] font-semibold leading-7 text-[#111827]';
 const subsectionTitleClass = 'text-[16px] font-semibold leading-6 text-[#111827]';
@@ -26,12 +26,7 @@ const metadataClass = 'text-[14px] font-normal leading-5 text-[#6B7280]';
 const badgeClass = 'inline-flex min-h-8 items-center rounded-full border border-orange-100 bg-orange-50 px-3 py-1 text-[14px] font-medium leading-5 text-orange-700';
 const historyCardClass = 'relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-4 pl-5 shadow-sm transition duration-200 hover:-translate-y-0.5 hover:border-orange-200 hover:shadow-md';
 const subsectionIconClass = 'flex size-9 shrink-0 items-center justify-center rounded-xl bg-orange-50 text-orange-600 ring-1 ring-orange-100';
-const educationLevels: Record<number, string> = {
-  1: 'College',
-  2: 'Bachelor',
-  3: 'Master',
-  4: 'Doctorate',
-};
+const educationLevels = ['High School', 'Bachelor', 'Master', 'PhD'];
 
 export function EmployeeApiHistory({ employeeId, employeeEmail, dateOfBirth, own = false, editable = false, initialEducations = [] }: {
   employeeId?: number;
@@ -57,6 +52,7 @@ export function EmployeeApiHistory({ employeeId, employeeEmail, dateOfBirth, own
   const [selectedInstitution, setSelectedInstitution] = useState<EducationInstitution | null>(null);
   const [suggestions, setSuggestions] = useState<EducationInstitution[]>([]);
   const [searching, setSearching] = useState(false);
+  const [searchedQuery, setSearchedQuery] = useState('');
   const [educationPermission, setCanManageEducation] = useState(false);
   const canManageEducation = editable && !own && educationPermission;
   const [editPermissionError, setEditPermissionError] = useAutoDismissState();
@@ -114,6 +110,8 @@ export function EmployeeApiHistory({ employeeId, employeeEmail, dateOfBirth, own
 
   useEffect(() => {
     const query = institutionQuery.trim();
+    setSuggestions([]);
+    setSearchedQuery('');
     if (query.length < 2) {
       setSuggestions([]);
       setSearching(false);
@@ -122,8 +120,8 @@ export function EmployeeApiHistory({ employeeId, employeeEmail, dateOfBirth, own
     const controller = new AbortController();
     const timer = window.setTimeout(() => {
       setSearching(true);
-      void searchEducationInstitutions(query, draft.educationLevel ? Number(draft.educationLevel) : undefined, controller.signal)
-        .then(result => { if (!controller.signal.aborted) setSuggestions(result.data); })
+      void searchEducationInstitutions(query, draft.educationLevel || undefined, controller.signal)
+        .then(result => { if (!controller.signal.aborted) { setSuggestions(result.data); setSearchedQuery(query); } })
         .catch(cause => { if (!controller.signal.aborted) setError(getApiErrorMessage(cause, 'Could not search institutions.')); })
         .finally(() => { if (!controller.signal.aborted) setSearching(false); });
     }, 350);
@@ -135,7 +133,7 @@ export function EmployeeApiHistory({ employeeId, employeeEmail, dateOfBirth, own
     setEditing(row || null);
     setShowEducationForm(true);
     setDraft(row ? {
-      educationLevel: String(row.educationLevel ?? 2),
+      educationLevel: row.educationLevel || 'Bachelor',
       fieldOfStudy: row.fieldOfStudy || '',
       graduationYear: row.graduationYear == null ? '' : String(row.graduationYear),
     } : emptyDraft);
@@ -159,7 +157,7 @@ export function EmployeeApiHistory({ employeeId, employeeEmail, dateOfBirth, own
   async function saveEducation(event: FormEvent) {
     event.preventDefault();
     if (!canManageEducation || !employeeId || saving) return;
-    if (!editing && !selectedInstitution) {
+    if ((!editing || institutionQuery.trim()) && !selectedInstitution) {
       setError('Select an institution from the search suggestions before saving.');
       return;
     }
@@ -175,14 +173,15 @@ export function EmployeeApiHistory({ employeeId, employeeEmail, dateOfBirth, own
         return;
       }
       const birthYear = dateOfBirth?.slice(0, 10).match(/^(\d{4})-\d{2}-\d{2}$/)?.[1];
-      if (birthYear && graduationYear < Number(birthYear) + 21) {
-        setError(`Graduation year must be at least ${Number(birthYear) + 21} (minimum graduation age: 21 by year).`);
+      const minimumAge = draft.educationLevel === 'High School' ? 18 : 21;
+      if (birthYear && graduationYear < Number(birthYear) + minimumAge) {
+        setError(`Graduation year must be at least ${Number(birthYear) + minimumAge} (minimum graduation age: ${minimumAge} by year).`);
         return;
       }
     }
     setSaving(true); setError(''); setNotice('');
     const values = {
-      educationLevel: Number(draft.educationLevel),
+      educationLevel: draft.educationLevel,
       fieldOfStudy: draft.fieldOfStudy.trim() || null,
       graduationYear: draft.graduationYear ? Number(draft.graduationYear) : null,
     };
@@ -263,7 +262,7 @@ export function EmployeeApiHistory({ employeeId, employeeEmail, dateOfBirth, own
                   <span className="inline-flex items-center gap-1.5"><CalendarDays className="size-4 shrink-0" strokeWidth={1.8} aria-hidden="true" />{row.graduationYear ?? '—'}</span>
                 </div>
                 <p className={`${badgeClass} mt-4`}>
-                  {t('Education level')}&nbsp;·&nbsp;{row.educationLevel && educationLevels[row.educationLevel] ? t(educationLevels[row.educationLevel]) : '—'}
+                  {t('Education level')}&nbsp;·&nbsp;{row.educationLevel ? t(row.educationLevel) : '—'}
                 </p>
               </div>
               {canManageEducation && <div className="flex shrink-0 flex-wrap items-center gap-2 border-t border-slate-100 pt-4 sm:border-0 sm:pt-0">
@@ -278,8 +277,7 @@ export function EmployeeApiHistory({ employeeId, employeeEmail, dateOfBirth, own
           <label className="text-sm font-semibold text-slate-700">{t('Education level')}
             <select required className={inputClass} value={draft.educationLevel} disabled={saving}
               onChange={event => setDraft(value => ({ ...value, educationLevel: event.target.value }))}>
-              <option value="1">{t('College')}</option><option value="2">{t('Bachelor')}</option>
-              <option value="3">{t('Master')}</option><option value="4">{t('Doctorate')}</option>
+              {educationLevels.map(level => <option key={level} value={level}>{t(level)}</option>)}
             </select>
           </label>
           <label className="text-sm font-semibold text-slate-700">{t('Field of study')}
@@ -291,10 +289,11 @@ export function EmployeeApiHistory({ employeeId, employeeEmail, dateOfBirth, own
               onChange={event => setDraft(value => ({ ...value, graduationYear: event.target.value }))} />
           </label>
           <label className="text-sm font-semibold text-slate-700">{t('Search institution')}
-            <input minLength={2} className={inputClass} value={selectedInstitution?.institution || institutionQuery} disabled={saving}
+            <input minLength={2} maxLength={100} className={inputClass} value={selectedInstitution?.institution || institutionQuery} disabled={saving}
               placeholder={t('Enter at least 2 characters')}
               onChange={event => { setSelectedInstitution(null); setInstitutionQuery(event.target.value); }} />
             {searching && <span role="status" className="mt-1 block text-xs text-slate-500">{t('Searching institutions...')}</span>}
+            {!searching && searchedQuery === institutionQuery.trim() && searchedQuery && !suggestions.length && <span role="status" className="mt-1 block text-xs text-slate-500">{t('No institutions found. Try another name.')}</span>}
             {suggestions.length > 0 && <div className="mt-2 max-h-48 overflow-y-auto rounded-lg border border-slate-200">
               {suggestions.map(item => <button key={item.id} type="button" className="block w-full border-b border-slate-100 p-3 text-left text-sm last:border-0 hover:bg-orange-50"
                 onClick={() => { setSelectedInstitution(item); setInstitutionQuery(''); setSuggestions([]); }}>
@@ -323,8 +322,8 @@ export function EmployeeApiHistory({ employeeId, employeeEmail, dateOfBirth, own
         {historyError ? null : history.length === 0 ? <p className="mt-4 rounded-xl border border-dashed border-slate-300 bg-white px-4 py-7 text-center text-sm text-slate-500">{t('No job history records.')}</p>
           : <div className="mt-4 grid gap-4 2xl:grid-cols-2">{history.map(row => <article key={row.id} className={historyCardClass}>
             <span className="absolute inset-y-0 left-0 w-1 bg-gradient-to-b from-orange-400 to-orange-600" aria-hidden="true" />
-            <h4 className={cardTitleClass}>{row.positionName || '—'}</h4>
-            <p className={`${metadataClass} mt-2 break-words [overflow-wrap:anywhere]`}>{row.departmentName || '—'}</p>
+            <h4 className={cardTitleClass}>{t(row.positionName || '—')}</h4>
+            <p className={`${metadataClass} mt-2 break-words [overflow-wrap:anywhere]`}>{t(row.departmentName || '—')}</p>
             <p className={`${metadataClass} mt-2 inline-flex items-center gap-1.5`}><CalendarDays className="size-4 shrink-0" strokeWidth={1.8} aria-hidden="true" />{row.startDate} – {row.endDate || t('Present')}</p>
           </article>)}</div>}
       </section>

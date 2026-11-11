@@ -7,6 +7,7 @@ import { AnimatePresence, motion } from 'motion/react';
 import { Button } from './ui';
 
 import { getApiErrorMessage, searchEducationInstitutions, type EducationInstitution } from '../services/api';
+import { useLanguage } from '../context/LanguageContext';
 
 
 
@@ -88,6 +89,7 @@ function EducationCard({ value, index, dateOfBirth, disabled, removable, text, o
 
 }) {
 
+  const { t } = useLanguage();
   const [suggestions, setSuggestions] = useState<EducationInstitution[]>([]);
 
   const [searching, setSearching] = useState(false);
@@ -242,7 +244,7 @@ function EducationCard({ value, index, dateOfBirth, disabled, removable, text, o
 
         <span className={`mt-1.5 block text-xs font-normal leading-5 ${searchError ? 'text-red-700' : value.institutionRefId ? 'text-emerald-700' : 'text-slate-500'}`}>
 
-          {searchError || (value.institutionRefId
+          {t(searchError) || (value.institutionRefId
 
             ? text('Đã chọn trường từ danh sách xác minh.', 'Verified institution selected.')
 

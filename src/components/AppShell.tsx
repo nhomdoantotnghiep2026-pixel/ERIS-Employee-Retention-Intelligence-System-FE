@@ -140,7 +140,7 @@ function SidebarLink({ to, icon: Icon, label, onNavigate, collapsed = false, nes
   const { pathname } = useLocation();
   const { t } = useLanguage();
   const employeeOperation = ['/employees/new', '/employees/import'].some(route => pathname.startsWith(route));
-  const isActive = pathname === to || ((to === '/work-schedules' || to === '/positions') ? false : to === '/employees' ? pathname.startsWith('/employees/') && !employeeOperation : pathname.startsWith(to + '/'));
+  const isActive = pathname === to || ((to === '/work-schedules' || to === '/positions' || to === '/departments' || to.startsWith('/departments/')) ? false : to === '/employees' ? pathname.startsWith('/employees/') && !employeeOperation : pathname.startsWith(to + '/'));
   return (
     <NavLink
       to={to}
@@ -164,6 +164,8 @@ function Sidebar({ onNavigate, collapsed, onToggle }: { onNavigate?: () => void;
   const { pathname } = useLocation();
   const [navQuery, setNavQuery] = useState('');
   const [positionsOpen, setPositionsOpen] = useState(() => pathname.startsWith('/positions'));
+  const [departmentsOpen, setDepartmentsOpen] = useState(() => pathname.startsWith('/departments'));
+  const departmentPath = pathname.match(/^\/departments\/([1-9]\d*)(?:\/edit)?$/)?.[1];
   const [schedulesOpen, setSchedulesOpen] = useState(() => pathname.startsWith('/work-schedules'));
   const [historyOpen, setHistoryOpen] = useState(() => ['/employee-history', '/employee-education', '/employee-job-history'].includes(pathname));
   const navigationRef = useRef<HTMLElement>(null);
@@ -200,7 +202,7 @@ function Sidebar({ onNavigate, collapsed, onToggle }: { onNavigate?: () => void;
   }, [scrollStorageKey]);
 
   return (
-    <aside aria-label="Main navigation" className={`fixed inset-y-0 left-0 z-50 flex h-dvh max-w-[88vw] flex-shrink-0 flex-col overflow-visible rounded-br-[40px] bg-white shadow-2xl transition-[width,transform] duration-300 ease-out lg:sticky lg:top-0 lg:z-40 lg:translate-x-0 lg:shadow-[5px_0_26px_rgba(30,41,59,0.10)] ${collapsed ? '-translate-x-full w-[292px] lg:w-[96px]' : 'w-[320px] translate-x-0 lg:w-[292px]'}`}>
+    <aside aria-label={t('Main navigation')} className={`fixed inset-y-0 left-0 z-50 flex h-dvh max-w-[88vw] flex-shrink-0 flex-col overflow-visible rounded-br-[40px] bg-white shadow-2xl transition-[width,transform] duration-300 ease-out lg:sticky lg:top-0 lg:z-40 lg:translate-x-0 lg:shadow-[5px_0_26px_rgba(30,41,59,0.10)] ${collapsed ? '-translate-x-full w-[292px] lg:w-[96px]' : 'w-[320px] translate-x-0 lg:w-[292px]'}`}>
       <button type="button" onClick={onToggle} aria-label={collapsed ? t('Expand sidebar') : t('Collapse sidebar')} className={`absolute top-[76px] z-50 hidden h-9 w-9 items-center justify-center rounded-full bg-[#f47721] text-white shadow-lg shadow-orange-700/25 transition-[right,transform] duration-300 hover:scale-105 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-500 lg:flex ${collapsed ? 'right-3' : '-right-4'}`}>
         <ChevronLeft size={20} className={`transition-transform duration-300 ${collapsed ? 'rotate-180' : ''}`} />
       </button>
@@ -258,6 +260,12 @@ function Sidebar({ onNavigate, collapsed, onToggle }: { onNavigate?: () => void;
                 <SidebarLink to="/positions" icon={ClipboardList} label="Position list" nested onNavigate={onNavigate}/>
                 {/^\/positions\/[^/]+$/.test(pathname) && <SidebarLink to={pathname} icon={ClipboardList} label="Position details" nested onNavigate={onNavigate}/>}
                 {/^\/positions\/[^/]+\/edit$/.test(pathname) && <SidebarLink to={pathname} icon={ClipboardList} label="Edit position" nested onNavigate={onNavigate}/>}
+              </div>}
+            </div> : item.to === '/departments' ? <div key={item.to}>
+              <button type="button" aria-expanded={departmentsOpen} onClick={() => setDepartmentsOpen(open => !open)} className="ml-5 flex min-h-10 w-[calc(100%-1.25rem)] items-center gap-3 rounded-full px-4 text-left text-[15px] text-slate-500 hover:bg-orange-50 hover:text-orange-700"><ClipboardList size={17} className="shrink-0"/><span className="min-w-0 flex-1 truncate">{t(item.label)}</span><ChevronDown size={16} className={departmentsOpen ? 'rotate-180' : ''}/></button>
+              {departmentsOpen && <div className="ml-5">
+                <SidebarLink to="/departments" icon={ClipboardList} label="Department list" nested onNavigate={onNavigate}/>
+                {departmentPath && <><SidebarLink to={`/departments/${departmentPath}`} icon={ClipboardList} label="Department details" nested onNavigate={onNavigate}/><SidebarLink to={`/departments/${departmentPath}/edit`} icon={ClipboardList} label="Edit department" nested onNavigate={onNavigate}/></>}
               </div>}
             </div> : item.to === '/work-schedules' ? <div key={item.to}>
               <button type="button" aria-expanded={schedulesOpen} onClick={() => setSchedulesOpen(open => !open)} className="ml-5 flex min-h-10 w-[calc(100%-1.25rem)] items-center gap-3 rounded-full px-4 text-left text-[15px] text-slate-500 hover:bg-orange-50 hover:text-orange-700"><ClipboardList size={17} className="shrink-0"/><span className="min-w-0 flex-1 truncate">{t(item.label)}</span><ChevronDown size={16} className={schedulesOpen ? 'rotate-180' : ''}/></button>

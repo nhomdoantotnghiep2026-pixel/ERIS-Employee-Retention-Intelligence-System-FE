@@ -13,7 +13,7 @@ test('work schedule calls use the BE contract and preserve errors', async () => 
   try {
     const api = await server.ssrLoadModule('/src/services/api.ts');
     const schedule = { name: 'Ngày thường', start_time: '08:00', end_time: '17:00', break_start: '12:00', break_end: '13:00', working_days: [1, 2, 3, 4, 5], status: 'ACTIVE' };
-    await api.createWorkSchedule(schedule, 'default');
+    await api.createDefaultSchedule(schedule);
     assert.equal(calls.at(-1)!.url, '/api/work-schedules/default');
     assert.deepEqual(JSON.parse(String(calls.at(-1)!.init?.body)), schedule);
     await api.createIndividualSchedule({ ...schedule, employee_id: 5, effective_from: '2026-12-01', effective_to: '2026-12-31' });

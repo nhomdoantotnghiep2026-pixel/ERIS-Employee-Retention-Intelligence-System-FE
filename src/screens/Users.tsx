@@ -219,7 +219,7 @@ export default function Users() {
                   {roles.map(r => <option key={r}>{r}</option>)}
                 </select>
               </div>
-              {formError && <p role="alert" className="text-xs font-semibold text-red-600">{formError}</p>}
+              {formError && <p role="alert" className="text-xs font-semibold text-red-600">{t(formError)}</p>}
             </div>
             <div className="px-4 py-3 border-t border-gray-200 flex justify-end gap-2">
               <Button variant="secondary" onClick={() => setShowModal(false)}>Cancel</Button>

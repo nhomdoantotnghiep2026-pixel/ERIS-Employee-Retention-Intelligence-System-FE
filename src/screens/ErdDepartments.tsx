@@ -1,3 +1,4 @@
+import { useLanguage } from '../context/LanguageContext';
 import { useEffect, useState } from 'react';
 import { AppShell } from '../components/AppShell';
 import { Button, Card, SectionHeader } from '../components/ui';
@@ -7,6 +8,7 @@ import { useAutoDismissFeedback } from '../hooks/useAutoDismissState';
 const control = 'mt-2 w-full rounded-xl border border-slate-300 bg-white p-3 text-sm';
 
 export default function ErdDepartments() {
+  const { t } = useLanguage();
   const [departments, setDepartments] = useState<ApiDepartment[]>([]);
   const [selected, setSelected] = useState<ApiDepartment | null>(null);
   const [editing, setEditing] = useState<ApiDepartment | null>(null);
@@ -92,8 +94,8 @@ export default function ErdDepartments() {
         <Button type="submit">Tìm kiếm</Button>
       </form>
       {loading && <p className="mt-4 text-sm text-slate-500">Đang tải danh sách...</p>}
-      {error && <p role="alert" className="mt-4 rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</p>}
-      {message && <p role="status" className="mt-4 rounded-lg bg-emerald-50 p-3 text-sm text-emerald-700">{message}</p>}
+      {error && <p role="alert" className="mt-4 rounded-lg bg-red-50 p-3 text-sm text-red-700">{t(error)}</p>}
+      {message && <p role="status" className="mt-4 rounded-lg bg-emerald-50 p-3 text-sm text-emerald-700">{t(message)}</p>}
       {!loading && <div className="mt-4 overflow-x-auto"><table className="w-full text-left text-sm"><thead><tr className="border-b text-slate-500"><th className="p-3">Mã phòng ban</th><th className="p-3">Tên phòng ban</th><th className="p-3">Mô tả</th><th className="p-3">Thao tác</th></tr></thead><tbody>{departments.map(department => <tr key={department.id} className="border-b border-slate-100"><td className="p-3 font-mono text-xs">{department.code || '—'}</td><td className="p-3 font-semibold text-slate-800">{department.name}</td><td className="max-w-sm p-3 text-slate-600">{department.description || '—'}</td><td className="flex flex-wrap gap-2 p-3"><Button size="sm" variant="secondary" onClick={() => void viewDetails(department)}>Xem chi tiết</Button><Button size="sm" variant="secondary" onClick={() => startEdit(department)}>Chỉnh sửa</Button></td></tr>)}</tbody></table>{!departments.length && <p className="py-6 text-center text-sm text-slate-500">Không tìm thấy phòng ban.</p>}<div className="mt-4 flex justify-end gap-2"><Button type="button" size="sm" variant="secondary" disabled={page <= 1 || loading} onClick={() => setPage(current => current - 1)}>Trước</Button><span className="flex items-center px-2 text-sm text-slate-500">Trang {page}</span><Button type="button" size="sm" variant="secondary" disabled={!hasMore || loading} onClick={() => setPage(current => current + 1)}>Sau</Button></div></div>}
     </Card>
     {selected && <Card className="mb-5 border border-orange-100 p-6"><div className="flex items-start justify-between gap-4"><div><h2 className="font-bold text-slate-900">Chi tiết phòng ban</h2><p className="mt-1 text-sm text-slate-500">Thông tin phòng ban được chọn</p></div><Button size="sm" variant="secondary" onClick={() => setSelected(null)}>Đóng</Button></div><dl className="mt-5 grid gap-4 sm:grid-cols-3"><div><dt className="text-xs text-slate-500">Mã phòng ban</dt><dd className="mt-1 font-semibold text-slate-800">{selected.code || '—'}</dd></div><div><dt className="text-xs text-slate-500">Tên phòng ban</dt><dd className="mt-1 font-semibold text-slate-800">{selected.name}</dd></div><div><dt className="text-xs text-slate-500">Trạng thái</dt><dd className="mt-1 font-semibold text-slate-800">{selected.status || '—'}</dd></div><div className="sm:col-span-3"><dt className="text-xs text-slate-500">Mô tả</dt><dd className="mt-1 text-sm text-slate-700">{selected.description || 'Chưa có mô tả.'}</dd></div></dl></Card>}

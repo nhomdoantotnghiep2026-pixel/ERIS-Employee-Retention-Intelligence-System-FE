@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import { restoreSession, SESSION_EXPIRED_EVENT } from '../services/api';
 import { useAutoDismissState } from '../hooks/useAutoDismissState';
+import { useLanguage } from './LanguageContext';
 
 export type UserRole = 'HR' | 'Data / AI Analyst' | 'System Administrator' | 'Employee / ESS';
 
@@ -31,6 +32,7 @@ interface RoleContextValue {
 const RoleContext = createContext<RoleContextValue | null>(null);
 
 export function RoleProvider({ children }: { children: ReactNode }) {
+  const { t } = useLanguage();
   const storedUser = (() => {
     try {
       const stored = sessionStorage.getItem('eris-user');
@@ -43,7 +45,7 @@ export function RoleProvider({ children }: { children: ReactNode }) {
   })();
   const [user, setUserState] = useState<RoleUser>(storedUser || ROLE_USERS[0]);
   const [isAuthenticated, setIsAuthenticated] = useState(Boolean(storedUser));
-  const [sessionNotice, setSessionNotice] = useAutoDismissState(5000);
+  const [sessionNotice, setSessionNotice] = useAutoDismissState();
   useEffect(() => {
     const handleSessionExpired = () => {
       setIsAuthenticated(false);
@@ -76,8 +78,8 @@ export function RoleProvider({ children }: { children: ReactNode }) {
   return <RoleContext.Provider value={{ user, isAuthenticated, setUser, signOut }}>
     {children}
     {sessionNotice && <div role="alert" aria-live="assertive" className="fixed right-4 top-4 z-[100] flex max-w-[calc(100vw-2rem)] items-start gap-3 rounded-xl border border-amber-200 bg-white px-4 py-3 text-sm text-slate-800 shadow-2xl sm:max-w-sm">
-      <span className="flex-1">{sessionNotice}</span>
-      <button type="button" onClick={() => setSessionNotice('')} className="rounded-md px-2 py-1 font-semibold text-orange-700 hover:bg-orange-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-600" aria-label="Đóng thông báo">Đóng</button>
+      <span className="flex-1">{t(sessionNotice)}</span>
+      <button type="button" onClick={() => setSessionNotice('')} className="rounded-md px-2 py-1 font-semibold text-orange-700 hover:bg-orange-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-600" aria-label={t('Đóng thông báo')}>{t('Đóng')}</button>
     </div>}
   </RoleContext.Provider>;
 }

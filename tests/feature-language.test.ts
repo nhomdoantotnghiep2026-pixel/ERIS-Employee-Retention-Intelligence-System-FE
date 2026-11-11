@@ -32,13 +32,19 @@ test('all routed feature pages use VI/EN consistently and preserve navigation an
   const reportId = loadReports()[0].id;
   type Page = [number, string, string, Record<string, unknown>?];
   const pages: Page[] = [
+   [0,'/departments/1','DepartmentPage',{mode:'detail'}],[0,'/departments/1/edit','DepartmentPage',{mode:'edit'}],
+   [0,'/portal','PortalHub'],[0,'/ai-analysis','AiAnalysis'],[0,'/policy-demo','PolicyDemo'],
+   [0,'/holidays','AttendanceHistory',{holidaysPage:true}],
+   [0,'/work-schedules','WorkSchedules'],[0,'/work-schedules/assign','WorkSchedules'],[0,'/work-schedules/list','WorkSchedules'],
+   [0,'/employee-requests','LeaveRequests',{own:false}],[0,'/company-location','CompanyLocation'],
+   [3,'/my-requests','LeaveRequests',{own:true}],[3,'/my-attendance','MyAttendance'],
    [0,'/departments','Departments'],[0,'/positions','Positions'],[0,'/employees','HrEmployees'],[0,'/employees/new','HrEmployees'],
    [0,'/org-overview','RiskWorkspace'],[0,'/attrition-risk','RiskWorkspace'],[0,'/executive-reports','RiskWorkspace',{reports:true}],
    [0,'/employees','Employees'],[0,'/employees/new','EmployeeDataManagement',{mode:'add'}],[0,'/employees/bulk-update','EmployeeDataManagement',{mode:'bulk'}],[0,'/employees/import','EmployeeImport'],
    [0,'/employees/'+employeeId,'ErdEmployeeDetails'],[0,'/employees/'+employeeId+'/edit','EmployeeRecord'],[0,'/employees/'+employeeId+'/risk','RiskAnalysis'],
    [0,'/employee-requests','EmployeeRequests'],[0,'/attendance','AttendanceHistory'],[0,'/employee-history','EmployeeHistory'],[0,'/org-chart','OrgChart'],[0,'/onboarding','Onboarding'],[0,'/interventions','RetentionInterventions'],[0,'/outcomes','EmployeeOutcomes'],[0,'/engagement','ErdSurveys'],[0,'/reports/'+reportId,'ReportDetail'],
    [1,'/employees','Employees'],[1,'/employees/new','EmployeeDataManagement',{mode:'add'}],[1,'/employees/import','EmployeeImport'],[1,'/preparation','WorkforceSnapshot'],[1,'/schema','ErdSchema'],[1,'/model-performance','ModelLifecycle'],[1,'/ai-config','ModelLifecycle'],[1,'/predictions','Predictions'],[1,'/feature-importance','FeatureImportance'],[1,'/model-history','Predictions'],[1,'/data-pipelines','DataPipelines'],[1,'/audit-logs','WorkflowActivity'],
-   [2,'/users','ErdAccounts'],[2,'/roles','Roles'],[2,'/roles?tab=matrix','Roles'],[2,'/system','SystemConfig'],[2,'/activity','WorkflowActivity'],[2,'/system-health','SystemHealth'],
+   [2,'/users','ErdAccounts'],[2,'/roles','Roles'],[2,'/roles?tab=matrix','Roles'],[2,'/system','SystemConfig'],[2,'/activity','AdminAuditLogs'],[2,'/system-health','SystemHealth'],
    [3,'/my-profile','ErdOwnProfile'],[3,'/my-attendance','EmployeePortal',{mode:'attendance'}],[3,'/my-requests','EmployeePortal',{mode:'requests'}],[3,'/my-payroll','EmployeePortal',{mode:'payroll'}],[3,'/my-performance','EmployeePortal',{mode:'performance'}],[3,'/my-offboarding','EmployeePortal',{mode:'offboarding'}],[3,'/my-surveys','ErdSurveys'],
   ];
   const modules = Object.fromEntries(await Promise.all([...new Set(pages.map(page=>page[2]))].map(async name=>[name,(await server.ssrLoadModule('/src/screens/'+name+'.tsx')).default])));
@@ -54,6 +60,18 @@ test('all routed feature pages use VI/EN consistently and preserve navigation an
     return renderToStaticMarkup(React.createElement(MemoryRouter,{initialEntries:[path]},React.createElement(LanguageProvider,null,React.createElement(RoleProvider,null,React.createElement(EmployeeProvider,null,React.createElement(WorkflowProvider,null,React.createElement(CaptureLanguage),screen))))));
    };
    const english=render('en'),vietnamese=render('vi'),en=chunks(english),vi=chunks(vietnamese);
+   if (name === 'ErdSurveys' && path === '/my-surveys') {
+    assert.ok(english.includes('Completed survey history'));
+    assert.ok(!vietnamese.includes('Nhập mã khảo sát'));
+    assert.ok(!english.includes('Enter a survey ID'));
+   }
+   if (name === 'WorkSchedules' && path === '/work-schedules') {
+    for (const html of [english, vietnamese]) {
+     assert.ok(html.includes('value="default"'));
+     assert.ok(html.includes('value="individual"'));
+     assert.ok(!html.includes('value="template"'), 'Schedule creation must not offer a template mode');
+    }
+   }
    if(name === 'RiskWorkspace') { assert.ok(en.has('Employee')); assert.ok(en.has('Department')); assert.ok(!en.has('employee_id')); }
    const leftVi=[...vi].filter(text=>!ROLE_USERS.some(actor=>actor.name===text||actor.initials===text)&&/[a-zA-Z]/.test(text)&&!identity(text)&&(en.has(text)||(!/[\u00c0-\u00d6\u00d8-\u00f6\u00f8-\u024f\u1ea0-\u1ef9]/.test(text)&&/[a-zA-Z]{3}/.test(text)&&translators.en(text)===text)));
    const leftEn=[...en].filter(text=>!ROLE_USERS.some(actor=>actor.name===text)&&/[\u00c0-\u00d6\u00d8-\u00f6\u00f8-\u024f\u1ea0-\u1ef9]/.test(text));

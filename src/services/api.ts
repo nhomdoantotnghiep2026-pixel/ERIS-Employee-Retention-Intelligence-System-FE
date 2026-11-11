@@ -181,7 +181,7 @@ export function getPolicyRecommendation(id: number) { return request<{data: Poli
 export interface EmployeeEducation {
   id: number;
   employeeId: number;
-  educationLevel: number | null;
+  educationLevel: string | null;
   fieldOfStudy: string | null;
   institution: string | null;
   graduationYear: number | null;
@@ -393,14 +393,14 @@ export function listEducationEmployees(signal?: AbortSignal) {
   return request<{ data: Array<{ id: number; employeeCode: string; fullName: string; dateOfBirth: string | null; employmentStatus: string }> }>('/employee-educations/employees', { signal, cache: 'no-store' });
 }
 
-export function searchEducationInstitutions(name: string, educationLevel?: number | string, signal?: AbortSignal) {
+export function searchEducationInstitutions(name: string, educationLevel?: string, signal?: AbortSignal) {
   const query = new URLSearchParams({ name });
   if (educationLevel !== undefined) query.set('educationLevel', String(educationLevel));
   return request<{ data: EducationInstitution[]; source: string; manualEntryAllowed: boolean }>(`/employee-educations/institutions?${query}`, { signal });
 }
 
 export function createEmployeeEducation(employeeId: number, input: {
-  educationLevel: number;
+  educationLevel: string;
   fieldOfStudy?: string | null;
   institution: string;
   institutionRefId: string;
@@ -413,7 +413,7 @@ export function createEmployeeEducation(employeeId: number, input: {
 }
 
 export function updateEmployeeEducation(employeeId: number, educationId: number, input: Partial<{
-  educationLevel: number;
+  educationLevel: string;
   fieldOfStudy: string | null;
   institution: string;
   institutionRefId: string;
@@ -656,7 +656,7 @@ function userWithRoleId(user: ApiUser): ApiUser {
 
 async function request<T>(path: string, init?: RequestInit, baseOverride?: string): Promise<T> {
   const adminSession = sessionStorage.getItem('eris-api-backend') === 'admin';
-  const adminResource = /^\/(users(?:\/|\?|$)|roles(?:\/|\?|$)|auth\/user_register$)/.test(path);
+  const adminResource = /^\/(users(?:\/|\?|$)|roles(?:\/|\?|$)|audit-logs(?:\/|\?|$)|auth\/user_register$)/.test(path);
   if (!baseOverride && ADMIN_API_BASE_URL && adminResource && !adminSession) {
     throw new ApiError('Vui lòng đăng xuất và đăng nhập lại tài khoản admin để kết nối dịch vụ quản lý người dùng.', 401, 'ADMIN_SESSION_REQUIRED');
   }
@@ -686,6 +686,22 @@ async function request<T>(path: string, init?: RequestInit, baseOverride?: strin
 
   return body as T;
 }
+
+export interface AuditLogEntry {
+  id: number;
+  userId: number | null;
+  entityType: string | null;
+  entityId: number | string | null;
+  action: string | null;
+  createdAt: string;
+  actor: { id: number; email: string; fullName: string | null } | null;
+}
+export interface AuditLogDetail extends AuditLogEntry {
+  oldValue: unknown;
+  newValue: unknown;
+}
+export const listAuditLogs = (signal?: AbortSignal) => request<{ data: AuditLogEntry[] }>('/audit-logs', { signal, cache: 'no-store' });
+export const getAuditLog = (id: number, signal?: AbortSignal) => request<{ data: AuditLogDetail }>(`/audit-logs/${id}`, { signal, cache: 'no-store' });
 
 export type AiEmployee = { id: number; employeeCode: string; fullName: string };
 export type AiSnapshot = { employee: AiEmployee; snapshotId: number | null; capturedAt: string; features: Record<string, string | number>; provenance: Record<string, string>; missingFeatures: string[]; invalidFeatures?: string[]; issues: string[]; ready: boolean; warning?: string };
@@ -1037,11 +1053,11 @@ export function importEmployees(file: File) {
   });
 }
 
-export interface WorkSchedule { id: number; name: string; start_time: string; end_time: string; break_start: string; break_end: string; working_days: number[]; status: 'ACTIVE' | 'INACTIVE'; is_default: boolean }
-export type WorkScheduleInput = Omit<WorkSchedule, 'id' | 'is_default'>;
+export interface WorkSchedule { id: number; name: string; start_time: string; end_time: string; break_start: string; break_end: string; working_days: number[]; status: 'ACTIVE' | 'INACTIVE'; is_default: boolean; pending_default?: { effective_from: string } | null }
+export type WorkScheduleInput = Omit<WorkSchedule, 'id' | 'is_default' | 'pending_default'>;
 export interface ScheduleAssignment extends WorkSchedule { employee_id: number; schedule_id: number; effective_from: string; effective_to: string | null }
 export const listWorkSchedules = () => request<{data: WorkSchedule[]}>('/work-schedules', {cache: 'no-store'});
-export const createWorkSchedule = (input: WorkScheduleInput, mode: 'template' | 'default') => request<{data: WorkSchedule & {effective_from?: string}}>('/work-schedules' + (mode === 'default' ? '/default' : ''), {method: 'POST', body: JSON.stringify(input)});
+export const createDefaultSchedule = (input: WorkScheduleInput) => request<{data: WorkSchedule & {effective_from?: string}}>('/work-schedules/default', {method: 'POST', body: JSON.stringify(input)});
 export const createIndividualSchedule = (input: WorkScheduleInput & {employee_id: number; effective_from: string; effective_to: string}) => request('/work-schedules/individual', {method: 'POST', body: JSON.stringify(input)});
 export const updateWorkSchedule = (id: number, input: Partial<WorkScheduleInput>) => request('/work-schedules/' + id, {method: 'PATCH', body: JSON.stringify(input)});
 export const setDefaultSchedule = (id: number) => request('/work-schedules/' + id + '/default', {method: 'PATCH'});

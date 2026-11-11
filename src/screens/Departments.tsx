@@ -1,15 +1,17 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { AppShell } from '../components/AppShell';
 import { Button, Card, SectionHeader } from '../components/ui';
 import { useLanguage } from '../context/LanguageContext';
 import { useAutoDismissFeedback } from '../hooks/useAutoDismissState';
-import { createDepartment, deactivateDepartment, getApiErrorMessage, getDepartmentById, listDepartments, updateDepartment, type ApiDepartment } from '../services/api';
+import { createDepartment, deactivateDepartment, getApiErrorMessage, listDepartments, type ApiDepartment } from '../services/api';
 
 const control = 'mt-2 w-full rounded-xl border border-slate-300 bg-white p-3 text-sm focus:outline-orange-500 disabled:opacity-60';
 const pageSize = 20;
 
 export default function Departments() {
   const { t } = useLanguage();
+  const navigate = useNavigate();
   const [departments, setDepartments] = useState<ApiDepartment[]>([]);
   const [hasMore, setHasMore] = useState(false);
   const [page, setPage] = useState(1);
@@ -20,31 +22,9 @@ export default function Departments() {
   const [listError, setListError] = useState('');
   const { error, message, setError, setMessage } = useAutoDismissFeedback();
   const [revision, setRevision] = useState(0);
-  const [editing, setEditing] = useState<ApiDepartment | null>(null);
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const nameInput = useRef<HTMLInputElement>(null);
-  const [detailId, setDetailId] = useState<number | null>(null);
-  const [detail, setDetail] = useState<ApiDepartment | null>(null);
-  const [detailLoading, setDetailLoading] = useState(false);
-  const [detailError, setDetailError] = useState('');
-  const [detailRevision, setDetailRevision] = useState(0);
-  const detailHeading = useRef<HTMLHeadingElement>(null);
-
-  useEffect(() => {
-    if (detailId === null) return;
-    const controller = new AbortController();
-    setDetail(null); setDetailError(''); setDetailLoading(true);
-    detailHeading.current?.focus();
-    void getDepartmentById(detailId, controller.signal)
-      .then(result => { if (!controller.signal.aborted) setDetail(result); })
-      .catch(cause => {
-        if (!controller.signal.aborted) setDetailError(getApiErrorMessage(cause, 'Could not load department details. Please try again.'));
-      })
-      .finally(() => { if (!controller.signal.aborted) setDetailLoading(false); });
-    return () => controller.abort();
-  }, [detailId, detailRevision]);
-
   useEffect(() => {
     const controller = new AbortController();
     setLoading(true);
@@ -62,15 +42,6 @@ export default function Departments() {
     return () => controller.abort();
   }, [revision, page, search]);
 
-  function resetForm() {
-    setEditing(null); setName(''); setDescription('');
-  }
-
-  function edit(department: ApiDepartment) {
-    setEditing(department); setName(department.name); setDescription(department.description || '');
-    setError(''); setMessage(''); nameInput.current?.focus();
-  }
-
   async function save(event: FormEvent) {
     event.preventDefault();
     if (pending) return;
@@ -79,13 +50,11 @@ export default function Departments() {
     setPending(true);
     try {
       const input = { name: name.trim(), description: description.trim() || null };
-      if (editing) await updateDepartment(editing.id, input);
-      else await createDepartment(input);
-      setMessage(editing ? 'Department updated.' : 'Department created.');
-      resetForm();
-      if (!editing) setPage(1);
+      await createDepartment(input);
+      setMessage('Department created.');
+      setName(''); setDescription('');
+      setPage(1);
       setRevision(value => value + 1);
-      setDetailRevision(value => value + 1);
     } catch (cause) { setError(getApiErrorMessage(cause, 'Could not save the department. Please try again.')); }
     finally { setPending(false); }
   }
@@ -111,11 +80,8 @@ export default function Departments() {
       await deactivateDepartment(department.id);
       setDepartments(current => current.filter(item => item.id !== department.id));
       if (departments.length === 1 && page > 1) setPage(value => value - 1);
-      if (editing?.id === department.id) resetForm();
-      if (detailId === department.id) { setDetailId(null); setDetail(null); }
       setMessage('Department deactivated.');
       setRevision(value => value + 1);
-      setDetailRevision(value => value + 1);
     } catch (cause) { setError(getApiErrorMessage(cause, 'Could not deactivate the department. Please try again.')); }
     finally { setPending(false); }
   }
@@ -124,30 +90,13 @@ export default function Departments() {
     <SectionHeader title="Departments" description="Manage department names and descriptions." />
     {message && <p role="status" className="mb-5 rounded-xl bg-emerald-50 p-4 text-sm text-emerald-800">{t(message)}</p>}
     {error && <p role="alert" className="mb-5 rounded-xl bg-red-50 p-4 text-sm text-red-800">{t(error)}</p>}
-    {detailId !== null && <Card className="mb-5 p-5 sm:p-6">
-      <section aria-labelledby="department-detail-title" aria-busy={detailLoading}>
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <h2 id="department-detail-title" ref={detailHeading} tabIndex={-1} className="text-lg font-bold text-slate-900 outline-none">{t('Department details')}</h2>
-          <Button variant="secondary" onClick={() => { setDetailId(null); setDetail(null); }}>{t('Close department details')}</Button>
-        </div>
-        {detailLoading ? <p role="status" className="py-5 text-sm text-slate-600">{t('Loading department details...')}</p>
-          : detailError ? <div role="alert" className="mt-4 rounded-xl bg-red-50 p-4 text-sm text-red-800"><p>{t(detailError)}</p><Button className="mt-3" variant="secondary" onClick={() => setDetailRevision(value => value + 1)}>{t('Retry departments')}</Button></div>
-          : detail && <dl className="mt-4 grid gap-x-6 gap-y-4 sm:grid-cols-2">
-            <div><dt className="text-sm text-slate-500">{t('Department code')}</dt><dd className="mt-1 break-words font-medium">{detail.code || '—'}</dd></div>
-            <div><dt className="text-sm text-slate-500">{t('Department name')}</dt><dd className="mt-1 break-words font-medium">{detail.name}</dd></div>
-            <div><dt className="text-sm text-slate-500">{t('Department status')}</dt><dd className="mt-1 font-medium">{t(detail.status === 'INACTIVE' ? 'Department inactive' : 'Department active')}</dd></div>
-            <div className="min-w-0"><dt className="text-sm text-slate-500">{t('Department description')}</dt><dd className="mt-1 whitespace-pre-wrap break-words">{detail.description || '—'}</dd></div>
-          </dl>}
-      </section>
-    </Card>}
     <Card className="mb-5 p-5 sm:p-6">
-      <h2 className="text-lg font-bold text-slate-900">{t(editing ? 'Edit department' : 'Add department')}</h2>
+      <h2 className="text-lg font-bold text-slate-900">{t('Add department')}</h2>
       <form onSubmit={save} className="mt-4 grid gap-4 lg:grid-cols-2">
-        <label className="text-sm font-medium text-slate-700">{t('Department name')}<input ref={nameInput} required maxLength={150} value={name} disabled={pending} onChange={event => setName(event.target.value)} className={control} /></label>
-        <label className="text-sm font-medium text-slate-700">{t('Department description')}<textarea rows={2} value={description} disabled={pending} onChange={event => setDescription(event.target.value)} className={control} /></label>
+        <label className="text-sm font-medium text-slate-700">{t('Department name')}<input ref={nameInput} required maxLength={150} value={name} disabled={pending} onChange={event => setName(event.target.value)} className={`${control} h-12`} /></label>
+        <label className="text-sm font-medium text-slate-700">{t('Department description')}<textarea rows={1} value={description} disabled={pending} onChange={event => setDescription(event.target.value)} className={`${control} h-12 resize-none overflow-y-auto`} /></label>
         <div className="flex flex-wrap gap-2 lg:col-span-2">
-          <Button type="submit" disabled={pending}>{t(pending ? 'Saving department...' : editing ? 'Save department' : 'Add department')}</Button>
-          {editing && <Button type="button" variant="secondary" disabled={pending} onClick={resetForm}>{t('Cancel')}</Button>}
+          <Button type="submit" disabled={pending}>{t(pending ? 'Saving department...' : 'Add department')}</Button>
         </div>
       </form>
     </Card>
@@ -169,8 +118,8 @@ export default function Departments() {
             <th scope="row" className="max-w-64 break-words p-3 font-medium text-slate-800">{department.name}</th>
             <td className="p-3">{t(department.status === 'INACTIVE' ? 'Department inactive' : 'Department active')}</td>
             <td className="w-px p-3"><div className="flex flex-nowrap gap-2">
-              <Button size="sm" variant="secondary" disabled={pending || loading} onClick={() => { setDetail(null); setDetailId(department.id); setDetailRevision(value => value + 1); }} aria-label={t('View department {name}', { name: department.name })}>{t('View details')}</Button>
-              <Button size="sm" variant="secondary" disabled={pending || loading} onClick={() => edit(department)} aria-label={t('Edit department {name}', { name: department.name })}>{t('Edit')}</Button>
+              <Button size="sm" variant="secondary" disabled={pending || loading} onClick={() => navigate(`/departments/${department.id}`)} aria-label={t('View department {name}', { name: department.name })}>{t('View details')}</Button>
+              <Button size="sm" variant="secondary" disabled={pending || loading} onClick={() => navigate(`/departments/${department.id}/edit`)} aria-label={t('Edit department {name}', { name: department.name })}>{t('Edit')}</Button>
               <Button size="sm" variant="secondary" disabled={pending || loading || department.status === 'INACTIVE'} onClick={() => void deactivate(department)} aria-label={t('Deactivate department {name}', { name: department.name })}>{t('Deactivate department')}</Button>
             </div></td>
           </tr>)}</tbody>

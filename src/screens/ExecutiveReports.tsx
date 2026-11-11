@@ -1,3 +1,4 @@
+import { useLanguage } from '../context/LanguageContext';
 import { useAutoDismissState } from '../hooks/useAutoDismissState';
 import { AppShell } from '../components/AppShell';
 import { Card, SectionHeader, Button, AIAdvisoryBanner } from '../components/ui';
@@ -37,6 +38,7 @@ function futureDisplayDate(days: number) {
 }
 
 export default function ExecutiveReports() {
+  const { t } = useLanguage();
   const [preview, setPreview] = useState<(typeof reports)[number] | null>(null);
   const [generated, setGenerated] = useState(reports);
   const [showSchedule, setShowSchedule] = useState(false);
@@ -224,7 +226,7 @@ export default function ExecutiveReports() {
                 <input value={scheduleForm.recipients} onChange={e => { setScheduleForm({ ...scheduleForm, recipients: e.target.value }); setScheduleError(''); }} type="text" placeholder="hr-leads@eris.com, executives@eris.com" className="h-10 w-full rounded border border-slate-300 px-3 text-[13px] text-slate-700 focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-100" />
                 <div className="mt-1 text-[11px] text-slate-400">Separate multiple recipients with commas.</div>
               </div>
-              {scheduleError && <p role="alert" className="text-xs font-semibold text-red-600">{scheduleError}</p>}
+              {scheduleError && <p role="alert" className="text-xs font-semibold text-red-600">{t(scheduleError)}</p>}
             </div>
             <div className="flex justify-end gap-2 border-t border-slate-200 px-5 py-4">
               <Button variant="secondary" onClick={() => setShowSchedule(false)}>Cancel</Button>

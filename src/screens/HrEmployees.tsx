@@ -36,7 +36,7 @@ const toForm = (value: EmployeeProfile): Form => ({
 });
 
 export default function HrEmployees() {
-  const { language } = useLanguage();
+  const { t, language } = useLanguage();
   const text = (vi: string, en: string) => language === 'vi' ? vi : en;
   const navigate = useNavigate(), location = useLocation(), { id } = useParams();
   const creating = location.pathname === '/employees/new', routeEditing = location.pathname.endsWith('/edit');
@@ -243,7 +243,7 @@ export default function HrEmployees() {
       min={type === 'number' ? '0.01' : undefined} step={type === 'number' ? '0.01' : undefined}
       aria-invalid={key === 'email' && Boolean(emailError)} aria-describedby={key === 'email' && emailError ? 'employee-email-error' : undefined}
       onChange={event => { if (key === 'email') setEmailError(''); setForm(value => ({ ...value, [key]: event.target.value })); }} />
-    {key === 'email' && emailError && <span id="employee-email-error" role="alert" className="mt-1.5 block text-xs font-medium text-red-600">{emailError}</span>}
+    {key === 'email' && emailError && <span id="employee-email-error" role="alert" className="mt-1.5 block text-xs font-medium text-red-600">{t(emailError)}</span>}
   </label>;
   const catalogSelect = (label: string, value: string, change: (id: string) => void, options: Array<{ id: number; name: string }>, required = false, disabled = false) =>
     <SearchableSelect key={label + revision + (id || '')} label={label} value={value} options={options} onChange={change} required={required} disabled={pending || disabled}
@@ -306,9 +306,9 @@ export default function HrEmployees() {
       <div className="flex gap-3">{!creating && <Button onClick={() => navigate('/employees/new')}>{text('Thêm nhân viên', 'Add employee')}</Button>}
         {(creating || showingRecord) && <Button variant="secondary" onClick={() => navigate('/employees')}>{text('Về danh sách', 'Back to list')}</Button>}</div>
     </div></Card>
-    {message && <p role="status" className="mb-5 rounded-xl bg-emerald-50 p-4 text-emerald-800">{message}</p>}
-    {catalogError && <p role="alert" className="mb-5 rounded-xl bg-red-50 p-4">{catalogError}<Button variant="secondary" onClick={() => setRevision(v => v + 1)}>{text('Thử lại', 'Retry')}</Button></p>}
-    {error && <p role="alert" className="mb-5 rounded-xl bg-red-50 p-4 text-red-800">{error}<Button variant="secondary" onClick={() => setRevision(v => v + 1)}>{text('Thử lại', 'Retry')}</Button></p>}
+    {message && <p role="status" className="mb-5 rounded-xl bg-emerald-50 p-4 text-emerald-800">{t(message)}</p>}
+    {catalogError && <p role="alert" className="mb-5 rounded-xl bg-red-50 p-4">{t(catalogError)}<Button variant="secondary" onClick={() => setRevision(v => v + 1)}>{text('Thử lại', 'Retry')}</Button></p>}
+    {error && <p role="alert" className="mb-5 rounded-xl bg-red-50 p-4 text-red-800">{t(error)}<Button variant="secondary" onClick={() => setRevision(v => v + 1)}>{text('Thử lại', 'Retry')}</Button></p>}
     {loading ? <Card className="p-6"><p role="status">{text('Đang tải nhân viên...', 'Loading employees...')}</p></Card>
       : creating ? <MotionConfig reducedMotion="user"><motion.form onSubmit={save} initial="hidden" animate="visible" variants={createContainerMotion} className="grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_300px]">
         <fieldset disabled={pending} className="min-w-0 space-y-5 border-0 p-0">

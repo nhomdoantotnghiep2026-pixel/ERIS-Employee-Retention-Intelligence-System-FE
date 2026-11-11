@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState, type Dispatch, type SetStateAction } 
  * State for short-lived page feedback. The timer is replaced whenever the
  * message changes and is cleaned up when the owning component unmounts.
  */
-export function useAutoDismissState(delayMs = 5500): [string, Dispatch<SetStateAction<string>>] {
+export function useAutoDismissState(delayMs = 7000): [string, Dispatch<SetStateAction<string>>] {
   const [state, setState] = useState({ value: '', revision: 0 });
   const setValue = useCallback<Dispatch<SetStateAction<string>>>((next) => {
     setState(current => ({ value: typeof next === 'function' ? next(current.value) : next, revision: current.revision + 1 }));
@@ -20,7 +20,7 @@ export function useAutoDismissState(delayMs = 5500): [string, Dispatch<SetStateA
 }
 
 /** Keeps success/information and error feedback mutually exclusive. */
-export function useAutoDismissFeedback(errorDelayMs = 5500, messageDelayMs = 5500) {
+export function useAutoDismissFeedback(errorDelayMs = 7000, messageDelayMs = 7000) {
   const [error, setErrorValue] = useAutoDismissState(errorDelayMs);
   const [message, setMessageValue] = useAutoDismissState(messageDelayMs);
   const setError = useCallback((value: string) => {
