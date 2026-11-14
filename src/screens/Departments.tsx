@@ -118,9 +118,9 @@ export default function Departments() {
             <th scope="row" className="max-w-64 break-words p-3 font-medium text-slate-800">{department.name}</th>
             <td className="p-3">{t(department.status === 'INACTIVE' ? 'Department inactive' : 'Department active')}</td>
             <td className="w-px p-3"><div className="flex flex-nowrap gap-2">
-              <Button size="sm" variant="secondary" disabled={pending || loading} onClick={() => navigate(`/departments/${department.id}`)} aria-label={t('View department {name}', { name: department.name })}>{t('View details')}</Button>
-              <Button size="sm" variant="secondary" disabled={pending || loading} onClick={() => navigate(`/departments/${department.id}/edit`)} aria-label={t('Edit department {name}', { name: department.name })}>{t('Edit')}</Button>
-              <Button size="sm" variant="secondary" disabled={pending || loading || department.status === 'INACTIVE'} onClick={() => void deactivate(department)} aria-label={t('Deactivate department {name}', { name: department.name })}>{t('Deactivate department')}</Button>
+              <Button size="sm" variant="info" disabled={pending || loading} onClick={() => navigate(`/departments/${department.id}`)} aria-label={t('View department {name}', { name: department.name })}>{t('View details')}</Button>
+              <Button size="sm" variant="warning" disabled={pending || loading} onClick={() => navigate(`/departments/${department.id}/edit`)} aria-label={t('Edit department {name}', { name: department.name })}>{t('Edit')}</Button>
+              <Button size="sm" variant="danger" disabled={pending || loading || department.status === 'INACTIVE'} onClick={() => void deactivate(department)} aria-label={t('Deactivate department {name}', { name: department.name })}>{t('Deactivate department')}</Button>
             </div></td>
           </tr>)}</tbody>
         </table></div>}

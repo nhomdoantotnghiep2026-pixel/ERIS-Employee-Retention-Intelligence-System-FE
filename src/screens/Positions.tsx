@@ -152,9 +152,9 @@ export default function Positions() {
             <td className="p-3">{t(POSITION_LEVELS.find(level => level.value === Number(position.jobLevel))?.label || 'Unknown level')}</td>
             <td className="p-3">{t(position.status === 'INACTIVE' ? 'Position inactive' : 'Position active')}</td>
             <td className="w-px p-3"><div className="flex flex-nowrap gap-2">
-              <Button size="sm" variant="secondary" disabled={pending || loading} onClick={() => navigate(`/positions/${position.id}`)} aria-label={t('View position {name}', { name: position.name })}>{t('View details')}</Button>
-              <Button size="sm" variant="secondary" disabled={pending || loading} onClick={() => navigate(`/positions/${position.id}/edit`)} aria-label={t('Edit position {name}', { name: position.name })}>{t('Edit')}</Button>
-              <Button size="sm" variant="secondary" disabled={pending || loading || position.status === 'INACTIVE'} onClick={() => void deactivate(position)} aria-label={t('Deactivate position {name}', { name: position.name })}>{t('Deactivate position')}</Button>
+              <Button size="sm" variant="info" disabled={pending || loading} onClick={() => navigate(`/positions/${position.id}`)} aria-label={t('View position {name}', { name: position.name })}>{t('View details')}</Button>
+              <Button size="sm" variant="warning" disabled={pending || loading} onClick={() => navigate(`/positions/${position.id}/edit`)} aria-label={t('Edit position {name}', { name: position.name })}>{t('Edit')}</Button>
+              <Button size="sm" variant="danger" disabled={pending || loading || position.status === 'INACTIVE'} onClick={() => void deactivate(position)} aria-label={t('Deactivate position {name}', { name: position.name })}>{t('Deactivate position')}</Button>
             </div></td>
           </tr>)}</tbody>
         </table></div>}

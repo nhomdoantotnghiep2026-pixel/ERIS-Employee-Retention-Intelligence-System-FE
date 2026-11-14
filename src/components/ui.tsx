@@ -56,7 +56,7 @@ export function Avatar({ initials, size = 'sm', color }: { initials: string; siz
 
 // Buttons — enterprise compact
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: 'primary' | 'secondary' | 'ghost' | 'danger' | 'link';
+  variant?: 'primary' | 'secondary' | 'ghost' | 'info' | 'warning' | 'success' | 'danger' | 'link';
   size?: 'sm' | 'md';
   children: ReactNode;
 }
@@ -68,6 +68,9 @@ export function Button({ variant = 'primary', size = 'md', children, className =
     primary: 'bg-[#F97316] text-white shadow-sm shadow-orange-600/20 hover:bg-[#EA580C] hover:shadow-md',
     secondary: 'bg-white text-slate-700 border border-slate-300 hover:border-orange-300 hover:bg-orange-50 hover:text-orange-700',
     ghost: 'text-slate-500 hover:bg-slate-100 hover:text-slate-700',
+    info: 'border border-blue-200 bg-blue-50 text-blue-800 enabled:hover:border-blue-300 enabled:hover:bg-blue-100 focus-visible:outline-blue-600',
+    warning: 'border border-amber-300 bg-amber-50 text-amber-900 enabled:hover:border-amber-400 enabled:hover:bg-amber-100 focus-visible:outline-amber-600',
+    success: 'border border-emerald-200 bg-emerald-50 text-emerald-800 enabled:hover:border-emerald-300 enabled:hover:bg-emerald-100 focus-visible:outline-emerald-600',
     danger: 'bg-red-600 text-white hover:bg-red-700',
     link: 'text-[#F97316] hover:underline p-0 h-auto',
   };

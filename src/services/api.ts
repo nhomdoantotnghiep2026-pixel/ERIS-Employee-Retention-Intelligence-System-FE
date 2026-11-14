@@ -625,6 +625,15 @@ export function getApiErrorMessage(error: unknown, fallback: string) {
   if (statusMessages[error.status]) return statusMessages[error.status];
 
   if (error.status >= 500) {
+    // Preserve only known AI diagnostics; arbitrary server details stay hidden.
+    const aiDiagnostics = [
+      'Chưa cấu hình AI_SERVICE_KEY (ít nhất 24 ký tự).',
+      'AI service chưa nạp model hoặc chưa sẵn sàng.',
+      'Model đang chạy không khớp phiên bản được tích hợp.',
+      'AI service từ chối yêu cầu; kiểm tra key và hợp đồng dữ liệu.',
+      'Không kết nối được AI service hoặc đã quá thời gian chờ.',
+    ];
+    if (aiDiagnostics.includes(error.message)) return error.message;
     const serverMessages: Record<number, string> = {
       500: 'Hệ thống đang gặp sự cố khi xử lý yêu cầu. Vui lòng thử lại sau.',
       502: 'Máy chủ đang tạm thời không phản hồi. Vui lòng thử lại sau ít phút.',
