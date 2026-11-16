@@ -21,11 +21,13 @@ export default function EmployeeSurveyHistory({ account, revision }: { account: 
       const ids = completedSurveyIds(account);
       let hasFailure = false;
       for (let offset = 0; offset < ids.length && !controller.signal.aborted; offset += 5) {
-        const responses = await Promise.allSettled(ids.slice(offset, offset + 5).map(id => getMySurveyResponse(id, controller.signal)));
-        for (const result of responses) {
+        const batchIds = ids.slice(offset, offset + 5);
+        const responses = await Promise.allSettled(batchIds.map(id => getMySurveyResponse(id, controller.signal)));
+        for (const [index, result] of responses.entries()) {
           if (result.status === 'rejected') { hasFailure = true; continue; }
-          const { survey, response } = result.value.data;
-          if (response.status === 'SUBMITTED') confirmed.push({ id: survey.id, title: survey.title, submittedAt: response.submittedAt });
+          const response = result.value.data;
+          const id = batchIds[index];
+          if (response.status === 'SUBMITTED') confirmed.push({ id, title: `Khảo sát #${id}`, submittedAt: response.submittedAt });
         }
       }
       if (!controller.signal.aborted) {

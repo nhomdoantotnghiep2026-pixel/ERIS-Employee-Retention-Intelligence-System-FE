@@ -219,20 +219,33 @@ export interface SurveySummary {
   createdByName?: string | null;
   questionCount?: number;
   responseCount?: number;
+  cycleNumber?: 1 | 2 | 3 | null;
 }
+
+export type SurveyQuestionType = 'TEXT' | 'SINGLE_CHOICE' | 'MULTIPLE_CHOICE' | 'RATING';
+export type SurveyChoiceOption = { code: string; label: string };
+export type SurveyAnswerConfig =
+  | { min: 1; max: 5; labels: string[]; templateCode?: string }
+  | { options: SurveyChoiceOption[] }
+  | null;
 
 export interface SurveyQuestion {
   id: number;
+  surveyId?: number;
   questionText: string;
-  dimensionCode: string;
-  required: boolean;
+  categoryId: number;
+  questionType: SurveyQuestionType;
+  answerConfig: SurveyAnswerConfig;
   displayOrder: number;
+  isRequired: boolean;
+  isSatisfactionCore: boolean;
 }
 
 export interface AvailableSurvey extends SurveySummary {
   questionCount: number;
-  responseStatus: 'NOT_STARTED' | 'IN_PROGRESS';
 }
+
+export type SurveyAnswerValue = number | string | { selectedCodes: string[] };
 
 export interface SurveyResponse {
   responseId: number;
@@ -243,43 +256,58 @@ export interface SurveyResponse {
 
 export interface SurveyParticipantResponse {
   responseId: number;
-  submittedAt: string;
+  employeeId: number;
+  submittedAt: string | null;
+  status: 'SUBMITTED' | 'NOT_SUBMITTED';
   satisfactionScore?: number | null;
-  employee: {
-    id: number;
-    employeeCode: string;
-    fullName: string;
-  };
+  employeeCode: string;
+  fullName: string;
   answers: Array<{
     questionId: number;
-    questionText: string;
-    dimensionCode?: string | null;
-    displayOrder?: number;
-    score: number | null;
+    answerValue: SurveyAnswerValue;
     comment: string | null;
   }>;
 }
 
-export interface SurveyParticipantResults {
-  survey: SurveySummary;
-  responseCount: number;
-  participants: SurveyParticipantResponse[];
+export interface SurveyCategory {
+  id: number;
+  name: string;
+  description: string | null;
+  cycleNumber: 1 | 2 | 3 | null;
+  defaultQuestions: Array<{ templateCode: string; questionText: string; categoryId: number }>;
 }
 
 export interface SurveyResults {
-  id: number;
-  title: string;
-  status: SurveySummary['status'];
+  survey: SurveySummary;
+  invitedCount: number;
   responseCount: number;
+  completionRate: number | null;
+  categoryScores: Array<{
+    categoryId: number;
+    name: string;
+    description: string | null;
+    responseCount: number;
+    satisfactionScore: number | null;
+  }>;
   questions: Array<SurveyQuestion & {
     answers?: Array<{
-      score: number | null;
+      responseId: number;
+      questionId: number;
+      answerValue: SurveyAnswerValue;
       comment: string | null;
     }>;
     answerCount: number;
     averageScore: number | null;
-    scoreDistribution: Record<1 | 2 | 3 | 4 | 5, number>;
+    options: Array<SurveyChoiceOption & { count: number }>;
   }>;
+}
+
+export interface SurveyQuestionInput {
+  questionText: string;
+  categoryId: number;
+  questionType: SurveyQuestionType;
+  answerConfig: SurveyAnswerConfig;
+  displayOrder: number;
 }
 
 export function listSurveys(signal?: AbortSignal) {
@@ -290,12 +318,16 @@ export function listAvailableSurveys(signal?: AbortSignal) {
   return request<{ data: AvailableSurvey[] }>('/surveys/available', { signal, cache: 'no-store' });
 }
 
+export function listSurveyCategories(cycleNumber: 1 | 2 | 3, signal?: AbortSignal) {
+  return request<{ data: SurveyCategory[] }>(`/surveys/categories?cycleNumber=${cycleNumber}`, { signal, cache: 'no-store' });
+}
+
 export function getSurveyForEmployee(id: number, signal?: AbortSignal) {
   return request<{ data: SurveySummary & { questions: SurveyQuestion[] } }>(`/surveys/${id}`, { signal, cache: 'no-store' });
 }
 
-export function createSurvey(input: { title: string; description?: string | null; startDate: string; endDate: string }) {
-  return request<{ message: string; data: SurveySummary & { questions: SurveyQuestion[] } }>('/surveys', {
+export function createSurvey(input: { title: string; description?: string | null; cycleNumber: 1 | 2 | 3; categoryIds: number[]; questions: SurveyQuestionInput[]; startDate: string; endDate: string }) {
+  return request<{ data: SurveySummary }>('/surveys', {
     method: 'POST',
     body: JSON.stringify(input),
   });
@@ -314,7 +346,7 @@ export function closeSurvey(id: number) {
 }
 
 export function getSurveyResponse(id: number, responseId: number, signal?: AbortSignal) {
-  return request<{ data: { survey: SurveySummary; response: SurveyParticipantResponse & { satisfactionScore: number | null } } }>(`/surveys/${id}/responses/${responseId}`, { signal, cache: 'no-store' });
+  return request<{ data: SurveyParticipantResponse }>(`/surveys/${id}/responses/${responseId}`, { signal, cache: 'no-store' });
 }
 
 export function getSurveyResults(id: number, signal?: AbortSignal) {
@@ -322,32 +354,30 @@ export function getSurveyResults(id: number, signal?: AbortSignal) {
 }
 
 export function getSurveyParticipants(id: number, signal?: AbortSignal) {
-  return request<{ data: SurveyParticipantResults }>(`/surveys/${id}/responses`, { signal, cache: 'no-store' });
+  return request<{ data: SurveyParticipantResponse[] }>(`/surveys/${id}/responses`, { signal, cache: 'no-store' });
 }
 
 export function getMySurveyResponse(id: number, signal?: AbortSignal) {
-  return request<{
-    data: {
-      survey: { id: number; title: string };
-      response: { id: number; status: 'SUBMITTED' | 'DRAFT'; submittedAt: string | null; satisfactionScore: number | null };
-      answers: Array<{
-        questionId: number;
-        questionText: string;
-        dimensionCode: string;
-        required: boolean;
-        displayOrder: number;
-        score: number | null;
-        comment: string | null;
-      }>;
-    };
-  }>(`/surveys/${id}/my-response`, { signal, cache: 'no-store' });
+  return request<{ data: SurveyParticipantResponse }>(`/surveys/${id}/my-response`, { signal, cache: 'no-store' });
 }
 
-export function submitSurveyResponse(id: number, answers: Array<{ questionId: number; score: number; comment?: string | null }>) {
-  return request<{ message: string; data: SurveyResponse }>(`/surveys/${id}/responses`, {
+export function submitSurveyResponse(id: number, answers: Array<{ questionId: number; answerValue: SurveyAnswerValue; comment?: string | null }>) {
+  return request<{ data: SurveyResponse }>(`/surveys/${id}/responses`, {
     method: 'POST',
     body: JSON.stringify({ answers }),
   });
+}
+
+export function addSurveyQuestion(id: number, input: SurveyQuestionInput) {
+  return request<{ data: SurveyQuestion }>(`/surveys/${id}/questions`, { method: 'POST', body: JSON.stringify(input) });
+}
+
+export function updateSurveyQuestion(id: number, questionId: number, input: SurveyQuestionInput) {
+  return request<{ data: SurveyQuestion }>(`/surveys/${id}/questions/${questionId}`, { method: 'PATCH', body: JSON.stringify(input) });
+}
+
+export function deleteSurveyQuestion(id: number, questionId: number) {
+  return request<{ data: null }>(`/surveys/${id}/questions/${questionId}`, { method: 'DELETE' });
 }
 
 export function listEmployeeEducation(employeeId: number, signal?: AbortSignal) {
