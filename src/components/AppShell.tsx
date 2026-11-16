@@ -39,7 +39,7 @@ const NAV_BY_ROLE: Record<UserRole, NavGroup[]> = {
         { label: 'Attendance History', icon: Activity, to: '/attendance' },
         { label: 'Holidays', icon: CalendarDays, to: '/holidays' },
         { label: 'Work schedules', icon: ClipboardList, to: '/work-schedules' },
-        { label: 'Employee Requests', icon: ClipboardList, to: '/employee-requests' },
+        { label: 'Leave records', icon: ClipboardList, to: '/employee-requests' },
         { label: 'Company Location', icon: MapPinned, to: '/company-location' },
         { label: 'Education & Job History', icon: History, to: '/employee-history' },
       ],
@@ -74,7 +74,7 @@ const NAV_BY_ROLE: Record<UserRole, NavGroup[]> = {
       group: 'Self Service',
       items: [
         { label: 'My Attendance', icon: Activity, to: '/my-attendance' },
-        { label: 'My Requests', icon: ClipboardList, to: '/my-requests' },
+        { label: 'My leave records', icon: ClipboardList, to: '/my-requests' },
         { label: 'My Surveys', icon: HeartPulse, to: '/my-surveys' },
       ],
     },
@@ -269,7 +269,7 @@ function Sidebar({ onNavigate, collapsed, onToggle }: { onNavigate?: () => void;
               </div>}
             </div> : item.to === '/work-schedules' ? <div key={item.to}>
               <button type="button" aria-expanded={schedulesOpen} onClick={() => setSchedulesOpen(open => !open)} className="ml-5 flex min-h-10 w-[calc(100%-1.25rem)] items-center gap-3 rounded-full px-4 text-left text-[15px] text-slate-500 hover:bg-orange-50 hover:text-orange-700"><ClipboardList size={17} className="shrink-0"/><span className="min-w-0 flex-1 truncate">{t(item.label)}</span><ChevronDown size={16} className={schedulesOpen ? 'rotate-180' : ''}/></button>
-              {schedulesOpen && <div className="ml-5"><SidebarLink to="/work-schedules" icon={CalendarDays} label="Create a work schedule" nested onNavigate={onNavigate}/><SidebarLink to="/work-schedules/assign" icon={Users} label="Assign schedules and view employee history" nested onNavigate={onNavigate}/><SidebarLink to="/work-schedules/list" icon={ClipboardList} label="Schedules" nested onNavigate={onNavigate}/></div>}
+              {schedulesOpen && <div className="ml-5"><SidebarLink to="/work-schedules" icon={CalendarDays} label="Create a work schedule" nested onNavigate={onNavigate}/><SidebarLink to="/work-schedules/assign" icon={Users} label="Assign current schedule" nested onNavigate={onNavigate}/><SidebarLink to="/work-schedules/list" icon={ClipboardList} label="Schedules" nested onNavigate={onNavigate}/></div>}
             </div> : <SidebarLink key={item.to} {...item} nested onNavigate={onNavigate} />)}</div></div>
           </div>;
         })}

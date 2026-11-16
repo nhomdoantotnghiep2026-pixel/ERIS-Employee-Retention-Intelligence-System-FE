@@ -57,15 +57,6 @@ export interface AttendanceResult {
   attendance?: AttendanceRecord;
 }
 
-export interface AttendanceHistoryRecord extends AttendanceRecord {
-  id: number;
-  employeeId: number;
-  employeeCode: string;
-  fullName: string;
-  createdAt: string;
-  updatedAt: string;
-}
-
 export function getAttendanceConfig(signal?: AbortSignal) {
   return request<{
     companyLocation: { latitude: number; longitude: number };
@@ -114,21 +105,6 @@ export function getTodayAttendance(signal?: AbortSignal) {
   return request<TodayAttendance>('/v1/attendance/today', { signal, cache: 'no-store' });
 }
 
-export function listAttendanceHistory(signal?: AbortSignal) {
-  return request<{ data: AttendanceHistoryRecord[] }>('/v1/attendance', { signal, cache: 'no-store' });
-}
-
-export function getAttendanceRecord(id: number, signal?: AbortSignal) {
-  return request<{ data: AttendanceHistoryRecord }>(`/v1/attendance/${id}`, { signal, cache: 'no-store' });
-}
-
-export function recordAttendance(action: 'check-in' | 'check-out', location: AttendanceLocation, signal?: AbortSignal) {
-  const { latitude, longitude, accuracyMeters } = location;
-  return request<AttendanceResult>(`/v1/attendance/${action}`, {
-    method: 'POST', body: JSON.stringify({ latitude, longitude, accuracyMeters }), signal,
-  });
-}
-
 export interface LeaveHistory { id: number; fromStatus: string | null; toStatus: string; note: string | null; actorName: string | null; actorRole: string | null; createdAt: string }
 export interface LeaveRequest { id: number; employeeId: number; employeeCode?: string; fullName?: string; fromDate: string; toDate: string; reason: string; status: string; effectiveStatus: string | null; histories: LeaveHistory[] }
 export interface AttendanceHoliday { id: number; name: string; start_date: string; end_date: string; status: string }
@@ -159,9 +135,6 @@ export function updateAttendanceHoliday(id: number, input: AttendanceHolidayInpu
 }
 export function deleteAttendanceHoliday(id: number) {
   return request<void>(`/v1/attendance/holidays/${id}`, { method: 'DELETE' });
-}
-export function closeAttendanceDay(date: string) {
-  return request<{date: string; created: number}>('/v1/attendance/close-day', { method: 'POST', body: JSON.stringify({date}) });
 }
 
 export function getBackendHealth(signal?: AbortSignal) {
@@ -663,7 +636,7 @@ function userWithRoleId(user: ApiUser): ApiUser {
   return { ...user, roleId: user.roleId ?? (typeof user.role === 'object' ? user.role?.id : undefined) };
 }
 
-async function request<T>(path: string, init?: RequestInit, baseOverride?: string): Promise<T> {
+export async function request<T>(path: string, init?: RequestInit, baseOverride?: string, responseType: 'json' | 'blob' = 'json'): Promise<T> {
   const adminSession = sessionStorage.getItem('eris-api-backend') === 'admin';
   const adminResource = /^\/(users(?:\/|\?|$)|roles(?:\/|\?|$)|audit-logs(?:\/|\?|$)|auth\/user_register$)/.test(path);
   if (!baseOverride && ADMIN_API_BASE_URL && adminResource && !adminSession) {
@@ -687,6 +660,7 @@ async function request<T>(path: string, init?: RequestInit, baseOverride?: strin
     throw new ApiError('Không thể kết nối đến máy chủ. Vui lòng kiểm tra kết nối mạng và thử lại.', 0, 'NETWORK_ERROR');
   }
 
+  if (response.ok && responseType === 'blob') return await response.blob() as T;
   const body = await response.json().catch(() => null) as { message?: string; code?: string; error?: { code?: string; message?: string } } | null;
   if (!response.ok) {
     if (response.status === 401 && token && path !== '/auth/logout') notifySessionExpired(token);
@@ -1062,14 +1036,13 @@ export function importEmployees(file: File) {
   });
 }
 
-export interface WorkSchedule { id: number; name: string; start_time: string; end_time: string; break_start: string; break_end: string; working_days: number[]; status: 'ACTIVE' | 'INACTIVE'; is_default: boolean; pending_default?: { effective_from: string } | null }
-export type WorkScheduleInput = Omit<WorkSchedule, 'id' | 'is_default' | 'pending_default'>;
-export interface ScheduleAssignment extends WorkSchedule { employee_id: number; schedule_id: number; effective_from: string; effective_to: string | null }
+export interface WorkSchedule { id: number; name: string; shift_type: string | null; attendance_policy?: Record<string, number>; start_time: string; end_time: string; break_start: string | null; break_end: string | null; working_days: number[]; status: 'ACTIVE' | 'INACTIVE' }
+export type WorkScheduleInput = Omit<WorkSchedule, 'id'>;
+export interface ScheduleAssignment extends Omit<WorkSchedule, 'id'> { employee_id: number; work_schedule_id: number }
 export const listWorkSchedules = () => request<{data: WorkSchedule[]}>('/work-schedules', {cache: 'no-store'});
-export const createDefaultSchedule = (input: WorkScheduleInput) => request<{data: WorkSchedule & {effective_from?: string}}>('/work-schedules/default', {method: 'POST', body: JSON.stringify(input)});
-export const createIndividualSchedule = (input: WorkScheduleInput & {employee_id: number; effective_from: string; effective_to: string}) => request('/work-schedules/individual', {method: 'POST', body: JSON.stringify(input)});
+export const createWorkSchedule = (input: WorkScheduleInput) => request<{data: WorkSchedule}>('/work-schedules', {method: 'POST', body: JSON.stringify(input)});
+export const createIndividualSchedule = (input: WorkScheduleInput & {employee_id: number}) => request('/work-schedules/individual', {method: 'POST', body: JSON.stringify(input)});
 export const updateWorkSchedule = (id: number, input: Partial<WorkScheduleInput>) => request('/work-schedules/' + id, {method: 'PATCH', body: JSON.stringify(input)});
-export const setDefaultSchedule = (id: number) => request('/work-schedules/' + id + '/default', {method: 'PATCH'});
 export const listScheduleAssignments = (employeeId: number) => request<{data: ScheduleAssignment[]}>('/employees/' + employeeId + '/schedule-assignments', {cache: 'no-store'});
-export const assignWorkSchedule = (employeeId: number, input: {schedule_id: number; effective_from: string; effective_to: string | null}) => request('/employees/' + employeeId + '/schedule-assignments', {method: 'POST', body: JSON.stringify(input)});
+export const assignWorkSchedule = (employeeId: number, input: {work_schedule_id: number}) => request('/employees/' + employeeId + '/work-schedule', {method: 'PUT', body: JSON.stringify(input)});
 export const deleteScheduleAssignment = (employeeId: number, id: number) => request('/employees/' + employeeId + '/schedule-assignments/' + id, {method: 'DELETE'});

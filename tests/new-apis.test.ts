@@ -16,10 +16,10 @@ test('new backend APIs use the published routes and payload contracts', async ()
     value: { getItem: () => 'new-api-test-token' },
   });
   try {
-    const api = await server.ssrLoadModule('/src/services/api.ts');
+    const api = await server.ssrLoadModule('/src/services/api.ts'); const attendance = await server.ssrLoadModule('/src/services/attendance.ts');
     await api.getAttendanceConfig();
-    await api.listAttendanceHistory();
-    await api.getAttendanceRecord(19);
+    await attendance.fetchAttendance({});
+    await attendance.fetchAttendanceDetail(19);
     await api.listEmployeeEducation(7);
     await api.listOwnEducation();
     await api.listAllEmployeeEducation();

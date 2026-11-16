@@ -32,7 +32,7 @@ import AttendanceHistory from './screens/AttendanceHistory';
 import WorkSchedules from './screens/WorkSchedules';
 import EmployeeHistory from './screens/EmployeeHistory';
 import CompanyLocationScreen from './screens/CompanyLocation';
-import LeaveRequests from './screens/LeaveRequests';
+import LeaveRecords from './screens/LeaveRecords';
 import PolicyDemo from './screens/PolicyDemo';
 import AiAnalysis from './screens/AiAnalysis';
 import PortalHub from './screens/PortalHub';
@@ -135,7 +135,7 @@ export default function App() {
           <Route path="/work-schedules" element={<RoleGuard><WorkSchedules /></RoleGuard>} />
           <Route path="/work-schedules/assign" element={<RoleGuard><WorkSchedules /></RoleGuard>} />
           <Route path="/work-schedules/list" element={<RoleGuard><WorkSchedules /></RoleGuard>} />
-          <Route path="/employee-requests" element={<RoleGuard><LeaveRequests own={false} /></RoleGuard>} />
+          <Route path="/employee-requests" element={<RoleGuard><LeaveRecords /></RoleGuard>} />
           <Route path="/company-location" element={<RoleGuard><CompanyLocationScreen /></RoleGuard>} />
           <Route path="/employee-history" element={<RoleGuard><EmployeeHistory /></RoleGuard>} />
           <Route path="/employee-education" element={<RoleGuard><EmployeeHistory /></RoleGuard>} />
@@ -145,7 +145,7 @@ export default function App() {
           <Route path="/employee-dashboard" element={<RoleGuard><EmployeePortal mode="dashboard" /></RoleGuard>} />
           <Route path="/my-profile" element={<RoleGuard><ErdOwnProfile /></RoleGuard>} />
           <Route path="/my-attendance" element={<RoleGuard><EmployeePortal mode="attendance" /></RoleGuard>} />
-          <Route path="/my-requests" element={<RoleGuard><LeaveRequests own /></RoleGuard>} />
+          <Route path="/my-requests" element={<RoleGuard><LeaveRecords own /></RoleGuard>} />
           <Route path="/my-surveys" element={<RoleGuard><ErdSurveys /></RoleGuard>} />
 
           {/* Data / AI Analyst */}

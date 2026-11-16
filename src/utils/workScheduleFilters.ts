@@ -1,18 +1,9 @@
 import type { WorkSchedule } from '../services/api.ts';
-
-export type ScheduleKind = 'default' | 'pending' | 'individual';
-export type ScheduleFilters = { search: string; kind: 'all' | ScheduleKind; status: 'all' | 'ACTIVE' | 'INACTIVE'; day: number | null };
-export function scheduleKind(schedule: WorkSchedule): ScheduleKind {
-  return schedule.is_default ? 'default' : schedule.pending_default ? 'pending' : 'individual';
-}
+export type ScheduleFilters = { search: string; shiftType: string; status: 'all' | 'ACTIVE' | 'INACTIVE'; day: number | null };
 const normalize = (value: string) => value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/gi, 'd').toLowerCase().trim();
-
-export function filterWorkSchedules(schedules: WorkSchedule[], filters: ScheduleFilters, recentId: number | null = null): WorkSchedule[] {
-  const query = normalize(filters.search);
-  const priority = (schedule: WorkSchedule) => schedule.id === recentId ? 0 : scheduleKind(schedule) === 'default' ? 1 : scheduleKind(schedule) === 'pending' ? 2 : 3;
-  return schedules.filter(schedule => (!query || normalize(schedule.name).includes(query))
-    && (filters.kind === 'all' || scheduleKind(schedule) === filters.kind)
-    && (filters.status === 'all' || schedule.status === filters.status)
-    && (filters.day === null || schedule.working_days.includes(filters.day)))
-    .sort((a, b) => priority(a) - priority(b) || b.id - a.id);
+export function filterWorkSchedules(schedules: WorkSchedule[], filters: ScheduleFilters): WorkSchedule[] {
+  return schedules.filter(s => normalize(s.name).includes(normalize(filters.search))
+    && normalize(s.shift_type || '').includes(normalize(filters.shiftType))
+    && (filters.status === 'all' || s.status === filters.status)
+    && (filters.day === null || s.working_days.includes(filters.day))).sort((a, b) => b.id - a.id);
 }

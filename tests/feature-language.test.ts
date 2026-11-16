@@ -36,8 +36,8 @@ test('all routed feature pages use VI/EN consistently and preserve navigation an
    [0,'/portal','PortalHub'],[0,'/ai-analysis','AiAnalysis'],[0,'/policy-demo','PolicyDemo'],
    [0,'/holidays','AttendanceHistory',{holidaysPage:true}],
    [0,'/work-schedules','WorkSchedules'],[0,'/work-schedules/assign','WorkSchedules'],[0,'/work-schedules/list','WorkSchedules'],
-   [0,'/employee-requests','LeaveRequests',{own:false}],[0,'/company-location','CompanyLocation'],
-   [3,'/my-requests','LeaveRequests',{own:true}],[3,'/my-attendance','MyAttendance'],
+   [0,'/employee-requests','LeaveRecords',{own:false}],[0,'/company-location','CompanyLocation'],
+   [3,'/my-requests','LeaveRecords',{own:true}],[3,'/my-attendance','MyAttendance'],
    [0,'/departments','Departments'],[0,'/positions','Positions'],[0,'/employees','HrEmployees'],[0,'/employees/new','HrEmployees'],
    [0,'/org-overview','RiskWorkspace'],[0,'/attrition-risk','RiskWorkspace'],[0,'/executive-reports','RiskWorkspace',{reports:true}],
    [0,'/employees','Employees'],[0,'/employees/new','EmployeeDataManagement',{mode:'add'}],[0,'/employees/bulk-update','EmployeeDataManagement',{mode:'bulk'}],[0,'/employees/import','EmployeeImport'],
@@ -67,8 +67,8 @@ test('all routed feature pages use VI/EN consistently and preserve navigation an
    }
    if (name === 'WorkSchedules' && path === '/work-schedules') {
     for (const html of [english, vietnamese]) {
-     assert.ok(html.includes('value="default"'));
-     assert.ok(html.includes('value="individual"'));
+     assert.ok(html.includes('type="checkbox"'));
+     assert.ok(!html.includes('value="default"'));
      assert.ok(!html.includes('value="template"'), 'Schedule creation must not offer a template mode');
     }
    }
