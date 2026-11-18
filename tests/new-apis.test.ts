@@ -45,13 +45,14 @@ test('new backend APIs use the published routes and payload contracts', async ()
     await api.getSurveyForEmployee(9);
     await api.createSurvey({
       title: 'Engagement check-in', description: 'Quarterly survey',
+      categoryIds: [1], questions: [],
       startDate: '2026-10-01T00:00:00+07:00', endDate: '2026-10-31T23:59:59+07:00',
     });
     await api.publishSurvey(9);
     await api.getSurveyResults(9);
     await api.getSurveyParticipants(9);
     await api.getMySurveyResponse(9);
-    await api.submitSurveyResponse(9, [{ questionId: 2, score: 4, comment: 'Good' }]);
+    await api.submitSurveyResponse(9, [{ questionId: 2, answerValue: 4, comment: 'Good' }]);
 
     assert.deepEqual(calls.map(call => call.url), [
       '/api/v1/attendance/config',
@@ -78,7 +79,7 @@ test('new backend APIs use the published routes and payload contracts', async ()
       '/api/surveys',
       '/api/surveys/9/publish',
       '/api/surveys/9/results',
-      '/api/surveys/9/responses',
+      '/api/surveys/9/participants',
       '/api/surveys/9/my-response',
       '/api/surveys/9/responses',
     ]);
@@ -96,10 +97,11 @@ test('new backend APIs use the published routes and payload contracts', async ()
     assert.equal(calls[17].init?.method, 'DELETE');
     assert.deepEqual(JSON.parse(String(calls[21].init?.body)), {
       title: 'Engagement check-in', description: 'Quarterly survey',
+      categoryIds: [1], questions: [],
       startDate: '2026-10-01T00:00:00+07:00', endDate: '2026-10-31T23:59:59+07:00',
     });
     assert.deepEqual(JSON.parse(String(calls[26].init?.body)), {
-      answers: [{ questionId: 2, score: 4, comment: 'Good' }],
+      answers: [{ questionId: 2, answerValue: 4, comment: 'Good' }],
     });
     for (const call of calls) {
       assert.ok(new Headers(call.init?.headers).get('Authorization'));

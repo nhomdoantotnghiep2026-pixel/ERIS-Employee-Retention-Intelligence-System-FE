@@ -32,3 +32,13 @@ This is the canonical project structure. Start with task-relevant files below. O
 This project uses **Tailwind CSS v4** through the `@tailwindcss/vite` plugin configured in `vite.config.ts`. `src/index.css` imports Tailwind with `@import 'tailwindcss';`. Use Tailwind utility classes directly in JSX and put global CSS or Tailwind v4 theme customization in `src/index.css`. This scaffold does not need a Tailwind config file or PostCSS config.
 
 `src/main.tsx` imports `src/index.css`, so global font wiring belongs in `src/index.css`. Keep CSS `@import` statements first, then add any `@font-face` rules and font-family defaults there.
+
+## Mandatory UI/UX Design Rules
+
+Apply these rules to every future UI implementation and refactor:
+
+1. **Design style:** Use a Modern Minimalist SaaS visual language inspired by Linear, Vercel, and Notion.
+2. **Preferred component system:** Always prefer `shadcn/ui` components with Tailwind CSS. Do not hand-write raw CSS for buttons or form controls.
+3. **Form layout:** Never stretch create or edit forms across the full viewport width. Place them in a Dialog (modal), Sheet (side drawer), or constrain them to `max-w-2xl`.
+4. **Typography and color:** Use Inter or Plus Jakarta Sans. Descriptive text must use at least `text-slate-600`; do not use low-contrast light gray text. Use `rounded-md` consistently for buttons and inputs.
+5. **Minimal actions:** Show at most one or two primary actions on each card or data row. Move secondary actions into a Dropdown Menu (`...`).

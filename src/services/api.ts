@@ -219,7 +219,8 @@ export interface SurveySummary {
   createdByName?: string | null;
   questionCount?: number;
   responseCount?: number;
-  cycleNumber?: 1 | 2 | 3 | null;
+  invitedCount?: number;
+  participantCount?: number;
 }
 
 export type SurveyQuestionType = 'TEXT' | 'SINGLE_CHOICE' | 'MULTIPLE_CHOICE' | 'RATING';
@@ -254,7 +255,7 @@ export interface SurveyResponse {
   satisfactionScore: number;
 }
 
-export interface SurveyParticipantResponse {
+export interface SurveyParticipant {
   responseId: number;
   employeeId: number;
   submittedAt: string | null;
@@ -262,19 +263,40 @@ export interface SurveyParticipantResponse {
   satisfactionScore?: number | null;
   employeeCode: string;
   fullName: string;
+  surveyId?: number;
+  surveyTitle?: string;
+  answerCount?: number;
+}
+
+export interface SurveyParticipantResponse extends SurveyParticipant {
   answers: Array<{
     questionId: number;
     answerValue: SurveyAnswerValue;
     comment: string | null;
+    questionText?: string;
+    questionType?: SurveyQuestionType;
+    displayOrder?: number;
+    categoryId?: number;
+    categoryName?: string | null;
+    answerConfig?: SurveyAnswerConfig;
+    isSatisfactionCore?: boolean;
+    displayAnswer?: string | number | null;
+    selectedOptions?: SurveyChoiceOption[];
   }>;
+}
+
+export interface SurveyCatalogQuestion extends SurveyQuestionInput {
+  catalogQuestionId: number;
+  templateCode?: string;
+  bankCode?: string;
 }
 
 export interface SurveyCategory {
   id: number;
   name: string;
   description: string | null;
-  cycleNumber: 1 | 2 | 3 | null;
-  defaultQuestions: Array<{ templateCode: string; questionText: string; categoryId: number }>;
+  defaultQuestions: SurveyCatalogQuestion[];
+  questionBank: SurveyCatalogQuestion[];
 }
 
 export interface SurveyResults {
@@ -318,15 +340,15 @@ export function listAvailableSurveys(signal?: AbortSignal) {
   return request<{ data: AvailableSurvey[] }>('/surveys/available', { signal, cache: 'no-store' });
 }
 
-export function listSurveyCategories(cycleNumber: 1 | 2 | 3, signal?: AbortSignal) {
-  return request<{ data: SurveyCategory[] }>(`/surveys/categories?cycleNumber=${cycleNumber}`, { signal, cache: 'no-store' });
+export function listSurveyCategories(signal?: AbortSignal) {
+  return request<{ data: SurveyCategory[] }>('/surveys/categories', { signal, cache: 'no-store' });
 }
 
 export function getSurveyForEmployee(id: number, signal?: AbortSignal) {
   return request<{ data: SurveySummary & { questions: SurveyQuestion[] } }>(`/surveys/${id}`, { signal, cache: 'no-store' });
 }
 
-export function createSurvey(input: { title: string; description?: string | null; cycleNumber: 1 | 2 | 3; categoryIds: number[]; questions: SurveyQuestionInput[]; startDate: string; endDate: string }) {
+export function createSurvey(input: { title: string; description?: string | null; categoryIds: number[]; questions: SurveyQuestionInput[]; startDate: string; endDate: string }) {
   return request<{ data: SurveySummary }>('/surveys', {
     method: 'POST',
     body: JSON.stringify(input),
@@ -354,7 +376,11 @@ export function getSurveyResults(id: number, signal?: AbortSignal) {
 }
 
 export function getSurveyParticipants(id: number, signal?: AbortSignal) {
-  return request<{ data: SurveyParticipantResponse[] }>(`/surveys/${id}/responses`, { signal, cache: 'no-store' });
+  return request<{ data: SurveyParticipant[] }>(`/surveys/${id}/participants`, { signal, cache: 'no-store' });
+}
+
+export function getSurveyParticipant(id: number, employeeId: number, signal?: AbortSignal) {
+  return request<{ data: SurveyParticipantResponse }>(`/surveys/${id}/participants/${employeeId}`, { signal, cache: 'no-store' });
 }
 
 export function getMySurveyResponse(id: number, signal?: AbortSignal) {

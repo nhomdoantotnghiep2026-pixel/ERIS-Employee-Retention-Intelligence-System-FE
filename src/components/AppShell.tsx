@@ -5,12 +5,12 @@ import { NavLink, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, Users, BarChart3,
   Settings, ChevronDown, Bell, Search, HelpCircle, LogOut,
-  User, Shield, Activity, GitBranch, AlertTriangle,
-  BarChart2, ServerCog, Network, UserPlus, Target, MessageSquare,
+  User, Shield, Activity, GitBranch,
+  BarChart2, ServerCog, Network, MessageSquare,
   Workflow, Sliders, Table2, BrainCircuit,
-  TrendingUp, History, ScrollText, Zap, ClipboardList,
-  HeartPulse, Download, MonitorCheck, KeyRound, X, Leaf, ChevronLeft, Upload,
-  ClipboardCheck, MapPinned, CalendarDays
+  TrendingUp, History, ScrollText, ClipboardList,
+  HeartPulse, Download, MonitorCheck, KeyRound, X, Leaf, ChevronLeft,
+  CalendarDays
 } from 'lucide-react';
 import { useRole, type UserRole } from '../context/RoleContext';
 import { useLanguage } from '../context/LanguageContext';
@@ -32,27 +32,16 @@ const NAV_BY_ROLE: Record<UserRole, NavGroup[]> = {
       group: 'Workforce',
       items: [
         { label: 'Employee Directory', icon: Users, to: '/employees' },
-        { label: 'Add Employee', icon: UserPlus, to: '/employees/new' },
-        { label: 'Import Employees', icon: Upload, to: '/employees/import' },
         { label: 'Departments', icon: Network, to: '/departments' },
         { label: 'Positions', icon: ClipboardList, to: '/positions' },
         { label: 'Attendance History', icon: Activity, to: '/attendance' },
-        { label: 'Holidays', icon: CalendarDays, to: '/holidays' },
-        { label: 'Work schedules', icon: ClipboardList, to: '/work-schedules' },
         { label: 'Leave records', icon: ClipboardList, to: '/employee-requests' },
-        { label: 'Company Location', icon: MapPinned, to: '/company-location' },
-        { label: 'Education & Job History', icon: History, to: '/employee-history' },
       ],
     },
     {
       group: 'Retention',
       items: [
-        { label: 'Portal', icon: Zap, to: '/portal' },
-        { label: 'Attrition Risk Analytics', icon: AlertTriangle, to: '/attrition-risk' },
-        { label: 'Retention Interventions', icon: Target, to: '/interventions' },
-        { label: 'Policy demo', icon: Target, to: '/policy-demo' },
         { label: 'AI analysis', icon: BrainCircuit, to: '/ai-analysis' },
-        { label: 'Employee Outcomes', icon: ClipboardCheck, to: '/outcomes' },
       ],
     },
     {
@@ -90,7 +79,6 @@ const NAV_BY_ROLE: Record<UserRole, NavGroup[]> = {
       group: 'Data Management',
       items: [
         { label: 'Employee Directory', icon: Users, to: '/employees' },
-        { label: 'Add Employee', icon: UserPlus, to: '/employees/new' },
         { label: 'Schema & Mapping', icon: Table2, to: '/schema' },
       ],
     },
@@ -139,8 +127,7 @@ const NAV_BY_ROLE: Record<UserRole, NavGroup[]> = {
 function SidebarLink({ to, icon: Icon, label, onNavigate, collapsed = false, nested = false }: NavItem & { onNavigate?: () => void; collapsed?: boolean; nested?: boolean }) {
   const { pathname } = useLocation();
   const { t } = useLanguage();
-  const employeeOperation = ['/employees/new', '/employees/import'].some(route => pathname.startsWith(route));
-  const isActive = pathname === to || ((to === '/work-schedules' || to === '/positions' || to === '/departments' || to.startsWith('/departments/')) ? false : to === '/employees' ? pathname.startsWith('/employees/') && !employeeOperation : pathname.startsWith(to + '/'));
+  const isActive = pathname === to || ((to === '/work-schedules' || to === '/positions' || to === '/departments' || to.startsWith('/departments/')) ? false : pathname.startsWith(to + '/'));
   return (
     <NavLink
       to={to}
@@ -150,7 +137,7 @@ function SidebarLink({ to, icon: Icon, label, onNavigate, collapsed = false, nes
       className={`flex items-center transition-all duration-300 ${nested && !collapsed ? 'ml-5 min-h-10 gap-3 text-[15px]' : `min-h-12 text-[16px] ${collapsed ? 'mx-auto h-12 w-12 justify-center gap-0 rounded-2xl' : 'gap-4'}`} ${
         isActive
           ? `${collapsed ? 'bg-[#f47721] px-0 text-white shadow-[0_7px_18px_rgba(244,119,33,0.24)]' : nested ? 'rounded-full bg-orange-50 px-4 text-orange-700' : '-ml-3 rounded-r-full bg-[#f47721] pl-8 pr-4 text-white shadow-[0_7px_18px_rgba(244,119,33,0.22)]'} font-bold`
-          : `${collapsed ? 'px-0 text-[#71809d] hover:bg-orange-50 hover:text-orange-700' : nested ? 'rounded-full px-4' : 'rounded-r-full px-5'} font-normal text-[#64748b] hover:bg-orange-50 hover:text-orange-700`
+          : `${collapsed ? 'px-0 text-[#64748b] hover:bg-orange-50 hover:text-orange-700' : nested ? 'rounded-full px-4' : 'rounded-r-full px-5'} font-semibold text-[#475569] hover:bg-orange-50 hover:text-orange-700`
       }`}
     >
       <Icon size={nested && !collapsed ? 17 : 23} strokeWidth={1.8} className={`flex-shrink-0 ${isActive ? nested && !collapsed ? 'text-orange-600' : 'text-white' : 'text-[#71809d]'}`} />
@@ -163,9 +150,6 @@ function Sidebar({ onNavigate, collapsed, onToggle }: { onNavigate?: () => void;
   const { t } = useLanguage();
   const { pathname } = useLocation();
   const [navQuery, setNavQuery] = useState('');
-  const [positionsOpen, setPositionsOpen] = useState(() => pathname.startsWith('/positions'));
-  const [departmentsOpen, setDepartmentsOpen] = useState(() => pathname.startsWith('/departments'));
-  const departmentPath = pathname.match(/^\/departments\/([1-9]\d*)(?:\/edit)?$/)?.[1];
   const [schedulesOpen, setSchedulesOpen] = useState(() => pathname.startsWith('/work-schedules'));
   const [historyOpen, setHistoryOpen] = useState(() => ['/employee-history', '/employee-education', '/employee-job-history'].includes(pathname));
   const navigationRef = useRef<HTMLElement>(null);
@@ -246,29 +230,16 @@ function Sidebar({ onNavigate, collapsed, onToggle }: { onNavigate?: () => void;
           const GroupIcon = group.items[0].icon;
           const groupActive = activeGroup === group.group;
           return <div key={groupKey} className="py-0.5">
-            <button type="button" onClick={() => updateOpenGroups(openGroups.includes(groupKey) ? openGroups.filter(key => key !== groupKey) : [...openGroups, groupKey])} aria-expanded={expanded} className={`flex min-h-12 w-full items-center gap-4 rounded-r-full px-5 text-left text-[15px] transition-colors ${groupActive ? 'font-bold text-orange-700' : 'text-[#64748b] hover:bg-orange-50 hover:text-orange-700'}`}>
+            <button type="button" onClick={() => updateOpenGroups(openGroups.includes(groupKey) ? openGroups.filter(key => key !== groupKey) : [...openGroups, groupKey])} aria-expanded={expanded} className={`flex min-h-12 w-full items-center gap-4 rounded-r-full px-5 text-left text-[16px] font-semibold transition-colors ${groupActive ? 'font-bold text-orange-700' : 'text-[#475569] hover:bg-orange-50 hover:text-orange-700'}`}>
               <GroupIcon size={23} strokeWidth={1.8} className={groupActive ? 'text-orange-600' : 'text-[#71809d]'} />
               <span className="min-w-0 flex-1 truncate">{t(group.group)}</span>
               <ChevronDown size={16} className={`transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`} />
             </button>
             <div aria-hidden={!expanded} inert={!expanded} className={`grid transition-[grid-template-rows,opacity] duration-200 ${expanded ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'}`}><div className="min-h-0 overflow-hidden space-y-0.5 pb-1">{group.items.map(item => item.to === '/employee-history' ? <div key={item.to}>
-              <button type="button" aria-expanded={historyOpen} onClick={() => setHistoryOpen(open => !open)} className="ml-5 flex min-h-10 w-[calc(100%-1.25rem)] items-center gap-3 rounded-full px-4 text-left text-[15px] text-slate-500 hover:bg-orange-50 hover:text-orange-700"><History size={17} className="shrink-0"/><span className="min-w-0 flex-1 truncate">{t(item.label)}</span><ChevronDown size={16} className={historyOpen ? 'rotate-180' : ''}/></button>
+              <button type="button" aria-expanded={historyOpen} onClick={() => setHistoryOpen(open => !open)} className="ml-5 flex min-h-10 w-[calc(100%-1.25rem)] items-center gap-3 rounded-full px-4 text-left text-[15px] font-semibold text-slate-700 hover:bg-orange-50 hover:text-orange-700"><History size={17} className="shrink-0"/><span className="min-w-0 flex-1 truncate">{t(item.label)}</span><ChevronDown size={16} className={historyOpen ? 'rotate-180' : ''}/></button>
               {historyOpen && <div className="ml-5"><SidebarLink to="/employee-education" icon={ClipboardList} label="Education" nested onNavigate={onNavigate}/><SidebarLink to="/employee-job-history" icon={History} label="Job history" nested onNavigate={onNavigate}/></div>}
-            </div> : item.to === '/positions' ? <div key={item.to}>
-              <button type="button" aria-expanded={positionsOpen} onClick={() => setPositionsOpen(open => !open)} className="ml-5 flex min-h-10 w-[calc(100%-1.25rem)] items-center gap-3 rounded-full px-4 text-left text-[15px] text-slate-500 hover:bg-orange-50 hover:text-orange-700"><ClipboardList size={17} className="shrink-0"/><span className="min-w-0 flex-1 truncate">{t(item.label)}</span><ChevronDown size={16} className={positionsOpen ? 'rotate-180' : ''}/></button>
-              {positionsOpen && <div className="ml-5">
-                <SidebarLink to="/positions" icon={ClipboardList} label="Position list" nested onNavigate={onNavigate}/>
-                {/^\/positions\/[^/]+$/.test(pathname) && <SidebarLink to={pathname} icon={ClipboardList} label="Position details" nested onNavigate={onNavigate}/>}
-                {/^\/positions\/[^/]+\/edit$/.test(pathname) && <SidebarLink to={pathname} icon={ClipboardList} label="Edit position" nested onNavigate={onNavigate}/>}
-              </div>}
-            </div> : item.to === '/departments' ? <div key={item.to}>
-              <button type="button" aria-expanded={departmentsOpen} onClick={() => setDepartmentsOpen(open => !open)} className="ml-5 flex min-h-10 w-[calc(100%-1.25rem)] items-center gap-3 rounded-full px-4 text-left text-[15px] text-slate-500 hover:bg-orange-50 hover:text-orange-700"><ClipboardList size={17} className="shrink-0"/><span className="min-w-0 flex-1 truncate">{t(item.label)}</span><ChevronDown size={16} className={departmentsOpen ? 'rotate-180' : ''}/></button>
-              {departmentsOpen && <div className="ml-5">
-                <SidebarLink to="/departments" icon={ClipboardList} label="Department list" nested onNavigate={onNavigate}/>
-                {departmentPath && <><SidebarLink to={`/departments/${departmentPath}`} icon={ClipboardList} label="Department details" nested onNavigate={onNavigate}/><SidebarLink to={`/departments/${departmentPath}/edit`} icon={ClipboardList} label="Edit department" nested onNavigate={onNavigate}/></>}
-              </div>}
             </div> : item.to === '/work-schedules' ? <div key={item.to}>
-              <button type="button" aria-expanded={schedulesOpen} onClick={() => setSchedulesOpen(open => !open)} className="ml-5 flex min-h-10 w-[calc(100%-1.25rem)] items-center gap-3 rounded-full px-4 text-left text-[15px] text-slate-500 hover:bg-orange-50 hover:text-orange-700"><ClipboardList size={17} className="shrink-0"/><span className="min-w-0 flex-1 truncate">{t(item.label)}</span><ChevronDown size={16} className={schedulesOpen ? 'rotate-180' : ''}/></button>
+              <button type="button" aria-expanded={schedulesOpen} onClick={() => setSchedulesOpen(open => !open)} className="ml-5 flex min-h-10 w-[calc(100%-1.25rem)] items-center gap-3 rounded-full px-4 text-left text-[15px] font-semibold text-slate-700 hover:bg-orange-50 hover:text-orange-700"><ClipboardList size={17} className="shrink-0"/><span className="min-w-0 flex-1 truncate">{t(item.label)}</span><ChevronDown size={16} className={schedulesOpen ? 'rotate-180' : ''}/></button>
               {schedulesOpen && <div className="ml-5"><SidebarLink to="/work-schedules" icon={CalendarDays} label="Create a work schedule" nested onNavigate={onNavigate}/><SidebarLink to="/work-schedules/assign" icon={Users} label="Assign current schedule" nested onNavigate={onNavigate}/><SidebarLink to="/work-schedules/list" icon={ClipboardList} label="Schedules" nested onNavigate={onNavigate}/></div>}
             </div> : <SidebarLink key={item.to} {...item} nested onNavigate={onNavigate} />)}</div></div>
           </div>;
