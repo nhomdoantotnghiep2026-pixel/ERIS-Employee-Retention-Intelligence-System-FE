@@ -108,7 +108,7 @@ export default function App() {
           {/* HR */}
           <Route path="/dashboard" element={<RoleGuard><Dashboard /></RoleGuard>} />
           <Route path="/portal" element={<RoleGuard><PortalHub /></RoleGuard>} />
-          <Route path="/org-overview" element={<RoleGuard><RiskWorkspace /></RoleGuard>} />
+          <Route path="/org-overview" element={<RoleGuard><Navigate to="/dashboard" replace /></RoleGuard>} />
           <Route path="/departments" element={<RoleGuard><Departments /></RoleGuard>} />
           <Route path="/departments/:id" element={<RoleGuard><DepartmentPage mode="detail" /></RoleGuard>} />
           <Route path="/departments/:id/edit" element={<RoleGuard><DepartmentPage mode="edit" /></RoleGuard>} />
