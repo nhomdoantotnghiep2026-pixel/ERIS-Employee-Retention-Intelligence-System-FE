@@ -50,6 +50,9 @@ test('four role dashboards, sidebars and guides render in one language while pre
     const leftovers: Record<string, string[]> = {};
     for (let index = 0; index < ROLE_USERS.length; index++) {
       const actor = ROLE_USERS[index];
+      // Personalized headings preserve the actor's name, including Vietnamese diacritics.
+      identities.add(`Hello, ${actor.name}!`);
+      identities.add(`Xin chào, ${actor.name}!`);
       const screen = React.createElement(screens[index], index === 3 ? { mode: 'dashboard' } : {});
       const english = render(actor, 'en', paths[index], screen);
       const vietnamese = render(actor, 'vi', paths[index], screen);
@@ -71,11 +74,11 @@ test('four role dashboards, sidebars and guides render in one language while pre
     assert.equal(translate('{count} accounts', { count: 7 }), '7 tài khoản');
     assert.equal(translate('{version} is active', { version: 'v2.3' }), 'v2.3 đang hoạt động');
     assert.equal(translate('Unknown custom text'), 'Unknown custom text');
-    // Exercise populated audit rows and the configured-service display label.
+    // Local demo audit entries must not appear in the server-backed admin overview.
     transactDatabase((draft: typeof db) => { draft.audit_logs.push(makeRow('audit_logs', { user_id: draft.users[0].id, entity_type: 'EMPLOYEES', entity_id: draft.employees[0].id, action: 'Create employee', old_value: null, new_value: null })); });
     const admin = chunks(render(ROLE_USERS[2], 'vi', paths[2], React.createElement(Admin)));
-    assert.ok(admin.has('Tạo nhân viên'));
-    assert.ok(admin.has('Hồ sơ nhân viên'));
+    assert.ok(!admin.has('Tạo nhân viên'));
+    assert.ok(admin.has('Đang tải…'));
     assert.equal(translate('Configured, not verified'), 'Đã cấu hình, chưa xác minh');
     assert.equal(translate('{count} pending', { count: 3 }), '3 đang chờ');
     assert.equal(translate('Requests awaiting HR review: {count}.', { count: 3 }), '3 yêu cầu đang chờ nhân sự xem xét.');

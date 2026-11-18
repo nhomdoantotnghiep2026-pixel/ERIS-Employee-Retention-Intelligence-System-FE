@@ -1,197 +1,64 @@
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { AlertCircle, CheckCircle, CircleHelp, RefreshCw } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { AppShell } from '../components/AppShell';
-import { Card, SectionHeader, Button } from '../components/ui';
-import { MonitorCheck, RefreshCw, CheckCircle, AlertCircle, Clock } from 'lucide-react';
-import { useCallback, useEffect, useState } from 'react';
-import { getBackendHealth } from '../services/api';
+import { Card, SectionHeader } from '../components/ui';
+import { Button } from '../components/ui/button';
+import { ApiError, getBackendHealth, getCurrentUser } from '../services/api';
 
-type HealthStatus = 'Operational' | 'Degraded' | 'Outage';
-
-interface ServiceStatus {
-  service: string;
-  category: string;
-  status: HealthStatus;
-  uptime: string;
-  latency: string;
-  lastChecked: string;
-}
-
-const services: ServiceStatus[] = [
-  { service: 'ERIS Core API', category: 'Application', status: 'Operational', uptime: '99.97%', latency: '42ms', lastChecked: '30s ago' },
-  { service: 'Authentication Service', category: 'Application', status: 'Operational', uptime: '100%', latency: '18ms', lastChecked: '30s ago' },
-  { service: 'HRIS Sync Connector', category: 'Integrations', status: 'Operational', uptime: '99.91%', latency: '210ms', lastChecked: '1m ago' },
-  { service: 'ML Inference Engine', category: 'AI / ML', status: 'Operational', uptime: '99.85%', latency: '380ms', lastChecked: '1m ago' },
-  { service: 'ML Feature Store', category: 'AI / ML', status: 'Degraded', uptime: '98.40%', latency: '—', lastChecked: '2m ago' },
-  { service: 'PostgreSQL (Primary)', category: 'Database', status: 'Operational', uptime: '99.99%', latency: '6ms', lastChecked: '30s ago' },
-  { service: 'Redis Cache', category: 'Database', status: 'Operational', uptime: '100%', latency: '1ms', lastChecked: '30s ago' },
-  { service: 'File Storage (S3)', category: 'Storage', status: 'Operational', uptime: '100%', latency: '95ms', lastChecked: '2m ago' },
-  { service: 'Email Notification Service', category: 'Notifications', status: 'Operational', uptime: '99.80%', latency: '140ms', lastChecked: '5m ago' },
-];
-
-const incidents = [
-  { title: 'ML Feature Store — Connection timeout', time: 'Sep 23, 2026 04:05', severity: 'Medium', status: 'Investigating' },
-  { title: 'HRIS Sync — Brief latency spike (resolved)', time: 'Sep 21, 2026 02:10', severity: 'Low', status: 'Resolved' },
-];
-
-const statusConfig: Record<HealthStatus, { icon: typeof CheckCircle; text: string; dot: string; bg: string }> = {
-  Operational: { icon: CheckCircle, text: 'text-emerald-700', dot: 'bg-emerald-700', bg: 'bg-emerald-100' },
-  Degraded: { icon: AlertCircle, text: 'text-amber-800', dot: 'bg-amber-700', bg: 'bg-amber-100' },
-  Outage: { icon: AlertCircle, text: 'text-red-800', dot: 'bg-red-700', bg: 'bg-red-100' },
-};
-
-const categories = Array.from(new Set(services.map(s => s.category)));
-
-function ServiceRow({ service: svc }: { service: ServiceStatus }) {
-  const { t, language } = useLanguage();
-  const cfg = statusConfig[svc.status];
-  const Icon = cfg.icon;
-
-  return (
-    <div className={`grid min-h-[48px] grid-cols-1 gap-2 border-t px-4 py-3 text-[13px] transition-colors first:border-t-0 md:grid-cols-[minmax(220px,1.65fr)_156px_172px_164px_92px] md:items-center md:gap-5 md:py-0 ${svc.status === 'Operational' ? 'border-slate-100 hover:bg-slate-50/70' : svc.status === 'Degraded' ? 'border-amber-200 bg-amber-50 hover:bg-amber-100/70' : 'border-red-200 bg-red-50 hover:bg-red-100/70'}`}>
-      <div className="flex min-w-0 items-center gap-2">
-        <span className={`h-1.5 w-1.5 flex-shrink-0 rounded-full ${cfg.dot} ${svc.status === 'Operational' ? 'shadow-[0_0_4px_rgba(34,197,94,0.5)]' : ''}`} />
-        <span className="truncate font-medium text-slate-900">{t(svc.service)}</span>
-      </div>
-
-      <span className={`inline-flex w-fit items-center gap-1 rounded border px-2 py-1 font-bold md:w-[132px] ${svc.status === 'Operational' ? 'border-emerald-200 bg-emerald-50' : svc.status === 'Degraded' ? 'border-amber-300 bg-amber-100' : 'border-red-300 bg-red-100'} ${cfg.text}`}>
-        <Icon size={14} className="shrink-0" />
-        {t(svc.status)}
-      </span>
-
-      <div className="grid grid-cols-[64px_minmax(0,1fr)] items-baseline gap-1 text-[12px] text-slate-500 md:grid-cols-[auto_minmax(0,1fr)]">
-        <span className="font-medium text-slate-700">{t("Uptime:")}</span>
-        <span className="font-mono tabular-nums">{t(svc.uptime)}</span>
-      </div>
-
-      <div className="grid grid-cols-[64px_minmax(0,1fr)] items-baseline gap-1 text-[12px] text-slate-500 md:grid-cols-[auto_minmax(0,1fr)]">
-        <span className="font-medium text-slate-700">{t("Latency:")}</span>
-        <span className="font-mono tabular-nums">{t(svc.latency)}</span>
-      </div>
-
-      <div className="inline-flex items-center gap-1 text-[11px] text-slate-400 md:justify-end">
-        <Clock size={12} className="shrink-0" />
-        <span className="whitespace-nowrap">{t(svc.lastChecked)}</span>
-      </div>
-    </div>
-  );
-}
-
+type State = 'reachable' | 'error' | 'unauthorized' | 'unreachable' | 'timeout';
+type Result = { state: State; checkedAt: Date; duration: number; httpStatus?: number };
+const probes = [
+  { id: 'api', vi: 'Kết nối ERIS', en: 'ERIS connection', run: getBackendHealth },
+  { id: 'auth', vi: 'Xác thực phiên đăng nhập', en: 'Session authentication', run: getCurrentUser },
+] as const;
 export default function SystemHealth() {
-  const { t, language } = useLanguage();
-  const [serviceRows, setServiceRows] = useState(services);
-  const [updatedAt, setUpdatedAt] = useState('just now');
+  const { language } = useLanguage();
+  const tr = (vi: string, en: string) => language === 'vi' ? vi : en;
+  const [results, setResults] = useState<Record<string, Result>>({});
   const [checking, setChecking] = useState(false);
-  const operational = serviceRows.filter(s => s.status === 'Operational').length;
-  const degraded = serviceRows.filter(s => s.status === 'Degraded').length;
-  const overall: HealthStatus = degraded > 0 ? 'Degraded' : 'Operational';
-  const overallCfg = statusConfig[overall];
-
-  const refreshHealth = useCallback(async (signal?: AbortSignal) => {
-    const startedAt = performance.now();
-    setChecking(true);
+  const active = useRef<AbortController | null>(null);
+  const refresh = useCallback(async () => {
+    if (active.current) return;
+    const controller = new AbortController(); active.current = controller; setChecking(true);
+    const next: Record<string, Result> = {};
     try {
-      const health = await getBackendHealth(signal);
-      if (signal?.aborted) return;
-      const latency = `${Math.max(1, Math.round(performance.now() - startedAt))}ms`;
-      setServiceRows(rows => rows.map(row => row.service === 'ERIS Core API'
-        ? { ...row, status: health.status === 'ok' ? 'Operational' : 'Degraded', latency, lastChecked: 'now' }
-        : row));
-    } catch {
-      if (signal?.aborted) return;
-      setServiceRows(rows => rows.map(row => row.service === 'ERIS Core API'
-        ? { ...row, status: 'Outage', latency: '—', lastChecked: 'now' }
-        : row));
-    } finally {
-      if (!signal?.aborted) {
-        setUpdatedAt(new Date().toLocaleTimeString(language === 'vi' ? 'vi-VN' : 'en-US'));
-        setChecking(false);
-      }
-    }
-  }, [language]);
-
+      await Promise.all(probes.map(async probe => {
+        const started = performance.now(), child = new AbortController();
+        let timedOut = false;
+        const cancel = () => child.abort();
+        controller.signal.addEventListener('abort', cancel, { once: true });
+        const timer = window.setTimeout(() => { timedOut = true; child.abort(); }, 10000);
+        try {
+          const response = await probe.run(child.signal);
+          next[probe.id] = { state: probe.id === 'api' && response?.status !== 'ok' ? 'error' : 'reachable', checkedAt: new Date(), duration: Math.round(performance.now() - started) };
+        } catch (error) {
+          const status = error instanceof ApiError ? error.status : undefined;
+          next[probe.id] = { state: timedOut ? 'timeout' : status === 401 || status === 403 ? 'unauthorized' : status && status > 0 ? 'error' : 'unreachable', httpStatus: status, checkedAt: new Date(), duration: Math.round(performance.now() - started) };
+        } finally { window.clearTimeout(timer); controller.signal.removeEventListener('abort', cancel); }
+      }));
+      if (!controller.signal.aborted) setResults(next);
+    } finally { if (!controller.signal.aborted) setChecking(false); if (active.current === controller) active.current = null; }
+  }, []);
   useEffect(() => {
-    const controller = new AbortController();
-    void refreshHealth(controller.signal);
-    return () => controller.abort();
-  }, [refreshHealth]);
-
-  return (
-    <AppShell breadcrumb={['System Operations', 'System Health Monitor']}>
-      <SectionHeader title={t("System Health Monitor")} description={t("Real-time status of all ERIS services and integrations")}>
-        <Button variant="secondary" size="sm" disabled={checking} onClick={() => void refreshHealth()}><RefreshCw size={13} className={checking ? 'animate-spin' : ''} /> {t("Refresh")}</Button>
-      </SectionHeader>
-
-      {/* Overall status banner */}
-      <Card className={`p-4 mb-5 flex items-center gap-3 border-l-4 ${overall === 'Operational' ? 'border-l-emerald-600 bg-emerald-50' : 'border-l-amber-600 bg-amber-100'}`}>
-        <div className={`w-9 h-9 ${overallCfg.bg} rounded-[6px] flex items-center justify-center flex-shrink-0`}>
-          <overallCfg.icon size={18} className={overallCfg.text} />
-        </div>
-        <div className="flex-1">
-          <div className={`text-[15px] font-semibold ${overallCfg.text}`}>
-            {t(overall === 'Operational' ? 'All Systems Operational' : 'Partial Service Degradation')}
-          </div>
-          <div className="text-[12px] text-slate-500 mt-0.5">
-            {operational}/{serviceRows.length} {t("services nominal · Last updated")} {t(updatedAt)}
-          </div>
-        </div>
-        <div className="grid grid-cols-3 gap-4 text-center flex-shrink-0">
-          {[
-            { label: 'Operational', value: operational, color: 'text-emerald-700' },
-            { label: 'Degraded', value: degraded, color: 'text-amber-800' },
-            { label: 'Outage', value: serviceRows.filter(s => s.status === 'Outage').length, color: 'text-red-800' },
-          ].map(s => (
-            <div key={s.label}>
-              <div className={`text-[22px] font-bold leading-none ${s.color}`}>{s.value}</div>
-              <div className="text-[10px] font-semibold text-slate-600 mt-0.5">{t(s.label)}</div>
-            </div>
-          ))}
-        </div>
-      </Card>
-
-      {/* Service status by category */}
-      <div className="space-y-4 mb-5">
-        {categories.map(cat => {
-          const catServices = serviceRows.filter(s => s.category === cat);
-          return (
-            <Card key={cat} className="overflow-hidden">
-              <div className="border-b border-slate-100 px-4 py-2.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-400">
-                {t(cat)}
-              </div>
-              <div>
-                {catServices.map(svc => <ServiceRow key={svc.service} service={svc} />)}
-              </div>
-            </Card>
-          );
-        })}
-      </div>
-
-      {/* Incident log */}
-      <div className="text-[12px] font-semibold text-slate-400 uppercase tracking-[0.08em] mb-2">{t("Recent Incidents")}</div>
-      <Card>
-        <table className="w-full">
-          <thead>
-            <tr className="border-b border-slate-200 bg-slate-50">
-              {['Incident', 'Time', 'Severity', 'Status'].map(h => (
-                <th key={h} className="px-4 py-2.5 text-left text-[12px] font-semibold text-slate-700 uppercase tracking-wide">{t(h)}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-50">
-            {incidents.map(inc => (
-              <tr key={inc.title} className="hover:bg-slate-50/60">
-                <td className="px-4 h-[48px] text-[13px] font-medium text-slate-800">{t(inc.title)}</td>
-                <td className="px-4 h-[48px] text-[12px] text-slate-500">{t(inc.time)}</td>
-                <td className="px-4 h-[48px]">
-                  <span className={`rounded border px-1.5 py-0.5 text-[12px] font-bold ${inc.severity === 'Medium' ? 'border-amber-300 bg-amber-100 text-amber-800' : 'border-slate-300 bg-slate-100 text-slate-700'}`}>{t(inc.severity)}</span>
-                </td>
-                <td className="px-4 h-[48px]">
-                  <span className={`rounded border px-1.5 py-0.5 text-[12px] font-bold ${inc.status === 'Resolved' ? 'border-emerald-300 bg-emerald-100 text-emerald-800' : 'border-amber-300 bg-amber-100 text-amber-800'}`}>{t(inc.status)}</span>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </Card>
-    </AppShell>
-  );
+    void refresh();
+    const interval = window.setInterval(() => { if (!document.hidden) void refresh(); }, 30000);
+    return () => { window.clearInterval(interval); active.current?.abort(); active.current = null; };
+  }, [refresh]);
+  const labels: Record<State, string> = {
+    reachable: tr('Kết nối thành công', 'Connection successful'), error: tr('Yêu cầu trả về lỗi', 'Request returned an error'),
+    unauthorized: tr('Chưa xác nhận quyền truy cập', 'Access not confirmed'), unreachable: tr('Không kết nối được từ trình duyệt', 'Unreachable from this browser'), timeout: tr('Hết thời gian chờ', 'Request timed out'),
+  };
+  const successful = Object.values(results).filter(result => result.state === 'reachable').length;
+  return <AppShell breadcrumb={['System Operations', 'System Health Monitor']}>
+    <SectionHeader title={tr('Kiểm tra kết nối hệ thống', 'System connection checks')} description={tr('Kết quả kiểm tra từ trình duyệt; tự làm mới mỗi 30 giây khi trang đang hiển thị.', 'Browser connection checks; refreshes every 30 seconds while the page is visible.')}>
+      <Button variant="outline" className="h-10 gap-2" disabled={checking} onClick={() => void refresh()}><RefreshCw aria-hidden="true" size={16} className={checking ? 'animate-spin motion-reduce:animate-none' : ''} />{tr('Làm mới', 'Refresh')}</Button>
+    </SectionHeader>
+    <div role="status" className="mb-5 flex items-start gap-3 rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-700"><CircleHelp aria-hidden="true" className="mt-0.5 size-5 shrink-0 text-orange-600" /><div><p className="font-semibold">{checking ? tr('Đang kiểm tra kết nối…', 'Checking connections…') : tr(`${successful}/2 kiểm tra kết nối thành công`, `${successful}/2 connection checks successful`)}</p><p className="mt-1 leading-6 text-slate-600">{tr('Đây không phải trạng thái của toàn bộ hệ thống. Lỗi kết nối có thể do mạng hoặc quyền truy cập.', 'This is not a whole-system health assessment. Failures may come from the network or access permissions.')}</p></div></div>
+    <div className="grid items-stretch gap-4 lg:grid-cols-2">{probes.map(probe => {
+      const result = results[probe.id], ok = result?.state === 'reachable';
+      const Icon = !result ? CircleHelp : ok ? CheckCircle : AlertCircle;
+      return <Card key={probe.id} className="p-5 sm:p-6"><h2 className="text-lg font-semibold text-slate-900">{language === 'vi' ? probe.vi : probe.en}</h2><p className="mt-1 text-sm text-slate-600">{probe.id === 'api' ? tr('Kiểm tra khả năng phản hồi của hệ thống ERIS.', 'Checks whether ERIS responds.') : tr('Kiểm tra phiên đăng nhập đang sử dụng.', 'Checks the current signed-in session.')}</p><div className={`mt-5 flex items-center gap-2 text-sm font-semibold ${!result ? 'text-slate-600' : ok ? 'text-emerald-700' : 'text-amber-800'}`}><Icon aria-hidden="true" className="size-5 shrink-0" />{result ? labels[result.state] : tr('Chưa có kết quả', 'No result yet')}{result?.httpStatus ? ` (HTTP ${result.httpStatus})` : ''}</div><dl className="mt-5 grid grid-cols-2 gap-4 border-t border-slate-100 pt-4 text-sm"><div><dt className="text-slate-600">{tr('Thời gian yêu cầu', 'Request duration')}</dt><dd className="mt-1 font-semibold tabular-nums text-slate-900">{result ? `${result.duration} ms` : '—'}</dd></div><div><dt className="text-slate-600">{tr('Kiểm tra lần cuối', 'Last checked')}</dt><dd className="mt-1 font-semibold tabular-nums text-slate-900">{result ? result.checkedAt.toLocaleTimeString(language === 'vi' ? 'vi-VN' : 'en-US') : '—'}</dd></div></dl><p className="mt-4 text-xs leading-5 text-slate-600">{tr('Thời gian yêu cầu bao gồm đường truyền; không phải thời gian xử lý riêng của dịch vụ.', 'Request duration includes network time, not just service processing.')}</p></Card>;
+    })}</div>
+  </AppShell>;
 }

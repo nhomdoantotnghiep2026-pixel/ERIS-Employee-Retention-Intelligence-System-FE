@@ -510,6 +510,8 @@ export interface ApiUser {
 
 export interface ApiEmployee {
   id: number;
+  employeeCode?: string | null;
+  fullName?: string | null;
   employee_code?: string | null;
   full_name?: string | null;
   email?: string | null;
@@ -710,7 +712,7 @@ export async function request<T>(path: string, init?: RequestInit, baseOverride?
   if (!baseOverride && ADMIN_API_BASE_URL && adminResource && !adminSession) {
     throw new ApiError('Vui lòng đăng xuất và đăng nhập lại tài khoản admin để kết nối dịch vụ quản lý người dùng.', 401, 'ADMIN_SESSION_REQUIRED');
   }
-  const base = baseOverride || (ADMIN_API_BASE_URL && adminSession ? ADMIN_API_BASE_URL : API_BASE_URL);
+  const base = baseOverride ?? (ADMIN_API_BASE_URL && adminSession ? ADMIN_API_BASE_URL : API_BASE_URL);
   const token = path === '/auth/login' ? null : sessionStorage.getItem('eris-access-token');
   const headers = new Headers(init?.headers);
   if (!(init?.body instanceof FormData)) headers.set('Content-Type', 'application/json');
@@ -974,7 +976,7 @@ export interface ApiDepartment {
 
 export interface ApiDepartmentListResponse {
   data: ApiDepartment[];
-  pagination?: { page: number; limit: number; has_more: boolean };
+  pagination?: { page: number; limit: number; has_more: boolean; total?: number };
 }
 
 export async function listDepartments(signal?: AbortSignal, options: { page?: number; limit?: number; search?: string } = {}) {
@@ -986,7 +988,7 @@ export async function listDepartments(signal?: AbortSignal, options: { page?: nu
   const filtered = result.data.filter(item => item.status !== 'INACTIVE'
     && (!search || `${item.code || ''} ${item.name}`.toLocaleLowerCase().includes(search)));
   const offset = (page - 1) * limit;
-  return { data: filtered.slice(offset, offset + limit), pagination: { page, limit, has_more: offset + limit < filtered.length } };
+  return { data: filtered.slice(offset, offset + limit), pagination: { page, limit, total: filtered.length, has_more: offset + limit < filtered.length } };
 }
 
 export async function createDepartment(input: Pick<ApiDepartment, 'name' | 'description'>) {
@@ -1039,14 +1041,14 @@ export interface ApiPosition {
   updatedAt?: string;
 }
 
-export async function listPositions(signal?: AbortSignal, options: { page?: number; limit?: number; search?: string; departmentId?: number } = {}) {
+export async function listPositions(signal?: AbortSignal, options: { page?: number; limit?: number; search?: string; departmentId?: number; jobLevel?: number } = {}) {
   const query = options.departmentId ? `?departmentId=${encodeURIComponent(options.departmentId)}` : '';
   const result = await request<{ data: ApiPosition[] }>(`/positions${query}`, { signal });
   const search = options.search?.trim().toLocaleLowerCase() || '';
-  const filtered = result.data.filter(item => item.status !== 'INACTIVE'
+  const filtered = result.data.filter(item => item.status !== 'INACTIVE' && (!options.jobLevel || Number(item.jobLevel) === options.jobLevel)
     && (!search || `${item.code} ${item.name}`.toLocaleLowerCase().includes(search)));
   const page = options.page ?? 1, limit = options.limit ?? 20, offset = (page - 1) * limit;
-  return { data: filtered.slice(offset, offset + limit), pagination: { page, limit, has_more: offset + limit < filtered.length } };
+  return { data: filtered.slice(offset, offset + limit), pagination: { page, limit, total: filtered.length, has_more: offset + limit < filtered.length } };
 }
 
 export async function getPositionById(id: number, signal?: AbortSignal) {

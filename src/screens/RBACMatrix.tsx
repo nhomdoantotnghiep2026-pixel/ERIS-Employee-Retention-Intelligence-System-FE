@@ -7,64 +7,54 @@ import { Fragment, useEffect, useMemo, useState } from 'react';
 import { downloadTextFile, toCsv } from '../utils/demoActions';
 import { RBAC_UPDATED_EVENT } from '../utils/rbacAccess';
 
-const roles = ['HR', 'Data / AI Analyst', 'System Administrator', 'Employee / ESS'];
+const roles = ['HR', 'System Administrator', 'Employee / ESS'];
 
 export const defaultPermissionMatrix: { category: string; items: { label: string; access: Record<string, boolean> }[] }[] = [
   {
     category: 'Employee Data',
     items: [
-      { label: 'View Employee Directory', access: { 'HR': true, 'Data / AI Analyst': true, 'System Administrator': false, 'Employee / ESS': false } },
-      { label: 'Edit Employee Records', access: { 'HR': true, 'Data / AI Analyst': true, 'System Administrator': false, 'Employee / ESS': false } },
-      { label: 'Record Employee Outcomes', access: { 'HR': true, 'Data / AI Analyst': false, 'System Administrator': false, 'Employee / ESS': false } },
-      { label: 'Export Employee Data', access: { 'HR': true, 'Data / AI Analyst': false, 'System Administrator': false, 'Employee / ESS': false } },
+      { label: 'View Employee Directory', access: { 'HR': true, 'System Administrator': false, 'Employee / ESS': false } },
+      { label: 'Edit Employee Records', access: { 'HR': true, 'System Administrator': false, 'Employee / ESS': false } },
+      { label: 'Record Employee Outcomes', access: { 'HR': true, 'System Administrator': false, 'Employee / ESS': false } },
     ],
   },
   {
     category: 'Attrition Risk',
     items: [
-      { label: 'View Individual Risk Score', access: { 'HR': true, 'Data / AI Analyst': false, 'System Administrator': false, 'Employee / ESS': false } },
-      { label: 'View Org-Level Risk', access: { 'HR': true, 'Data / AI Analyst': false, 'System Administrator': false, 'Employee / ESS': false } },
-      { label: 'Trigger Risk Analysis', access: { 'HR': false, 'Data / AI Analyst': true, 'System Administrator': false, 'Employee / ESS': false } },
+      { label: 'View Individual Risk Score', access: { 'HR': true, 'System Administrator': false, 'Employee / ESS': false } },
+      { label: 'View Org-Level Risk', access: { 'HR': true, 'System Administrator': false, 'Employee / ESS': false } },
+      { label: 'Trigger Risk Analysis', access: { 'HR': true, 'System Administrator': false, 'Employee / ESS': false } },
     ],
   },
   {
     category: 'Retention Interventions',
     items: [
-      { label: 'View Interventions', access: { 'HR': true, 'Data / AI Analyst': false, 'System Administrator': false, 'Employee / ESS': false } },
-      { label: 'Create / Update Interventions', access: { 'HR': true, 'Data / AI Analyst': false, 'System Administrator': false, 'Employee / ESS': false } },
-      { label: 'Escalate to Director', access: { 'HR': true, 'Data / AI Analyst': false, 'System Administrator': false, 'Employee / ESS': false } },
+      { label: 'View Interventions', access: { 'HR': true, 'System Administrator': false, 'Employee / ESS': false } },
+      { label: 'Create / Update Interventions', access: { 'HR': true, 'System Administrator': false, 'Employee / ESS': false } },
     ],
   },
   {
     category: 'Engagement Surveys',
     items: [
-      { label: 'View Survey Results', access: { 'HR': true, 'Data / AI Analyst': false, 'System Administrator': false, 'Employee / ESS': false } },
-      { label: 'Launch Surveys', access: { 'HR': true, 'Data / AI Analyst': false, 'System Administrator': false, 'Employee / ESS': false } },
-      { label: 'Submit Assigned Surveys', access: { 'HR': false, 'Data / AI Analyst': false, 'System Administrator': false, 'Employee / ESS': true } },
+      { label: 'View Survey Results', access: { 'HR': true, 'System Administrator': false, 'Employee / ESS': false } },
+      { label: 'Launch Surveys', access: { 'HR': true, 'System Administrator': false, 'Employee / ESS': false } },
+      { label: 'Submit Assigned Surveys', access: { 'HR': false, 'System Administrator': false, 'Employee / ESS': true } },
     ],
   },
   {
     category: 'Employee Self Service',
     items: [
-      { label: 'View Own Profile', access: { 'HR': false, 'Data / AI Analyst': false, 'System Administrator': false, 'Employee / ESS': true } },
-      { label: 'Record Own Attendance', access: { 'HR': false, 'Data / AI Analyst': false, 'System Administrator': false, 'Employee / ESS': true } },
-    ],
-  },
-  {
-    category: 'AI & Data',
-    items: [
-      { label: 'Manage Data Pipelines', access: { 'HR': false, 'Data / AI Analyst': true, 'System Administrator': false, 'Employee / ESS': false } },
-      { label: 'Configure AI Model', access: { 'HR': false, 'Data / AI Analyst': true, 'System Administrator': false, 'Employee / ESS': false } },
-      { label: 'View Model Evaluation', access: { 'HR': false, 'Data / AI Analyst': true, 'System Administrator': false, 'Employee / ESS': false } },
+      { label: 'View Own Profile', access: { 'HR': false, 'System Administrator': false, 'Employee / ESS': true } },
+      { label: 'Record Own Attendance', access: { 'HR': false, 'System Administrator': false, 'Employee / ESS': true } },
     ],
   },
   {
     category: 'System Administration',
     items: [
-      { label: 'Manage Users', access: { 'HR': false, 'Data / AI Analyst': false, 'System Administrator': true, 'Employee / ESS': false } },
-      { label: 'Manage Roles & Permissions', access: { 'HR': false, 'Data / AI Analyst': false, 'System Administrator': true, 'Employee / ESS': false } },
-      { label: 'System Configuration', access: { 'HR': false, 'Data / AI Analyst': false, 'System Administrator': true, 'Employee / ESS': false } },
-      { label: 'View System Activity Logs', access: { 'HR': false, 'Data / AI Analyst': false, 'System Administrator': true, 'Employee / ESS': false } },
+      { label: 'Manage Users', access: { 'HR': false, 'System Administrator': true, 'Employee / ESS': false } },
+      { label: 'Manage Roles & Permissions', access: { 'HR': false, 'System Administrator': true, 'Employee / ESS': false } },
+      { label: 'System Configuration', access: { 'HR': false, 'System Administrator': true, 'Employee / ESS': false } },
+      { label: 'View System Activity Logs', access: { 'HR': false, 'System Administrator': true, 'Employee / ESS': false } },
     ],
   },
 ];
@@ -85,7 +75,12 @@ export function loadPermissionMatrix(): PermissionMatrix {
   try {
     const saved = localStorage.getItem(RBAC_STORAGE_KEY);
     const parsed = saved ? JSON.parse(saved) : null;
-    return Array.isArray(parsed) ? parsed : cloneMatrix(defaultPermissionMatrix);
+    if (!Array.isArray(parsed)) return cloneMatrix(defaultPermissionMatrix);
+    return defaultPermissionMatrix.map(category => ({ ...category, items: category.items.map(item => {
+      const savedItems = parsed.find(entry => entry?.category === category.category)?.items;
+      const access = Array.isArray(savedItems) ? savedItems.find(entry => entry?.label === item.label)?.access : null;
+      return { ...item, access: Object.fromEntries(roles.map(role => [role, item.access[role] && (typeof access?.[role] === 'boolean' ? access[role] : true)])) };
+    }) }));
   } catch {
     return cloneMatrix(defaultPermissionMatrix);
   }
@@ -163,7 +158,7 @@ export function PermissionMatrixPanel() {
   };
 
   const togglePermission = (category: string, label: string, role: string) => {
-    if (!editing) return;
+    if (!editing || !defaultPermissionMatrix.find(cat => cat.category === category)?.items.find(item => item.label === label)?.access[role]) return;
     setDraft(current => current.map(cat => cat.category === category ? {
       ...cat,
       items: cat.items.map(item => item.label === label ? { ...item, access: { ...item.access, [role]: !item.access[role] } } : item),
@@ -207,7 +202,7 @@ export function PermissionMatrixPanel() {
       )}
 
       <Card className="overflow-x-auto">
-        <table className="w-full min-w-[860px] table-fixed">
+        <table className="w-full min-w-[715px] table-fixed">
           <colgroup>
             <col className="w-[280px]" />
             {roles.map(role => <col key={role} className="w-[145px]" />)}
@@ -240,7 +235,7 @@ export function PermissionMatrixPanel() {
                         <button
                           aria-label={t('{action} {permission} for {role}', { action: t(item.access[role] ? 'Revoke' : 'Grant'), permission: t(item.label), role: t(role) })}
                           aria-pressed={item.access[role]}
-                          disabled={!editing}
+                          disabled={!editing || !defaultPermissionMatrix[ci].items[ii].access[role]}
                           onClick={() => togglePermission(cat.category, item.label, role)}
                           className={`mx-auto flex h-8 w-8 items-center justify-center rounded transition-colors ${editing ? 'cursor-pointer hover:bg-orange-50 focus-visible:outline-2 focus-visible:outline-orange-500' : 'cursor-default'}`}
                         >

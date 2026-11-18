@@ -7,7 +7,6 @@ import { PermissionMatrixPanel, loadPermissionMatrix } from './RBACMatrix';
 
 const roles = [
   { name: 'HR', description: 'Manage employee records, retention risks, interventions, surveys, and reports.', color: 'bg-orange-50 text-orange-700 border-orange-200' },
-  { name: 'Data / AI Analyst', description: 'Manage datasets, import and validate data, maintain the AI analysis component.', color: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
   { name: 'System Administrator', description: 'Manage users, roles, permissions, and system configuration.', color: 'bg-violet-50 text-violet-700 border-violet-200' },
   { name: 'Employee / ESS', description: 'View personal information, record attendance, and complete employee surveys.', color: 'bg-blue-50 text-blue-700 border-blue-200' },
 ];
@@ -32,7 +31,7 @@ export default function Roles() {
 
       {activeTab === 'Role Overview' ? (
         <>
-          <div className="mb-4 grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="mb-4 grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3">
             {roles.map(r => (
               <button
                 key={r.name}
