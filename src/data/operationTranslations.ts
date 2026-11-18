@@ -1,5 +1,6 @@
 // Application feedback and API-owned copy. Never translate arbitrary profile data.
 const pairs: Array<[string, string]> = [
+  ['Loading data…', 'Đang tải dữ liệu…'],
   ['Employee engagement surveys', 'Khảo sát gắn kết nhân viên'],
   ['My surveys', 'Khảo sát của tôi'],
   ['Design surveys by cycle, manage questions, publish and review results.', 'Thiết kế khảo sát theo chu kỳ, quản lý câu hỏi, xuất bản và xem kết quả.'],

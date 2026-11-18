@@ -717,8 +717,9 @@ export const listAuditLogs = (signal?: AbortSignal) => request<{ data: AuditLogE
 export const getAuditLog = (id: number, signal?: AbortSignal) => request<{ data: AuditLogDetail }>(`/audit-logs/${id}`, { signal, cache: 'no-store' });
 
 export type AiEmployee = { id: number; employeeCode: string; fullName: string };
-export type AiSnapshot = { employee: AiEmployee; snapshotId: number | null; capturedAt: string; features: Record<string, string | number>; provenance: Record<string, string>; missingFeatures: string[]; invalidFeatures?: string[]; issues: string[]; ready: boolean; warning?: string };
-export type AiPrediction = { saved: boolean; predictionId?: number; preview: AiSnapshot; model: { model_id: string; score: number; contributions: Record<string, number> }; warning: string };
+export type AiSnapshot = { employee: AiEmployee; snapshotId: number | null; capturedAt: string; snapshotDate?: string; features: Record<string, string | number>; provenance: Record<string, string>; missingFeatures: string[]; invalidFeatures?: string[]; issues: string[]; ready: boolean; warning?: string };
+export type AiModelOutput = { model_id: string; score: number; contributions: Record<string, number>; schema_version?: string; validation_status?: string; demo_mode?: boolean; base_value?: number; riskLevel?: string | null; risk_level?: string | null };
+export type AiPrediction = { saved: boolean; predictionId?: number; snapshotId?: number; createdAt?: string; preview: AiSnapshot; model: AiModelOutput; warning: string };
 type AiModelResponse = { data: { model_id: string; warning: string } };
 let aiModelRequest: Promise<AiModelResponse> | null = null;
 export const getAiModel = () => {
