@@ -544,12 +544,10 @@ export async function listEmployeeProfiles(options: { page?: number; limit?: num
   const { page = 1, limit = 20, ...filters } = options;
   const query = new URLSearchParams();
   for (const [key, value] of Object.entries(filters)) if (value !== undefined && value !== '') query.set(key, String(value));
-  const result = await request<{ data: EmployeeProfile[] }>(`/employees?${query}`, { signal });
+  const suffix = query.size ? `?${query}` : '';
+  const result = await request<{ data: EmployeeProfile[] }>(`/employees${suffix}`, { signal, cache: 'no-store' });
   const total = result.data.length;
-  return {
-    data: result.data.slice((page - 1) * limit, page * limit),
-    pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
-  };
+  return { data: result.data.slice((page - 1) * limit, page * limit), pagination: { page, limit, total, totalPages: Math.ceil(total / limit) } };
 }
 export function getEmployeeProfile(id: number, signal?: AbortSignal) {
   return request<EmployeeProfile>(`/employees/${id}`, { signal });
@@ -563,6 +561,20 @@ export async function updateEmployeeProfile(id: number, changes: EmployeeChanges
 export function deactivateEmployeeProfile(id: number) {
   return request<{ data: { id: number; employmentStatus: string } }>(`/employees/${id}`, { method: 'DELETE' });
 }
+
+export interface CareerGoal {
+  id: number; employeeId: number; careerAspiration: string; goalDescription: string;
+  createdAt: string; updatedAt: string; goalChangeReason: string | null;
+  status: 'ACTIVE' | 'ACHIEVED' | 'REPLACED' | 'CANCELLED';
+}
+export interface CareerGoals { currentGoal: CareerGoal | null; history: CareerGoal[] }
+export const getOwnCareerGoals = () => request<CareerGoals>('/me/career-goals', { cache: 'no-store' });
+export const getEmployeeCareerGoals = (employeeId: number) => request<CareerGoals & { employee: { id: number; employeeCode: string; fullName: string } }>(`/employees/${employeeId}/career-goals`, { cache: 'no-store' });
+export const createCareerGoal = (careerAspiration: string, goalDescription: string) => request<CareerGoal>('/me/career-goals', { method: 'POST', body: JSON.stringify({ careerAspiration, goalDescription }) });
+export const editCareerGoal = (id: number, goalDescription: string) => request<CareerGoal>(`/me/career-goals/${id}`, { method: 'PATCH', body: JSON.stringify({ goalDescription }) });
+export const completeCareerGoal = (id: number) => request<{ id: number; status: 'ACHIEVED'; message: string }>(`/me/career-goals/${id}/complete`, { method: 'POST', body: JSON.stringify({}) });
+export const cancelCareerGoal = (id: number, goalChangeReason: string | null) => request<CareerGoal>(`/me/career-goals/${id}/cancel`, { method: 'POST', body: JSON.stringify({ goalChangeReason }) });
+export const replaceCareerGoal = (id: number, input: { newCareerAspiration: string; newGoalDescription: string; goalChangeReason: string }) => request<{ previousGoal: CareerGoal; currentGoal: CareerGoal }>(`/me/career-goals/${id}/replace`, { method: 'POST', body: JSON.stringify(input) });
 
 interface LoginResponse {
   accessToken?: string;
@@ -914,9 +926,11 @@ export async function listUsers(params: { page?: number; limit?: number; search?
   }
 }
 
-export function listEmployees(search = '') {
-  const query = search ? `?page=1&limit=100&q=${encodeURIComponent(search)}` : '?page=1&limit=100';
-  return request<{ data: ApiEmployee[]; pagination: { page: number; limit: number; total: number; totalPages: number } }>(`/employees${query}`);
+export async function listEmployees(search = '') {
+  const result = await request<{ data: ApiEmployee[] }>('/employees', { cache: 'no-store' });
+  const keyword = search.trim().toLocaleLowerCase();
+  const data = keyword ? result.data.filter(employee => `${employee.employeeCode} ${employee.fullName} ${employee.email}`.toLocaleLowerCase().includes(keyword)) : result.data;
+  return { data, pagination: { page: 1, limit: data.length, total: data.length, totalPages: data.length ? 1 : 0 } };
 }
 
 export async function getUserById(id: number) {

@@ -28,15 +28,11 @@ export interface ImportedAttendance {
   working_minutes: number
   late_mins: number
   early_mins: number
-  outside_shift_minutes: number
   overtime_minutes: number
   record_status: "ACTIVE" | "CANCEL"
-  version: Id
-  schedule_snapshot: {
-    shift_type: string
-    start_time: string
-    end_time: string
-  } | null
+  attendance_status?: string
+  work_schedule_id?: Id
+  record_fingerprint?: string
   cancellation_reason?: string | null
   cancelled_at?: string | null
   cancelled_by?: Id | null
@@ -46,7 +42,6 @@ export interface AttendanceSummary {
   working_minutes: string | number
   late_mins: string | number
   early_mins: string | number
-  outside_shift_minutes: string | number
   overtime_minutes: string | number
 }
 export interface ImportIssue {
@@ -74,13 +69,8 @@ export interface PreviewRow {
   excluded?: boolean
   previous?: ImportedAttendance | null
 }
-export interface ConfirmDecision {
-  duplicate_strategy: "SKIP"
-  confirm_warnings: boolean
-  updates: Array<{ excel_row: number; action: "UPDATE"; reason: string }>
-}
+export interface AttendanceChoice { excel_row: number; work_date?: string; exclude?: boolean }
 export interface ConfirmResult {
-  batch_id: string
   status: string
   inserted: number
   updated: number
@@ -89,26 +79,16 @@ export interface ConfirmResult {
   rows: unknown[]
 }
 export interface AttendanceBatch {
-  batch_id: string
   status: string
-  created_at: string
-  expires_at: string
-  expired: boolean
   rows: PreviewRow[]
-  result?: ConfirmResult | null
-}
-export interface BatchHistory {
-  batch_id: string
-  filename: string
-  status: string
-  created_at: string
-  result?: ConfirmResult | null
+  preview_token: string
+  expires_in_seconds: number
 }
 export interface AttendanceAudit {
   id: Id
   action: string
   reason?: string
-  created_at?: string
+  occurred_at?: string
   old_values?: unknown
   new_values?: unknown
   actor_id?: Id
@@ -139,66 +119,36 @@ export const fetchAttendanceAudit = (id: Id, offset = 0) =>
     root + "/" + id + "/audit-logs?limit=20&offset=" + offset,
     { cache: "no-store" },
   )
-export const mutateAttendance = (
-  row: ImportedAttendance,
-  action: "UPDATE" | "CANCEL" | "RESTORE",
-  reason: string,
-  times?: { check_in: string; check_out: string },
-) =>
+export const cancelAttendance = (row: ImportedAttendance, reason: string) =>
   request<{ data: ImportedAttendance }>(
-    root +
-      "/" +
-      row.id +
-      (action === "UPDATE" ? "" : "/" + action.toLowerCase()),
+    root + "/" + row.id + "/cancel",
     {
       method: "PATCH",
       body: JSON.stringify({
-        expected_version: row.version,
+        expected_fingerprint: row.record_fingerprint,
         reason: reason.trim(),
-        ...(action === "UPDATE" ? times : {}),
       }),
     },
   )
-export const previewAttendance = (file: File) => {
+const importBody = (file: File, options: object) => {
   const body = new FormData()
   body.append("file", file)
-  return request<AttendanceBatch>(root + "/import/preview", {
-    method: "POST",
-    body,
-  })
+  body.append("options", JSON.stringify(options))
+  return body
 }
-export const fetchAttendanceBatch = (id: string) =>
-  request<AttendanceBatch>(root + "/import/" + id, { cache: "no-store" })
-export const resolveAttendanceRow = (
-  id: string,
-  row: number,
-  choice: { work_date?: string; exclude?: boolean },
-) =>
-  request<AttendanceBatch>(root + "/import/" + id + "/rows/" + row, {
-    method: "PATCH",
-    body: JSON.stringify(choice),
-  })
-export const confirmAttendance = (id: string, decision: ConfirmDecision) =>
-  request<ConfirmResult>(root + "/import/" + id + "/confirm", {
+export const previewAttendance = (file: File, choices: AttendanceChoice[] = []) =>
+  request<AttendanceBatch>(root + "/import/preview", {
     method: "POST",
-    body: JSON.stringify(decision),
+    body: importBody(file, { choices }),
   })
-export const attendanceBatches = (offset = 0) =>
-  request<{ data: BatchHistory[] }>(
-    root + "/import/history?limit=10&offset=" + offset,
-    { cache: "no-store" },
-  )
-export const attendanceErrors = (id: string) =>
-  request<Blob>(
-    root + "/import/" + id + "/errors",
-    undefined,
-    undefined,
-    "blob",
-  )
+export const confirmAttendance = (file: File, previewToken: string, choices: AttendanceChoice[], confirmWarnings: boolean) =>
+  request<ConfirmResult>(root + "/import/confirm", {
+    method: "POST",
+    body: importBody(file, { preview_token: previewToken, choices, confirm_warnings: confirmWarnings, duplicate_strategy: "SKIP" }),
+  })
+export const attendanceErrors = (file: File, choices: AttendanceChoice[] = []) =>
+  request<Blob>(root + "/import/errors", { method: "POST", body: importBody(file, { choices }) }, undefined, "blob")
 export const batchBlocked = (b: AttendanceBatch) =>
-  b.expired ||
-  Date.parse(b.expires_at) <= Date.now() ||
-  b.status === "CONFIRMED" ||
   b.rows.some(
     (r) =>
       !r.excluded &&
@@ -206,6 +156,22 @@ export const batchBlocked = (b: AttendanceBatch) =>
       (r.validation_status === "ERROR" ||
         r.issues.some((i) => i.requires_resolution)),
   )
+
+export interface ReconcileScope { from: string; to: string; employee_ids: number[] }
+export interface ReconcileRow {
+  employee_id: number; employee_code: string; full_name?: string; work_date?: string
+  attendance_status?: "HOLIDAY" | "ON_LEAVE"; action: "INSERT" | "KEEP" | "ERROR"; warning?: string | null; message?: string
+}
+export interface ReconcilePreview {
+  scope: ReconcileScope; rows: ReconcileRow[]; summary: { prepared: number; kept: number; errors: number }
+  status: string; preview_token: string
+}
+export const previewAttendanceReconcile = (scope: ReconcileScope) =>
+  request<ReconcilePreview>(root + "/reconcile/preview", { method: "POST", body: JSON.stringify({ scope }) })
+export const confirmAttendanceReconcile = (scope: ReconcileScope, previewToken: string, confirmWarnings: boolean) =>
+  request<{ status: string; scope: ReconcileScope; inserted: number; kept: number }>(root + "/reconcile/confirm", {
+    method: "POST", body: JSON.stringify({ scope, preview_token: previewToken, confirm_warnings: confirmWarnings }),
+  })
 export function attendanceMessage(error: unknown, fallback: string) {
   if (error instanceof ApiError) {
     const messages: Record<string, string> = {

@@ -5,8 +5,9 @@ import { BadgeCheck, BriefcaseBusiness, Building2, CalendarDays, CheckCircle2, I
 import { MotionConfig, motion } from 'motion/react';
 import { SearchableSelect } from '../components/SearchableSelect';
 import { AppShell } from '../components/AppShell';
-import { EmployeeCreateBackgroundFields, type CreateEducationDraft, type CreateExperienceDraft } from '../components/EmployeeCreateBackgroundFields';
+import { EmployeeCreateBackgroundFields, type CreateEducationDraft } from '../components/EmployeeCreateBackgroundFields';
 import { EmployeeApiHistory } from '../components/EmployeeApiHistory';
+import { CareerGoals } from '../components/CareerGoals';
 import { employeeDate, jobChangeDateRestriction } from '../utils/employeeDates';
 import { positionSelection } from '../utils/positionSelection';
 import { useAutoDismissFeedback } from '../hooks/useAutoDismissState';
@@ -56,7 +57,6 @@ export default function HrEmployees() {
   const [form, setForm] = useState<Form>(empty);
   const [selectedPositionTitle, setSelectedPositionTitle] = useState('');
   const [educations, setEducations] = useState<CreateEducationDraft[]>([initialEducation]);
-  const [experiences, setExperiences] = useState<CreateExperienceDraft[]>([]);
   const [addressSuggestions, setAddressSuggestions] = useState<PlaceSuggestion[]>([]);
   const [showAddressSuggestions, setShowAddressSuggestions] = useState(false);
   const [addressLoading, setAddressLoading] = useState(false);
@@ -96,16 +96,14 @@ export default function HrEmployees() {
       setSelectedPositionTitle('');
       try {
         const savedDraft = window.localStorage.getItem(EMPLOYEE_DRAFT_KEY);
-        const parsed = savedDraft ? JSON.parse(savedDraft) as { form?: Partial<Form>; educations?: CreateEducationDraft[]; experiences?: CreateExperienceDraft[] } : null;
+        const parsed = savedDraft ? JSON.parse(savedDraft) as { form?: Partial<Form>; educations?: CreateEducationDraft[] } : null;
         setForm(parsed?.form ? { ...empty, ...parsed.form, departmentId: '', positionId: '' } : empty);
         setEducations(parsed?.educations?.length ? parsed.educations.map(row => ({ ...row,
           educationLevel: ({ '1': '', '2': 'Bachelor', '3': 'Master', '4': 'PhD' } as Record<string, string>)[row.educationLevel] ?? row.educationLevel,
         })) : [initialEducation]);
-        setExperiences(parsed?.experiences || []);
       } catch {
         setForm(empty);
         setEducations([initialEducation]);
-        setExperiences([]);
       }
       setLoading(false); return () => controller.abort();
     }
@@ -134,10 +132,6 @@ export default function HrEmployees() {
     setError(''); setMessage(''); setEmailError('');
     if (creating && educations.some(row => !row.institutionRefId)) {
       setError(text('Hãy chọn trường/cơ sở đào tạo từ danh sách gợi ý trước khi lưu.', 'Select every institution from the verified suggestions before saving.'));
-      return;
-    }
-    if (creating && experiences.length) {
-      setError(text('Hiện chưa thể lưu kinh nghiệm khi tạo hồ sơ. Hãy lưu lại thông tin kinh nghiệm của bạn, bỏ các mục kinh nghiệm ở đây và thêm lại trong hồ sơ sau khi tạo.', 'Experience cannot be saved during profile creation. Keep a copy, remove the experience entries here, then add them to the profile after creation.'));
       return;
     }
     setPending(true);
@@ -292,14 +286,13 @@ export default function HrEmployees() {
     const timer = window.setTimeout(() => {
       try {
         const hasDraft = Object.values(form).some(value => value.trim().length > 0)
-          || educations.some(row => row.institution || row.fieldOfStudy || row.graduationYear)
-          || experiences.length > 0;
-        if (hasDraft) window.localStorage.setItem(EMPLOYEE_DRAFT_KEY, JSON.stringify({ form, educations, experiences }));
+          || educations.some(row => row.institution || row.fieldOfStudy || row.graduationYear);
+        if (hasDraft) window.localStorage.setItem(EMPLOYEE_DRAFT_KEY, JSON.stringify({ form, educations }));
         else window.localStorage.removeItem(EMPLOYEE_DRAFT_KEY);
       } catch { /* Storage may be unavailable in private browsing. */ }
     }, 300);
     return () => window.clearTimeout(timer);
-  }, [creating, form, educations, experiences]);
+  }, [creating, form, educations]);
   return <AppShell breadcrumb={['Workforce', 'Employees']}>
     <Card className="mb-5 p-6"><div className="flex flex-wrap items-center justify-between gap-3">
       <h1 className="text-2xl font-bold">{text(creating ? 'Thêm nhân viên' : showingRecord ? 'Chi tiết nhân viên' : 'Danh sách nhân viên', creating ? 'Add employee' : showingRecord ? 'Employee details' : 'Employee directory')}</h1>
@@ -364,7 +357,7 @@ export default function HrEmployees() {
             </label>
           </motion.section>
 
-          <EmployeeCreateBackgroundFields educations={educations} experiences={experiences} dateOfBirth={form.dateOfBirth} disabled={pending} text={text} onEducationsChange={setEducations} onExperiencesChange={setExperiences} />
+          <EmployeeCreateBackgroundFields educations={educations} experiences={[]} dateOfBirth={form.dateOfBirth} disabled={pending} text={text} onEducationsChange={setEducations} onExperiencesChange={() => undefined} />
         </fieldset>
         <motion.aside variants={createItemMotion} className="xl:sticky xl:top-5">
           <Card className="p-5 sm:p-6"><p className="text-xs font-bold uppercase tracking-[0.12em] text-orange-600">{text('Trước khi lưu', 'Before saving')}</p><h2 className="mt-2 text-lg font-semibold text-slate-950">{text('Hồ sơ nhân viên mới', 'New employee profile')}</h2>
@@ -472,6 +465,7 @@ export default function HrEmployees() {
         <div className="mt-5 flex flex-wrap items-center justify-between gap-3"><p className="text-sm text-slate-500">{text('Trang', 'Page')} {page} / {Math.max(1, pages)} · {total} {text('nhân viên', 'employees')}</p><div className="flex gap-3"><Button variant="secondary" disabled={page <= 1} onClick={() => setPage(p => p - 1)}>{text('Trang trước', 'Previous')}</Button><Button variant="secondary" disabled={page >= pages} onClick={() => setPage(p => p + 1)}>{text('Trang sau', 'Next')}</Button></div></div></>}
       </Card>}
     {showingRecord && detail && <EmployeeApiHistory employeeId={detail.id} employeeEmail={detail.email} dateOfBirth={detail.dateOfBirth} editable={editing && detail.employmentStatus === 'ACTIVE'} />}
+    {showingRecord && detail && <CareerGoals employeeId={detail.id} />}
   </AppShell>;
 }
 

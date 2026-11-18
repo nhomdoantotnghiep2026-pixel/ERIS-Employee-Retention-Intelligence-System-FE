@@ -10,7 +10,7 @@ test("shift timeline accepts overnight and rejects breaks outside the actual shi
   assert.equal(validScheduleTimeline("08:00", "08:00", null, null), false)
   assert.equal(validScheduleTimeline("08:00", "17:00", null, "13:00"), false)
 })
-test("main attendance contract: preview only, explicit row decisions, versioned mutations, owner endpoints and authenticated export", async () => {
+test("main attendance contract: stateless preview, explicit row decisions, fingerprint cancellation, owner endpoints and authenticated export", async () => {
   const server = await createServer({
     configFile: false,
     server: { middlewareMode: true, ws: false },
@@ -22,7 +22,7 @@ test("main attendance contract: preview only, explicit row decisions, versioned 
     value: { getItem: () => "fixture-token" },
   })
   const calls: Array<{ url: string; init?: RequestInit }> = []
-  let response = Response.json({ batch_id: "batch", rows: [] })
+  let response = Response.json({ status: "READY", rows: [], preview_token: "token", expires_in_seconds: 1800 })
   globalThis.fetch = async (url, init) => {
     calls.push({ url: String(url), init })
     return response
@@ -45,38 +45,25 @@ test("main attendance contract: preview only, explicit row decisions, versioned 
       await (calls.at(-1)!.init!.body as FormData).get("file")!.text(),
       "original bytes",
     )
-    await api.resolveAttendanceRow("batch", 4, { work_date: "2026-11-16" })
-    assert.equal(calls.at(-1)!.url, "/api/v1/attendance/import/batch/rows/4")
-    assert.deepEqual(JSON.parse(String(calls.at(-1)!.init?.body)), {
-      work_date: "2026-11-16",
-    })
-    await api.resolveAttendanceRow("batch", 5, { exclude: true })
-    const decision = {
-      duplicate_strategy: "SKIP",
-      confirm_warnings: true,
-      updates: [{ excel_row: 4, action: "UPDATE", reason: "Correct source" }],
-    }
-    await api.confirmAttendance("batch", decision)
-    assert.equal(calls.at(-1)!.url, "/api/v1/attendance/import/batch/confirm")
-    assert.deepEqual(JSON.parse(String(calls.at(-1)!.init?.body)), decision)
-    const row = { id: "9007199254740995", version: "12" }
-    await api.mutateAttendance(row, "CANCEL", " why ")
+    const choices = [{ excel_row: 4, work_date: "2026-11-16" }, { excel_row: 5, exclude: true }]
+    await api.previewAttendance(file, choices)
+    assert.deepEqual(JSON.parse(String((calls.at(-1)!.init!.body as FormData).get("options"))), { choices })
+    await api.confirmAttendance(file, "preview-token", choices, true)
+    assert.equal(calls.at(-1)!.url, "/api/v1/attendance/import/confirm")
+    const confirmOptions = JSON.parse(String((calls.at(-1)!.init!.body as FormData).get("options")))
+    assert.equal(confirmOptions.preview_token, "preview-token")
+    assert.deepEqual(confirmOptions.choices, choices)
+    const row = { id: "9007199254740995", record_fingerprint: "a".repeat(64) }
+    await api.cancelAttendance(row, " why ")
     assert.equal(
       calls.at(-1)!.url,
       "/api/v1/attendance/9007199254740995/cancel",
     )
     assert.equal(calls.at(-1)!.init?.method, "PATCH")
     assert.deepEqual(JSON.parse(String(calls.at(-1)!.init?.body)), {
-      expected_version: "12",
+      expected_fingerprint: "a".repeat(64),
       reason: "why",
     })
-    await api.mutateAttendance(row, "UPDATE", "Correction", {
-      check_in: "2026-11-16 22:15:00",
-      check_out: "2026-11-17 06:10:00",
-    })
-    const edit = JSON.parse(String(calls.at(-1)!.init?.body))
-    assert.equal(edit.check_out, "2026-11-17 06:10:00")
-    assert.equal("working_minutes" in edit, false)
     await api.fetchAttendance(
       { record_status: "CANCEL", offset: 20, limit: 20 },
       true,
@@ -92,7 +79,7 @@ test("main attendance contract: preview only, explicit row decisions, versioned 
       },
     })
     assert.equal(
-      await (await api.attendanceErrors("batch")).text(),
+      await (await api.attendanceErrors(file, choices)).text(),
       "xlsx bytes",
     )
     assert.equal(
@@ -100,9 +87,9 @@ test("main attendance contract: preview only, explicit row decisions, versioned 
       "Bearer fixture-token",
     )
     const batch = {
-      expired: false,
       status: "READY",
-      expires_at: "2099-01-01",
+      preview_token: "token",
+      expires_in_seconds: 1800,
       rows: [
         {
           excluded: false,
@@ -118,10 +105,6 @@ test("main attendance contract: preview only, explicit row decisions, versioned 
         rows: [{ ...batch.rows[0], excluded: true }],
       }),
       false,
-    )
-    assert.equal(
-      api.batchBlocked({ ...batch, status: "CONFIRMED", rows: [] }),
-      true,
     )
   } finally {
     globalThis.fetch = original
