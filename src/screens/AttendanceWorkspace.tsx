@@ -1,10 +1,21 @@
 import { useEffect, useState, type FormEvent } from "react"
-import { Inbox, RotateCcw, Search } from "lucide-react"
+import { Link } from "react-router-dom"
+import {
+  CalendarRange,
+  HelpCircle,
+  Inbox,
+  RotateCcw,
+  Search,
+  Upload,
+  X,
+} from "lucide-react"
 import { AppShell } from "../components/AppShell"
 import { Button, Card, SectionHeader } from "../components/ui"
 import AttendanceImport from "../components/AttendanceImport"
 import AttendanceReconcile from "../components/AttendanceReconcile"
 import { useLanguage } from "../context/LanguageContext"
+import { useAutoDismissFeedback } from "../hooks/useAutoDismissState"
+import { listWorkSchedules } from "../services/api"
 import {
   fetchAttendance,
   fetchAttendanceSummary,
@@ -33,6 +44,7 @@ export default function AttendanceWorkspace({
     [draft, setDraft] = useState<RecordFilters>({ record_status: "ACTIVE" })
   const [rows, setRows] = useState<ImportedAttendance[]>([]),
     [summary, setSummary] = useState<AttendanceSummary | null>(null)
+  const [hasAnyRecords, setHasAnyRecords] = useState<boolean | null>(null)
   const [selected, setSelected] = useState<ImportedAttendance | null>(null),
     [logs, setLogs] = useState<AttendanceAudit[]>([]),
     [logOffset, setLogOffset] = useState(0)
@@ -40,25 +52,23 @@ export default function AttendanceWorkspace({
     [revision, setRevision] = useState(0),
     [loading, setLoading] = useState(true),
     [busy, setBusy] = useState(false)
-  const [error, setError] = useState(""),
-    [notice, setNotice] = useState(""),
-    [logError, setLogError] = useState("")
+  const { error, message: notice, setError, setMessage: setNotice } = useAutoDismissFeedback()
+  const [logError, setLogError] = useState("")
   const [reason, setReason] = useState("")
+  const [importOpen, setImportOpen] = useState(false)
+  const [importBusy, setImportBusy] = useState(false)
+  const [reconcileOpen, setReconcileOpen] = useState(false)
+  const [reconcileBusy, setReconcileBusy] = useState(false)
+  const [activeShiftTypes, setActiveShiftTypes] = useState<string[]>([])
+  const [scheduleCheck, setScheduleCheck] = useState<"loading" | "ready" | "missing" | "error">("loading")
   useEffect(() => {
     const c = new AbortController()
     setLoading(true)
     setError("")
     setRows([])
-    setSummary(null)
-    void Promise.all([
-      fetchAttendance({ ...filters, limit: 20, offset }, own, c.signal),
-      own ? Promise.resolve(null) : fetchAttendanceSummary(filters, c.signal),
-    ])
-      .then(([r, s]) => {
-        if (!c.signal.aborted) {
-          setRows(r.data)
-          setSummary(s?.data || null)
-        }
+    void fetchAttendance({ ...filters, limit: 20, offset }, own, c.signal)
+      .then((response) => {
+        if (!c.signal.aborted) setRows(response.data)
       })
       .catch((e) => {
         if (!c.signal.aborted)
@@ -72,8 +82,31 @@ export default function AttendanceWorkspace({
       .finally(() => {
         if (!c.signal.aborted) setLoading(false)
       })
+    if (!own) {
+      setSummary(null)
+      void fetchAttendanceSummary(filters, c.signal)
+        .then((response) => { if (!c.signal.aborted) setSummary(response.data) })
+        .catch(() => { if (!c.signal.aborted) setSummary(null) })
+    }
+    void fetchAttendance({ record_status: "ALL", limit: 1, offset: 0 }, own, c.signal)
+      .then((response) => { if (!c.signal.aborted) setHasAnyRecords(response.data.length > 0) })
+      .catch(() => undefined)
     return () => c.abort()
   }, [filters, offset, revision, own])
+  useEffect(() => {
+    if (own) return
+    let live = true
+    setScheduleCheck("loading")
+    void listWorkSchedules()
+      .then((response) => {
+        if (!live) return
+        const shiftTypes = Array.from(new Set(response.data.filter((schedule) => schedule.status === "ACTIVE" && schedule.shift_type?.trim()).map((schedule) => schedule.shift_type!.trim())))
+        setActiveShiftTypes(shiftTypes)
+        setScheduleCheck(shiftTypes.length ? "ready" : "missing")
+      })
+      .catch(() => { if (live) setScheduleCheck("error") })
+    return () => { live = false }
+  }, [own, revision])
   useEffect(() => {
     let live = true
     setLogs([])
@@ -99,6 +132,22 @@ export default function AttendanceWorkspace({
       live = false
     }
   }, [selected, logOffset, own])
+  useEffect(() => {
+    if (!importOpen && !reconcileOpen && !selected) return
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = "hidden"
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key !== "Escape" || busy || importBusy || reconcileBusy) return
+      setImportOpen(false)
+      setReconcileOpen(false)
+      setSelected(null)
+    }
+    window.addEventListener("keydown", closeOnEscape)
+    return () => {
+      document.body.style.overflow = previousOverflow
+      window.removeEventListener("keydown", closeOnEscape)
+    }
+  }, [importOpen, reconcileOpen, selected, busy, importBusy, reconcileBusy])
   async function open(row: ImportedAttendance) {
     if (busy) return
     setBusy(true)
@@ -151,9 +200,17 @@ export default function AttendanceWorkspace({
     }
   }
   const invalid = !!(draft.from && draft.to && draft.from > draft.to)
+  const pageStart = rows.length ? offset + 1 : 0
+  const pageEnd = offset + rows.length
   return (
     <AppShell
-      breadcrumb={["Workforce", own ? "My Attendance" : "Attendance history"]}
+      breadcrumb={[
+        tr("Nhân sự", "Workforce"),
+        tr(
+          own ? "Chấm công của tôi" : "Quản lý chấm công",
+          own ? "My attendance" : "Attendance management",
+        ),
+      ]}
     >
       <SectionHeader
         title={tr(
@@ -165,38 +222,195 @@ export default function AttendanceWorkspace({
           "Source data is reviewed before saving. Missing data does not imply absence.",
         )}
       >
-        <Button
-          variant="secondary"
-          disabled={loading || busy}
-          onClick={() => {
-            setSelected(null)
-            setRevision((v) => v + 1)
-          }}
-        >
-          {tr("Tải lại", "Refresh")}
-        </Button>
+        {!own ? (
+          <>
+            <span
+              className="inline-flex"
+              title={!hasAnyRecords ? tr("Cần có dữ liệu chấm công trước khi đối soát.", "Import attendance data before reconciliation.") : undefined}
+            >
+              <Button
+                type="button"
+                variant="secondary"
+                disabled={!hasAnyRecords}
+                onClick={() => setReconcileOpen(true)}
+              >
+                <CalendarRange size={16} />
+                {tr("Đối soát", "Reconcile")}
+              </Button>
+            </span>
+            <span
+              className="inline-flex"
+              title={scheduleCheck === "missing" ? tr("Cần tạo ít nhất một ca đang hoạt động trước khi nhập.", "Create at least one active schedule before importing.") : undefined}
+            >
+            <Button
+              type="button"
+              disabled={scheduleCheck === "loading" || scheduleCheck === "missing"}
+              onClick={() => setImportOpen(true)}
+            >
+              <Upload size={16} />
+              {tr("Nhập chấm công", "Import attendance")}
+            </Button>
+            </span>
+          </>
+        ) : (
+          <Button
+            variant="secondary"
+            disabled={loading || busy}
+            onClick={() => setRevision((v) => v + 1)}
+          >
+            {tr("Tải lại", "Refresh")}
+          </Button>
+        )}
       </SectionHeader>
       {error && (
-        <p role="alert" className="mb-4 rounded-xl bg-red-50 p-4 text-red-800">
+        <p role="alert" className="mb-4 rounded-md bg-red-50 p-4 text-red-800">
           {error}
         </p>
       )}
       {notice && (
         <p
           role="status"
-          className="mb-4 rounded-xl bg-emerald-50 p-4 text-emerald-800"
+          className="mb-4 rounded-md bg-emerald-50 p-4 text-emerald-800"
         >
           {notice}
         </p>
       )}
-      {!own && (
-        <><AttendanceImport onImported={() => { setOffset(0); setRevision((v) => v + 1) }}/><AttendanceReconcile onSaved={() => { setOffset(0); setRevision((v) => v + 1) }}/></>
+      {!own && scheduleCheck === "missing" && (
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-md border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
+          <div>
+            <p className="font-semibold">{tr("Chưa thể nhập dữ liệu chấm công", "Attendance import is not ready")}</p>
+            <p className="mt-1">{tr("Hệ thống chưa có mã ca đang hoạt động. Hãy tạo ca và gán ca cho nhân viên trước.", "There is no active shift code. Create a schedule and assign it to employees first.")}</p>
+          </div>
+          <Link to="/work-schedules" className="inline-flex h-10 items-center rounded-md border border-amber-300 bg-white px-4 font-semibold text-amber-900 hover:bg-amber-100">
+            {tr("Tạo ca làm việc", "Create schedule")}
+          </Link>
+        </div>
       )}
-      <Card className="mb-4 p-5">
+      {!own && scheduleCheck === "error" && (
+        <p className="mb-4 rounded-md bg-blue-50 p-3 text-sm text-blue-900">
+          {tr("Không kiểm tra được danh mục ca. Bạn vẫn có thể nhập tệp; hệ thống sẽ kiểm tra lại khi xem trước.", "The schedule catalogue could not be checked. You can still upload; preview will validate it.")}
+        </p>
+      )}
+      {importOpen && (
+        <div
+          className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-[1px]"
+          role="dialog"
+          aria-modal="true"
+          aria-label={tr("Nhập dữ liệu chấm công", "Import attendance data")}
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget && !importBusy) setImportOpen(false)
+          }}
+        >
+          <Card className="relative max-h-[calc(100vh-2rem)] w-full max-w-4xl overflow-y-auto p-5 shadow-2xl sm:p-6">
+            <button
+              type="button"
+              aria-label={tr("Đóng", "Close")}
+              disabled={importBusy}
+              className="absolute right-5 top-5 z-10 flex size-10 items-center justify-center rounded-md text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+              onClick={() => setImportOpen(false)}
+            >
+              <X size={20} />
+            </button>
+            <AttendanceImport
+              activeShiftTypes={activeShiftTypes}
+              onBusyChange={setImportBusy}
+              onImported={(result) => {
+                setImportOpen(false)
+                setOffset(0)
+                setRevision((v) => v + 1)
+                setNotice(
+                  tr(
+                    `Nhập chấm công thành công: đã lưu ${result.inserted} bản ghi, bỏ qua ${result.skipped}, loại ${result.excluded}.`,
+                    `Attendance imported successfully: saved ${result.inserted}, skipped ${result.skipped}, excluded ${result.excluded}.`,
+                  ),
+                )
+              }}
+            />
+          </Card>
+        </div>
+      )}
+      {reconcileOpen && (
+        <div
+          className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-[1px]"
+          role="dialog"
+          aria-modal="true"
+          aria-label={tr("Đối soát ngày nghỉ và ngày lễ", "Reconcile leave and holidays")}
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget && !reconcileBusy) setReconcileOpen(false)
+          }}
+        >
+          <Card className="relative max-h-[calc(100vh-2rem)] w-full max-w-4xl overflow-y-auto p-5 shadow-2xl sm:p-6">
+            <button
+              type="button"
+              aria-label={tr("Đóng", "Close")}
+              disabled={reconcileBusy}
+              className="absolute right-5 top-5 z-10 flex size-10 items-center justify-center rounded-md text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+              onClick={() => setReconcileOpen(false)}
+            >
+              <X size={20} />
+            </button>
+            <AttendanceReconcile
+              onBusyChange={setReconcileBusy}
+              onSaved={(result) => {
+                setReconcileOpen(false)
+                setOffset(0)
+                setRevision((v) => v + 1)
+                setNotice(
+                  tr(
+                    `Đối soát thành công: đã tạo ${result.inserted} bản ghi, giữ nguyên ${result.kept}.`,
+                    `Reconciliation completed: created ${result.inserted}, kept ${result.kept}.`,
+                  ),
+                )
+              }}
+            />
+          </Card>
+        </div>
+      )}
+      {hasAnyRecords && summary && (
+        <section className="mb-4">
+          <div className="mb-3 flex items-center gap-2">
+            <h2 className="text-base font-semibold text-slate-950">
+              {tr("Tổng hợp chấm công đang sử dụng", "Active attendance summary")}
+            </h2>
+            <span
+              title={tr(
+                "Chỉ tính các bản ghi đang sử dụng trong bộ lọc hiện tại.",
+                "Counts active records within the current filters only.",
+              )}
+              className="inline-flex cursor-help text-slate-500"
+            >
+              <HelpCircle size={16} />
+            </span>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            {[
+              [tr("Ngày có bản ghi", "Recorded days"), summary.recorded_days],
+              [tr("Phút công thực tế", "Work minutes"), summary.working_minutes],
+              [
+                tr("Đi muộn / về sớm", "Late / early minutes"),
+                `${summary.late_mins} / ${summary.early_mins}`,
+              ],
+              [
+                tr("Phút tăng ca", "Overtime minutes"),
+                summary.overtime_minutes,
+              ],
+            ].map(([label, value]) => (
+              <Card key={String(label)} className="p-4">
+                <p className="text-sm font-semibold text-slate-600">{label}</p>
+                <p className="mt-2 text-2xl font-bold tabular-nums text-slate-950">
+                  {value}
+                </p>
+              </Card>
+            ))}
+          </div>
+        </section>
+      )}
+      <Card className={hasAnyRecords ? "mb-0 rounded-b-none border-b-0 p-5 shadow-none" : "hidden"}>
         <form
           onSubmit={(e) => {
             e.preventDefault()
             if (!invalid) {
+              setNotice("")
               setFilters({ ...draft })
               setOffset(0)
               setSelected(null)
@@ -272,6 +486,7 @@ export default function AttendanceWorkspace({
                 variant="secondary"
                 disabled={loading}
                 onClick={() => {
+                  setNotice("")
                   const initial = { record_status: "ACTIVE" } as RecordFilters
                   setDraft(initial)
                   setFilters(initial)
@@ -294,44 +509,17 @@ export default function AttendanceWorkspace({
           )}
         </form>
       </Card>
-      {summary && (
-        <Card className="mb-4 p-5">
-          <h2 className="font-bold">
-            {tr(
-              "Tổng hợp bản ghi đang sử dụng trong bộ lọc",
-              "Summary of active records within filters",
-            )}
-          </h2>
-          <dl className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {[
-              [tr("Ngày có bản ghi", "Recorded days"), summary.recorded_days],
-              [
-                tr("Phút công thực tế", "Work minutes"),
-                summary.working_minutes,
-              ],
-              [tr("Phút đi muộn", "Late minutes"), summary.late_mins],
-              [tr("Phút về sớm", "Early minutes"), summary.early_mins],
-              [
-                tr("Phút tăng ca được ghi nhận", "Recorded overtime minutes"),
-                summary.overtime_minutes,
-              ],
-            ].map(([label, value]) => (
-              <div key={label} className="rounded-xl bg-slate-50 p-3">
-                <dt className="text-sm text-slate-600">{label}</dt>
-                <dd className="mt-1 text-xl font-bold">{value}</dd>
-              </div>
-            ))}
-          </dl>
-          <p className="mt-3 text-sm text-slate-500">
-            {tr(
-              "Tổng hợp chỉ tính bản ghi đang sử dụng, không phải số ngày phải đi làm.",
-              "Summary includes active records only, not expected work days.",
-            )}
-          </p>
-        </Card>
-      )}
       {selected && (
-        <Card className="mb-4 p-5">
+        <div
+          className="fixed inset-0 z-[80] bg-slate-950/40 backdrop-blur-[1px]"
+          role="dialog"
+          aria-modal="true"
+          aria-label={tr("Chi tiết chấm công", "Attendance details")}
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget && !busy) setSelected(null)
+          }}
+        >
+          <Card className="absolute inset-y-0 right-0 flex w-full max-w-xl flex-col overflow-y-auto rounded-none border-0 p-5 shadow-2xl sm:p-6">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <h2 className="font-bold">
               {selected.employee_code} · {selected.full_name} ·{" "}
@@ -426,9 +614,10 @@ export default function AttendanceWorkspace({
               </div>
             </details>
           )}
-        </Card>
+          </Card>
+        </div>
       )}
-      <Card className="p-5">
+      <Card className={hasAnyRecords ? "rounded-t-none p-5" : "p-5"}>
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <div>
             <h2 className="text-base font-semibold text-slate-950">
@@ -442,14 +631,14 @@ export default function AttendanceWorkspace({
             </p>
           </div>
           <span className="rounded-md bg-slate-100 px-3 py-1.5 text-sm font-semibold text-slate-700">
-            {rows.length} {tr("bản ghi", "records")}
+            {rows.length} {tr("bản ghi trên trang", "records on this page")}
           </span>
         </div>
         {loading ? (
           <p role="status">{tr("Đang tải…", "Loading…")}</p>
         ) : (
           <>
-            <div className="overflow-x-auto">
+            <div className={hasAnyRecords ? "overflow-x-auto" : "hidden"}>
               <table className="w-full whitespace-nowrap text-left text-sm">
                 <thead className="bg-slate-50">
                   <tr>
@@ -493,13 +682,16 @@ export default function AttendanceWorkspace({
                       </td>
                       <td className="p-3">{r.overtime_minutes}</td>
                       <td className="p-3">
-                        {r.record_status === "CANCEL"
-                          ? tr("Đã hủy", "Cancelled")
-                          : tr("Đang dùng", "Active")}
+                        <span className={`inline-flex h-6 items-center rounded-md border px-2 text-xs font-semibold ${r.record_status === "CANCEL" ? "border-slate-300 bg-slate-100 text-slate-700" : "border-emerald-300 bg-emerald-50 text-emerald-800"}`}>
+                          {r.record_status === "CANCEL"
+                            ? tr("Đã hủy", "Cancelled")
+                            : tr("Đang sử dụng", "Active")}
+                        </span>
                       </td>
                       <td className="p-3">
                         <Button
-                          variant="info"
+                          variant="secondary"
+                          size="sm"
                           disabled={busy}
                           onClick={() => void open(r)}
                         >
@@ -517,25 +709,36 @@ export default function AttendanceWorkspace({
                   <Inbox size={23} />
                 </span>
                 <p className="mt-3 text-sm font-semibold text-slate-800">
-                  {tr(
-                    "Không có bản ghi trong bộ lọc này.",
-                    "No records match these filters.",
-                  )}
+                  {hasAnyRecords
+                    ? tr(
+                        "Không có bản ghi trong bộ lọc này.",
+                        "No records match these filters.",
+                      )
+                    : tr(
+                        "Chưa có dữ liệu chấm công.",
+                        "No attendance data yet.",
+                      )}
                 </p>
                 <p className="mt-1 text-sm font-medium text-slate-600">
-                  {tr(
-                    "Hãy tải tệp chấm công lên hoặc thay đổi điều kiện lọc.",
-                    "Upload an attendance file or change the filters.",
-                  )}
+                  {hasAnyRecords
+                    ? tr(
+                        "Hãy thay đổi điều kiện lọc để tìm lại.",
+                        "Change the filters to search again.",
+                      )
+                    : tr(
+                        "Sử dụng nút Nhập chấm công ở góc trên bên phải để bắt đầu.",
+                        "Use Import attendance in the top-right corner to get started.",
+                      )}
                 </p>
               </div>
             )}
           </>
         )}
-        <div className="mt-4 flex flex-col gap-3 border-t border-slate-200 pt-4 sm:flex-row sm:items-center sm:justify-between">
-          <span className="text-sm">
-            {tr("Trang chấm công", "Attendance page")} {offset / 20 + 1}
-          </span>
+        {hasAnyRecords && <div className="mt-4 flex flex-col gap-3 border-t border-slate-200 pt-4 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-sm font-medium text-slate-600">
+            {tr("Hiển thị", "Showing")} {pageStart} - {pageEnd}{" "}
+            {tr("bản ghi", "records")}
+          </p>
           <div className="flex gap-2">
             <Button
               variant="secondary"
@@ -544,6 +747,9 @@ export default function AttendanceWorkspace({
             >
               {tr("Trước", "Previous")}
             </Button>
+            <span className="flex min-w-10 items-center justify-center rounded-md bg-slate-100 px-3 text-sm font-semibold text-slate-700">
+              {offset / 20 + 1}
+            </span>
             <Button
               variant="secondary"
               disabled={loading || rows.length < 20}
@@ -552,7 +758,7 @@ export default function AttendanceWorkspace({
               {tr("Trang sau", "Next page")}
             </Button>
           </div>
-        </div>
+        </div>}
       </Card>
     </AppShell>
   )

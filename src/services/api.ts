@@ -934,7 +934,7 @@ export async function listUsers(params: { page?: number; limit?: number; search?
 export async function listEmployees(search = '') {
   const result = await request<{ data: ApiEmployee[] }>('/employees', { cache: 'no-store' });
   const keyword = search.trim().toLocaleLowerCase();
-  const data = keyword ? result.data.filter(employee => `${employee.employeeCode} ${employee.fullName} ${employee.email}`.toLocaleLowerCase().includes(keyword)) : result.data;
+  const data = keyword ? result.data.filter(employee => `${employee.employee_code} ${employee.full_name} ${employee.email}`.toLocaleLowerCase().includes(keyword)) : result.data;
   return { data, pagination: { page: 1, limit: data.length, total: data.length, totalPages: data.length ? 1 : 0 } };
 }
 

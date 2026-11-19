@@ -1,0 +1,4 @@
+employee_code,leave_type,start_date,end_date,reason
+EMP001,LT001,2026-11-24,2026-11-24,Nghi viec ca nhan
+EMP002,LT001,2026-11-25,2026-11-26,Nghi phep nam
+EMP003,LT001,2026-11-27,2026-11-27,Kham suc khoe

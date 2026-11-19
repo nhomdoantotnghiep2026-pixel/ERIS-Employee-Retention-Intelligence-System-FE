@@ -37,6 +37,8 @@ This project uses **Tailwind CSS v4** through the `@tailwindcss/vite` plugin con
 
 Apply these rules to every future UI implementation and refactor:
 
+For any request to create, redesign, or review ERIS screens or components, use the project skill at `.agents/skills/ui-ux-pro-max/SKILL.md` when it is installed. Read its workflow and use its design-system search for a React + Tailwind SaaS dashboard before choosing layout, typography, colors, interaction states, and responsive behavior. Treat the ERIS rules below and the user's current request as the project-specific constraints if a generated recommendation differs. Review the finished UI for accessibility, responsive layout, readable contrast, and consistent components. If the skill is missing, say so and follow the rules below; do not claim its recommendations were applied.
+
 1. **Design style:** Use a Modern Minimalist SaaS visual language inspired by Linear, Vercel, and Notion.
 2. **Preferred component system:** Always prefer `shadcn/ui` components with Tailwind CSS. Do not hand-write raw CSS for buttons or form controls.
 3. **Form layout:** Never stretch create or edit forms across the full viewport width. Place them in a Dialog (modal), Sheet (side drawer), or constrain them to `max-w-2xl`.
