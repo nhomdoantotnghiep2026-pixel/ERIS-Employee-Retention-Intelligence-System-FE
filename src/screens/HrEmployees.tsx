@@ -2,7 +2,7 @@ import { Button as ListButton } from '../components/ui/button';
 import { useAutoDismissState } from '../hooks/useAutoDismissState';
 import { useEffect, useState, type FormEvent, type MouseEvent, type ReactNode } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
-import { BadgeCheck, BriefcaseBusiness, Building2, CalendarDays, CheckCircle2, IdCard, Mail, MapPin, Phone, Route, Search, SlidersHorizontal, Upload, UserRound, WalletCards, X } from 'lucide-react';
+import { BadgeCheck, BarChart3, BriefcaseBusiness, Building2, CalendarDays, CheckCircle2, IdCard, Mail, MapPin, Phone, Route, Search, SlidersHorizontal, Upload, UserRound, WalletCards, X } from 'lucide-react';
 import { MotionConfig, motion } from 'motion/react';
 import { SearchableSelect } from '../components/SearchableSelect';
 import { AppShell } from '../components/AppShell';
@@ -64,13 +64,18 @@ export default function HrEmployees() {
   const [departments, setDepartments] = useState<Array<{ id: number; name: string }>>([]);
   const [positions, setPositions] = useState<Array<{ id: number; name: string; code: string; jobLevel: number; departmentId?: number | null }>>([]);
   const [catalogError, setCatalogError] = useState('');
+  const initialFilters = new URLSearchParams(location.search);
+  const initialDepartment = initialFilters.get('department') ?? '';
+  const initialQuery = initialFilters.get('q') ?? '';
+  const requestedStatus = initialFilters.get('status');
+  const initialStatus = requestedStatus === '' || requestedStatus === 'INACTIVE' ? requestedStatus : 'ACTIVE';
   const [filtersOpen, setFiltersOpen] = useState(false);
-  const [query, setQuery] = useState(''), [search, setSearch] = useState('');
-  const [departmentId, setDepartmentId] = useState(''), [positionId, setPositionId] = useState('');
-  const [status, setStatus] = useState('ACTIVE');
-  const [draftDepartmentId, setDraftDepartmentId] = useState('');
+  const [query, setQuery] = useState(initialQuery), [search, setSearch] = useState(initialQuery);
+  const [departmentId, setDepartmentId] = useState(initialDepartment), [positionId, setPositionId] = useState('');
+  const [status, setStatus] = useState(initialStatus);
+  const [draftDepartmentId, setDraftDepartmentId] = useState(initialDepartment);
   const [draftPositionId, setDraftPositionId] = useState('');
-  const [draftStatus, setDraftStatus] = useState('ACTIVE');
+  const [draftStatus, setDraftStatus] = useState(initialStatus);
   
   const [page, setPage] = useState(1), [total, setTotal] = useState(0), [pages, setPages] = useState(0);
   const [revision, setRevision] = useState(0), [loading, setLoading] = useState(true), [pending, setPending] = useState(false);
@@ -298,7 +303,7 @@ export default function HrEmployees() {
   return <AppShell breadcrumb={['Workforce', 'Employees']}>
     <Card className="mb-5 p-6"><div className="flex flex-wrap items-center justify-between gap-3">
       <h1 className="text-2xl font-bold">{text(creating ? 'Thêm nhân viên' : showingRecord ? 'Chi tiết nhân viên' : 'Danh sách nhân viên', creating ? 'Add employee' : showingRecord ? 'Employee details' : 'Employee directory')}</h1>
-      <div className="flex flex-wrap justify-end gap-2">{!creating && !showingRecord && <><Button variant="secondary" onClick={() => navigate('/employees/import')}><Upload size={16}/>{text('Nhập danh sách', 'Import employees')}</Button><Button onClick={() => navigate('/employees/new')}><UserRound size={16}/>{text('Thêm nhân viên', 'Add employee')}</Button></>}
+      <div className="flex flex-wrap justify-end gap-2">{!creating && !showingRecord && <><Button variant="secondary" className="rounded-md" onClick={() => navigate('/employees/dashboard')}><BarChart3 size={16} aria-hidden="true" />{text('Xem dashboard', 'View dashboard')}</Button><Button variant="secondary" onClick={() => navigate('/employees/import')}><Upload size={16}/>{text('Nhập danh sách', 'Import employees')}</Button><Button onClick={() => navigate('/employees/new')}><UserRound size={16}/>{text('Thêm nhân viên', 'Add employee')}</Button></>}
         {(creating || showingRecord) && <Button variant="secondary" onClick={() => navigate('/employees')}>{text('Về danh sách', 'Back to list')}</Button>}</div>
     </div></Card>
     {message && <p role="status" className="mb-5 rounded-xl bg-emerald-50 p-4 text-emerald-800">{t(message)}</p>}

@@ -214,12 +214,11 @@ export default function Landing() {
       <section className="px-5 pb-4 pt-16 sm:px-8 sm:pt-20">
         <div className="mx-auto max-w-7xl text-center">
           <p className="text-sm font-semibold text-slate-500">{t("Một nền tảng phối hợp xuyên suốt giữa các vai trò")}</p>
-          <div id="roles" className="mt-7 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <div id="roles" className="mt-7 grid gap-3 sm:grid-cols-3">
             {[
               [UsersRound, 'HR', 'Hồ sơ · Rủi ro · Can thiệp'],
-              [Database, 'Data / AI', 'Dữ liệu · Mô hình · Đánh giá'],
-              [UserCog, 'System Admin', 'Tài khoản · Quyền · Cấu hình'],
-              [ShieldCheck, 'Employee / ESS', 'Cá nhân · Khảo sát · Tiện ích'],
+              [UserCog, 'Admin', 'Tài khoản · Quyền · Cấu hình'],
+              [ShieldCheck, 'Employee', 'Cá nhân · Khảo sát · Tiện ích'],
             ].map(([Icon, title, text], index) => {
               const RoleIcon = Icon as typeof UsersRound;
               return <motion.div key={String(title)} initial={{ opacity: 0, y: 30, scale: 0.94 }} whileInView={{ opacity: 1, y: 0, scale: 1 }} viewport={{ once: true, amount: 0.4 }} transition={{ type: 'spring', stiffness: 115, damping: 18, delay: index * 0.08 }} whileHover={{ y: -7, scale: 1.025 }} className="flex items-center gap-3 rounded-[18px] border border-slate-100 bg-slate-50 px-4 py-4 text-left shadow-sm transition-shadow hover:shadow-xl"><motion.span whileHover={{ rotate: [0, -8, 8, 0] }} transition={{ duration: 0.45 }} className="grid h-10 w-10 flex-none place-items-center rounded-xl bg-white text-orange-600 shadow-sm"><RoleIcon size={19} /></motion.span><span><b className="block text-sm text-slate-900">{t(String(title))}</b><span className="text-xs text-slate-500">{t(String(text))}</span></span></motion.div>;
@@ -234,7 +233,7 @@ export default function Landing() {
           <div className="mt-12 grid gap-4 md:grid-cols-3">
             {[
               ['01', 'Nguồn dữ liệu thống nhất', 'Hồ sơ, hiệu suất, gắn kết và lịch sử làm việc.'],
-              ['04', 'Không gian theo vai trò', 'Mỗi nhóm người dùng có luồng công việc riêng.'],
+              ['03', 'Không gian theo vai trò', 'Mỗi nhóm người dùng có luồng công việc riêng.'],
               ['24/7', 'Theo dõi liên tục', 'Cảnh báo, lịch sử hành động và trạng thái hệ thống.'],
             ].map(([value, title, text], index) => (
               <motion.article key={title} initial={{ opacity: 0, y: 45, rotateX: 12 }} whileInView={{ opacity: 1, y: 0, rotateX: 0 }} viewport={{ once: true, amount: 0.35 }} transition={{ type: 'spring', stiffness: 100, damping: 18, delay: index * 0.1 }} whileHover={{ y: -10, scale: 1.025 }} className="rounded-[26px] bg-slate-50 px-6 py-8 ring-1 ring-slate-100 hover:shadow-[0_20px_55px_rgba(71,85,105,0.12)]">

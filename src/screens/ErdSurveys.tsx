@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from "react"
+import { useEffect, useRef, useState, type FormEvent } from "react"
 
 import {
   BarChart3,
@@ -1543,7 +1543,10 @@ function SurveyContentEditor({
     (question) => !question.isSatisfactionCore,
   )
 
-  const startEdit = (question: SurveyQuestion) =>
+  const questionFormRef = useRef<HTMLFormElement>(null)
+  const questionTextRef = useRef<HTMLTextAreaElement>(null)
+
+  const startEdit = (question: SurveyQuestion) => {
     onDraft({
       questionId: question.id,
       questionText: question.questionText,
@@ -1554,6 +1557,9 @@ function SurveyContentEditor({
         : "",
       displayOrder: question.displayOrder,
     })
+    questionTextRef.current?.focus({ preventScroll: true })
+    questionFormRef.current?.scrollIntoView({ block: "start" })
+  }
 
   return (
     <div
@@ -1651,6 +1657,7 @@ function SurveyContentEditor({
             )}
           </section>
           <form
+            ref={questionFormRef}
             onSubmit={onSave}
             className="h-fit rounded-2xl border border-slate-200 bg-slate-50 p-4"
           >
@@ -1699,6 +1706,7 @@ function SurveyContentEditor({
             <label className="mt-4 block text-sm font-semibold text-slate-700">
               Nội dung
               <textarea
+                ref={questionTextRef}
                 required
                 maxLength={4000}
                 className={area}

@@ -58,7 +58,7 @@ export function EnterpriseHeader({ breadcrumb, sidebarOpen, toggleSidebar, links
   return (
     <header ref={root} className="sticky top-0 z-30 flex min-h-[58px] shrink-0 items-center gap-4 bg-gradient-to-r from-[#f59b32] via-[#f47b2c] to-[#ef5b2a] px-3 py-1.5 text-white shadow-[0_4px_16px_rgba(234,88,12,0.16)] sm:px-6">
       <button className={iconButton + ' lg:hidden'} aria-label={sidebarOpen ? t('Collapse sidebar') : t('Expand sidebar')} aria-expanded={sidebarOpen} onClick={toggleSidebar}><PanelLeft size={21} /></button>
-      <h1 className="min-w-0 flex-1 truncate text-lg font-bold tracking-[-0.01em] sm:text-xl">{title}</h1>
+      <div className="min-w-0 flex-1 truncate text-lg font-bold tracking-[-0.01em] sm:text-xl">{title}</div>
       <div className="relative">
         <button
           type="button"

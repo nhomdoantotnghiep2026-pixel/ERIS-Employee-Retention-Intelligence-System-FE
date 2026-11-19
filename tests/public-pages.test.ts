@@ -7,11 +7,11 @@ import { createServer } from 'vite';
 import { PUBLIC_TOPICS } from '../src/data/publicTopics.ts';
 import { ROLE_HOME, ROLE_ROUTES } from '../src/workflows/access.ts';
 
-test('public navigation does not replace protected role routes and documents the four actors', () => {
+test('public navigation preserves protected routes and lists the three public roles', () => {
   const paths = Object.values(PUBLIC_TOPICS).map(topic => topic.path);
   assert.equal(new Set(paths).size, 4);
   for (const path of paths) assert.ok(!Object.values(ROLE_ROUTES).flat().includes(path), path + ' collides with a workspace route');
-  assert.deepEqual(PUBLIC_TOPICS.roles.sections.map(section => section.role).sort(), Object.keys(ROLE_HOME).sort());
+  assert.deepEqual(PUBLIC_TOPICS.roles.sections.map(section => section.role).sort(), ['Admin', 'Employee', 'HR']);
 });
 
 test('every public menu destination resolves to a rendered section with detail content', async () => {

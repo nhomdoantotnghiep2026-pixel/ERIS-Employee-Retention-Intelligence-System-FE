@@ -142,7 +142,7 @@ function SidebarLink({ to, icon: Icon, label, onNavigate, collapsed = false, nes
     </NavLink>
   );
 }
-function Sidebar({ onNavigate, collapsed, onToggle }: { onNavigate?: () => void; collapsed: boolean; onToggle: () => void }) {
+function Sidebar({ onNavigate, collapsed, onToggle, quiet }: { quiet?: boolean; onNavigate?: () => void; collapsed: boolean; onToggle: () => void }) {
   const { user } = useRole();
   const { t } = useLanguage();
   const { pathname } = useLocation();
@@ -183,13 +183,13 @@ function Sidebar({ onNavigate, collapsed, onToggle }: { onNavigate?: () => void;
   }, [scrollStorageKey]);
 
   return (
-    <aside aria-label={t('Main navigation')} className={`fixed inset-y-0 left-0 z-50 flex h-dvh max-w-[88vw] flex-shrink-0 flex-col overflow-visible rounded-br-[40px] bg-white shadow-2xl transition-[width,transform] duration-300 ease-out lg:sticky lg:top-0 lg:z-40 lg:translate-x-0 lg:shadow-[5px_0_26px_rgba(30,41,59,0.10)] ${collapsed ? '-translate-x-full w-[292px] lg:w-[96px]' : 'w-[320px] translate-x-0 lg:w-[292px]'}`}>
-      <button type="button" onClick={onToggle} aria-label={collapsed ? t('Expand sidebar') : t('Collapse sidebar')} className={`absolute top-[11px] z-50 hidden h-9 w-9 items-center justify-center rounded-full bg-[#f47721] text-white shadow-lg shadow-orange-700/25 transition-[right,transform] duration-300 hover:scale-105 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-500 lg:flex ${collapsed ? 'right-3' : '-right-2'}`}>
+    <aside aria-label={t('Main navigation')} className={`fixed inset-y-0 left-0 z-50 flex h-dvh max-w-[88vw] flex-shrink-0 flex-col overflow-visible bg-white transition-[width,transform] duration-300 ease-out lg:sticky lg:top-0 lg:z-40 lg:translate-x-0 ${quiet ? 'border-r border-slate-200' : 'rounded-br-[40px] shadow-2xl lg:shadow-[5px_0_26px_rgba(30,41,59,0.10)]'} ${collapsed ? (quiet ? '-translate-x-full w-[292px] lg:w-16' : '-translate-x-full w-[292px] lg:w-[96px]') : 'w-[320px] translate-x-0 lg:w-[292px]'}`}>
+      <button type="button" onClick={onToggle} aria-label={collapsed ? t('Expand sidebar') : t('Collapse sidebar')} className={`absolute top-[11px] z-50 hidden h-9 w-9 items-center justify-center rounded-full ${quiet ? 'border border-slate-200 bg-white text-slate-700 shadow-xs' : 'bg-[#f47721] text-white shadow-lg shadow-orange-700/25'} transition-[right,transform] duration-300 hover:scale-105 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-500 lg:flex ${collapsed && !quiet ? 'right-3' : '-right-2'}`}>
         <ChevronLeft size={20} className={`transition-transform duration-300 ${collapsed ? 'rotate-180' : ''}`} />
       </button>
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-br-[40px] bg-white">
       {/* Logo */}
-      <div className={`flex items-center justify-between py-4 transition-[min-height,padding] duration-300 ${collapsed ? 'min-h-[96px] px-6' : 'min-h-[112px] px-7'}`}>
+      <div className={`flex items-center justify-between py-4 transition-[min-height,padding] duration-300 ${collapsed ? (quiet ? 'min-h-[96px] px-2.5' : 'min-h-[96px] px-6') : 'min-h-[112px] px-7'}`}>
         <div className={`flex items-center ${collapsed ? 'gap-0' : 'gap-2.5'}`}>
           <div className={`relative flex flex-shrink-0 items-center justify-center rounded-full border-[3px] border-orange-500 text-orange-500 transition-all duration-300 ${collapsed ? 'h-11 w-11' : 'h-12 w-12'}`}>
             <Leaf size={20} className={`absolute -right-1 -top-3 rotate-[25deg] text-emerald-500 transition-opacity ${collapsed ? 'opacity-0' : 'opacity-100'}`} fill="currentColor" />
@@ -205,7 +205,7 @@ function Sidebar({ onNavigate, collapsed, onToggle }: { onNavigate?: () => void;
         </button>
       </div>
 
-      <div className={`border-b border-slate-100 transition-[padding] duration-300 ${collapsed ? 'px-6 pb-3' : 'px-7 pb-5'}`}>
+      <div className={`border-b border-slate-100 transition-[padding] duration-300 ${collapsed ? (quiet ? 'px-2 pb-3' : 'px-6 pb-3') : 'px-7 pb-5'}`}>
         <div className={`relative ${collapsed ? 'flex h-12 w-12 items-center justify-center rounded-2xl hover:bg-orange-50' : ''}`}>
           <Search size={24} strokeWidth={1.8} className={`pointer-events-none text-[#71809d] ${collapsed ? '' : 'absolute left-1 top-1/2 -translate-y-1/2'}`} />
           <input value={navQuery} onChange={event => setNavQuery(event.target.value)} aria-label={t('Search menu')} placeholder={t('Search')} className={`h-12 border-0 bg-transparent text-base text-slate-700 outline-none placeholder:text-slate-500 focus:ring-0 ${collapsed ? 'pointer-events-none w-0 p-0 opacity-0' : 'w-full pl-11 pr-3 opacity-100'}`} />
@@ -219,7 +219,7 @@ function Sidebar({ onNavigate, collapsed, onToggle }: { onNavigate?: () => void;
           if (!group.group || group.items.length === 1) return group.items.map(item => <SidebarLink key={item.to} {...item} collapsed onNavigate={onNavigate} />);
           const GroupIcon = group.items[0].icon;
           const groupActive = activeGroup === group.group;
-          return <button key={groupKey} type="button" title={t(group.group)} aria-label={t(group.group)} onClick={() => { updateOpenGroups(openGroups.includes(groupKey) ? openGroups : [...openGroups, groupKey]); onToggle(); }} className={`mx-auto flex h-12 w-12 items-center justify-center rounded-2xl transition-all duration-200 ${groupActive ? 'bg-[#f47721] text-white shadow-[0_7px_18px_rgba(244,119,33,0.24)]' : 'text-[#71809d] hover:bg-orange-50 hover:text-orange-700'}`}><GroupIcon size={23} strokeWidth={1.8} /></button>;
+          return <button key={groupKey} type="button" title={t(group.group)} aria-label={t(group.group)} onClick={() => { updateOpenGroups(openGroups.includes(groupKey) ? openGroups : [...openGroups, groupKey]); onToggle(); }} className={`mx-auto flex h-12 w-12 items-center justify-center rounded-2xl transition-all duration-200 ${groupActive ? (quiet ? 'bg-orange-50 text-orange-500' : 'bg-[#f47721] text-white shadow-[0_7px_18px_rgba(244,119,33,0.24)]') : 'text-[#71809d] hover:bg-orange-50 hover:text-orange-700'}`}><GroupIcon size={23} strokeWidth={1.8} /></button>;
         }) : visibleGroups.map((group, index) => {
           const groupKey = group.group || `group-${index}`;
           const expanded = Boolean(navQuery) || openGroups.includes(groupKey);
@@ -250,13 +250,13 @@ function Sidebar({ onNavigate, collapsed, onToggle }: { onNavigate?: () => void;
   );
 }
 
-export function AppShell({ children, breadcrumb }: { children: ReactNode; breadcrumb?: string[] }) {
+export function AppShell({ children, breadcrumb, quiet = false }: { children: ReactNode; breadcrumb?: string[]; quiet?: boolean }) {
   const { t } = useLanguage();
   const pageTitle = t(breadcrumb?.[breadcrumb.length - 1] || 'Workspace');
   useEffect(() => { document.title = pageTitle + ' | ERIS'; }, [pageTitle]);
   const { user } = useRole();
-  const [sidebarOpen, setSidebarOpen] = useState(() => window.innerWidth >= 1024 && sessionStorage.getItem('eris-sidebar') !== 'closed');
-  const toggleSidebar = () => setSidebarOpen(open => { sessionStorage.setItem('eris-sidebar', open ? 'closed' : 'open'); return !open; });
+  const [sidebarOpen, setSidebarOpen] = useState(() => !quiet && window.innerWidth >= 1024 && sessionStorage.getItem('eris-sidebar') !== 'closed');
+  const toggleSidebar = () => setSidebarOpen(open => { if (!quiet) sessionStorage.setItem('eris-sidebar', open ? 'closed' : 'open'); return !open; });
   const closeMobileSidebar = () => {
     if (window.innerWidth < 1024) setSidebarOpen(false);
   };
@@ -281,14 +281,14 @@ export function AppShell({ children, breadcrumb }: { children: ReactNode; breadc
   }, []);
 
   return (
-    <div className="flex h-dvh min-h-0 overflow-hidden bg-[#F4F3F9]">
+    <div className={'flex h-dvh min-h-0 overflow-hidden ' + (quiet ? 'bg-slate-50' : 'bg-[#F4F3F9]')}>
       <a href="#main-content" className="fixed left-4 top-4 z-[70] -translate-y-24 rounded-lg bg-orange-600 px-4 py-3 font-semibold text-white shadow-lg transition focus:translate-y-0">{t('Skip to main content')}</a>
       {sidebarOpen && <button type="button" aria-label={t('Close navigation')} onClick={closeMobileSidebar} className="fixed inset-0 z-40 bg-slate-950/45 backdrop-blur-[1px] lg:hidden" />}
-      <Sidebar key={user.role} onNavigate={closeMobileSidebar} collapsed={!sidebarOpen} onToggle={toggleSidebar} />
+      <Sidebar quiet={quiet} key={user.role} onNavigate={closeMobileSidebar} collapsed={!sidebarOpen} onToggle={toggleSidebar} />
       <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
         <EnterpriseHeader breadcrumb={breadcrumb} sidebarOpen={sidebarOpen} toggleSidebar={toggleSidebar} links={NAV_BY_ROLE} />
-        <main id="main-content" tabIndex={-1} className="min-h-0 flex-1 overflow-y-auto overscroll-contain bg-[radial-gradient(circle_at_top_right,rgba(249,115,22,0.07),transparent_28rem)] outline-none">
-          <div className="eris-content mx-auto w-full max-w-[1480px] p-4 sm:p-5 lg:p-6">
+        <main id="main-content" tabIndex={-1} className={'min-h-0 flex-1 overflow-y-auto overscroll-contain outline-none ' + (quiet ? '' : 'bg-[radial-gradient(circle_at_top_right,rgba(249,115,22,0.07),transparent_28rem)]')}>
+          <div className={'eris-content mx-auto w-full p-4 sm:p-5 lg:p-6 ' + (quiet ? '2xl:px-8' : 'max-w-[1480px]')}>
             {children}
           </div>
         </main>

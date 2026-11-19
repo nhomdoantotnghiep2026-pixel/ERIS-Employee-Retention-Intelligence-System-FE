@@ -46,6 +46,7 @@ import RetentionInterventions from './screens/RetentionInterventions';
 // Shared HR screens
 import Employees from './screens/Employees';
 import HrEmployees from './screens/HrEmployees';
+import EmployeeDirectoryDashboard from './screens/EmployeeDirectoryDashboard';
 import RiskAnalysis from './screens/RiskAnalysis';
 import EmployeeDataManagement from './screens/EmployeeDataManagement';
 import EmployeePortal from './screens/EmployeePortal';
@@ -125,6 +126,7 @@ export default function App() {
 
           {/* Shared HR */}
           <Route path="/employees" element={<RoleGuard><EmployeeWorkspace mode="list" /></RoleGuard>} />
+          <Route path="/employees/dashboard" element={<RoleGuard><EmployeeDirectoryDashboard /></RoleGuard>} />
           <Route path="/employees/new" element={<RoleGuard><EmployeeWorkspace mode="add" /></RoleGuard>} />
           <Route path="/employees/import" element={<RoleGuard><EmployeeImport /></RoleGuard>} />
           <Route path="/employees/:id" element={<RoleGuard><EmployeeDetailRoute /></RoleGuard>} />
