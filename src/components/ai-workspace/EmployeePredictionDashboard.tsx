@@ -145,7 +145,7 @@ export const EmployeePredictionDashboard = forwardRef<
   return (
     <section
       aria-label="Mức độ gắn kết tổng thể"
-      className="panel h-full min-w-0"
+      className="panel min-h-[680px] w-full min-w-0"
       aria-busy={state === "loading"}
     >
       <div className="p-5 sm:p-6">

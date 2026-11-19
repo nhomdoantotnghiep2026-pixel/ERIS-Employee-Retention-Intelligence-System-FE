@@ -1,5 +1,6 @@
 import test from "node:test"
 import assert from "node:assert/strict"
+import { readFile } from "node:fs/promises"
 import { createServer } from "vite"
 
 test("individual prediction sends an explicit save choice in one request; history reads do not predict", async () => {
@@ -44,4 +45,17 @@ test("individual prediction sends an explicit save choice in one request; histor
     else Reflect.deleteProperty(globalThis, "sessionStorage")
     await server.close()
   }
+})
+
+test("the profile save toggle runs prediction directly without a broken confirmation dialog", async () => {
+  const source = await readFile(new URL("../src/components/ai-workspace/IndividualAnalysis.tsx", import.meta.url), "utf8")
+  assert.match(source, /onClick=\{\(\) => void runPrediction\(save, "predict"\)\}/)
+  assert.match(source, /if \(response\.data\.saved\) setSaveNotice/)
+  assert.doesNotMatch(source, /setConfirmation|<Dialog open=\{confirmation\}/)
+  assert.match(source, /grid items-stretch gap-5/)
+  assert.match(source, /panel flex min-h-\[680px\] w-full flex-col/)
+  assert.doesNotMatch(source, /mobileTab === "data" \? "block h-full"/)
+  assert.match(source, /role="switch"/)
+  assert.match(source, /type="button"[\s\S]*role="switch"/)
+  assert.doesNotMatch(source, /className="peer sr-only"/)
 })
