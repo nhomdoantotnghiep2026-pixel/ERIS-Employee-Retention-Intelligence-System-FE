@@ -32,6 +32,12 @@ test("individual prediction sends an explicit save choice in one request; histor
     assert.equal(calls.length, 1)
     assert.equal(calls[0].url, "/api/ai/results/12")
     assert.notEqual(calls[0].init?.method, "POST")
+    calls.length = 0
+    await api.listAiEmployeeResults(4)
+    assert.equal(calls.length, 1)
+    assert.equal(calls[0].url, "/api/ai/employees/4/results")
+    assert.notEqual(calls[0].init?.method, "POST")
+    assert.equal(calls[0].init?.cache, "no-store")
   } finally {
     globalThis.fetch = originalFetch
     if (storage) Object.defineProperty(globalThis, "sessionStorage", storage)

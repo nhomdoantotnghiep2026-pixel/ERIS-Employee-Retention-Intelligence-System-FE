@@ -18,7 +18,7 @@ test('AI analysis and policy workflows render their initial controls in the sele
     const { LanguageProvider } = await server.ssrLoadModule('/src/context/LanguageContext.tsx');
     const { RoleProvider } = await server.ssrLoadModule('/src/context/RoleContext.tsx');
     const cases = [
-      ['/src/screens/AiAnalysis.tsx', {}, 'Phân tích AI nhân viên', 'Kiểm tra dữ liệu'],
+      ['/src/screens/AiAnalysis.tsx', {}, 'Hồ sơ sức khỏe nhân sự &amp; Kế hoạch giữ chân', 'Kiểm tra dữ liệu'],
       ['/src/screens/PolicyDemo.tsx', {}, 'Minh họa đề xuất chính sách', 'Tạo kết quả minh họa'],
       ['/src/components/AiPolicyRecommendations.tsx', { predictionId: 42 }, 'Đề xuất hỗ trợ', 'Xem đề xuất'],
       ['/src/components/AiBatchAnalysis.tsx', { employees: [] }, 'Phân tích nhiều nhân viên', 'Thêm vào nhóm'],

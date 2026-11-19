@@ -99,13 +99,13 @@ export default function Overview() {
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={riskTrendData} margin={{ top: 4, right: 8, bottom: 0, left: -16 }}>
                 <CartesianGrid strokeDasharray="2 2" stroke="#F3F4F6" />
-                <XAxis dataKey="month" tick={{ fontSize: 11, fill: '#9CA3AF', fontFamily: 'Roboto' }} />
-                <YAxis tick={{ fontSize: 11, fill: '#9CA3AF', fontFamily: 'Roboto' }} />
+                <XAxis dataKey="month" tick={{ fontSize: 11, fill: '#9CA3AF', fontFamily: 'Inter' }} />
+                <YAxis tick={{ fontSize: 11, fill: '#9CA3AF', fontFamily: 'Inter' }} />
                 <Tooltip content={<TooltipContent />} />
                 <Line type="monotone" dataKey="high" stroke="#DC2626" strokeWidth={1.5} dot={false} name="High Risk" />
                 <Line type="monotone" dataKey="medium" stroke="#D97706" strokeWidth={1.5} dot={false} name="Medium Risk" />
                 <Line type="monotone" dataKey="low" stroke="#16A34A" strokeWidth={1.5} dot={false} name="Low Risk" />
-                <Legend iconType="plainline" iconSize={16} formatter={(v) => <span style={{ fontSize: 11, color: '#6B7280', fontFamily: 'Roboto' }}>{v}</span>} />
+                <Legend iconType="plainline" iconSize={16} formatter={(v) => <span style={{ fontSize: 11, color: '#6B7280', fontFamily: 'Inter' }}>{v}</span>} />
               </LineChart>
             </ResponsiveContainer>
           </div>
@@ -120,7 +120,7 @@ export default function Overview() {
                   {pieData.map((entry, i) => <Cell key={i} fill={entry.color} strokeWidth={0} />)}
                 </Pie>
                 <Tooltip formatter={(v: any, n: any) => [`${v} employees`, n]} />
-                <Legend iconType="circle" iconSize={8} formatter={(v) => <span style={{ fontSize: 11, color: '#6B7280', fontFamily: 'Roboto' }}>{v}</span>} />
+                <Legend iconType="circle" iconSize={8} formatter={(v) => <span style={{ fontSize: 11, color: '#6B7280', fontFamily: 'Inter' }}>{v}</span>} />
               </PieChart>
             </ResponsiveContainer>
           </div>

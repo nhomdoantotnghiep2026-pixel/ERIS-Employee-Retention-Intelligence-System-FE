@@ -1,7 +1,17 @@
-import { useEffect, useRef, useState } from "react"
-import { AlertTriangle, CheckCircle2, Play } from "lucide-react"
+import { useEffect, useRef, useState, type ReactNode } from "react"
+import {
+  Activity,
+  Banknote,
+  AlertTriangle,
+  BriefcaseBusiness,
+  BrainCircuit,
+  CheckCircle2,
+  Loader2,
+  UserRound,
+} from "lucide-react"
 import {
   getAiResult,
+  listAiEmployeeResults,
   getAiSnapshot,
   getApiErrorMessage,
   listAiSnapshots,
@@ -39,6 +49,7 @@ type Props = {
     preview: typeof previewAiEmployee
     predict: typeof predictAiEmployee
     getResult: typeof getAiResult
+    listResults?: typeof listAiEmployeeResults
   }
   illustrative?: boolean
 }
@@ -47,15 +58,18 @@ type FailedAction = { type: "predict" } | { type: "result"; id: number } | null
 
 const FEATURE_GROUPS = [
   {
-    title: "Thông tin cơ bản",
+    icon: UserRound,
+    title: "Nhân thân",
     keys: ["Department", "Gender", "Age", "Education_Level"],
   },
   {
-    title: "Quá trình làm việc",
+    icon: BriefcaseBusiness,
+    title: "Chế độ đãi ngộ & Thâm niên",
     keys: ["Hire_Date", "Years_At_Company", "Monthly_Salary", "Promotions"],
   },
   {
-    title: "Công việc và trải nghiệm",
+    icon: Activity,
+    title: "Nhịp độ công việc & Mức độ thỏa mãn",
     keys: [
       "Work_Hours_Per_Week",
       "Overtime_Hours",
@@ -79,6 +93,7 @@ export function IndividualAnalysis({
       preview: previewAiEmployee,
       predict: predictAiEmployee,
       getResult: getAiResult,
+      listResults: listAiEmployeeResults,
     },
   )
   const [employeeId, setEmployeeId] = useState<number | undefined>(
@@ -98,7 +113,11 @@ export function IndividualAnalysis({
   const [busy, setBusy] = useState<Busy>("")
   const [dataError, setDataError] = useState("")
   const [result, setResult] = useState<AiPrediction | null>(null)
+  const resultRef = useRef<AiPrediction | null>(null)
   const [savedResults, setSavedResults] = useState<AiPrediction[]>([])
+  const [historyLoading, setHistoryLoading] = useState(false)
+  const [historyError, setHistoryError] = useState("")
+  const [saveNotice, setSaveNotice] = useState("")
   function rememberSaved(value: AiPrediction) {
     if (!value.saved || !value.predictionId) return;
     setSavedResults(current => [value, ...current.filter(item => item.predictionId !== value.predictionId)]
@@ -109,8 +128,54 @@ export function IndividualAnalysis({
   const [mobileTab, setMobileTab] = useState<"data" | "result">("data")
   const seq = useRef(0)
   const snapSeq = useRef(0)
+  const historySeq = useRef(0)
   const headingRef = useRef<HTMLHeadingElement>(null)
   const openedInitialResult = useRef(false)
+
+  useEffect(() => {
+    if (!saveNotice) return
+    const timer = window.setTimeout(() => setSaveNotice(""), 4000)
+    return () => window.clearTimeout(timer)
+  }, [saveNotice])
+
+  useEffect(() => {
+    const api = apiRef.current
+    const my = ++historySeq.current
+    setSavedResults([])
+    setHistoryError("")
+    setHistoryLoading(!!employeeId)
+    if (!employeeId || !api.listResults) {
+      setHistoryLoading(false)
+      return
+    }
+    api.listResults(employeeId)
+      .then(async response => {
+        const details = await Promise.allSettled(response.data.map(item => api.getResult(item.predictionId)))
+        if (my !== historySeq.current) return
+        const loaded = details.flatMap(item => item.status === "fulfilled" ? [item.value.data] : [])
+        const ordered = loaded.sort((a, b) => (Date.parse(b.createdAt || "") || 0) - (Date.parse(a.createdAt || "") || 0))
+        setSavedResults(ordered)
+        const latest = ordered[0]
+        if (latest && !resultRef.current && !predictionLock.current) {
+          resultRef.current = latest
+          setResult(latest)
+          setSnapshot(latest.preview)
+          setSnapshotId(latest.snapshotId ?? latest.preview.snapshotId ?? undefined)
+          onSelectionChange({
+            employeeId,
+            snapshotId: latest.snapshotId ?? latest.preview.snapshotId ?? undefined,
+            resultId: latest.predictionId,
+          })
+        }
+        if (loaded.length !== response.data.length) setHistoryError("Một số lần đánh giá cũ chưa thể tải chi tiết.")
+      })
+      .catch(error => {
+        if (my === historySeq.current) setHistoryError(getApiErrorMessage(error, "Không tải được lịch sử đánh giá."))
+      })
+      .finally(() => {
+        if (my === historySeq.current) setHistoryLoading(false)
+      })
+  }, [employeeId])
 
   useEffect(() => {
     const api = apiRef.current
@@ -161,6 +226,7 @@ export function IndividualAnalysis({
 
   useEffect(() => {
     if (result) headingRef.current?.focus({ preventScroll: true })
+    resultRef.current = result
   }, [result, mobileTab])
 
   function chooseEmployee(id?: number) {
@@ -171,6 +237,7 @@ export function IndividualAnalysis({
     setEmployeeId(id)
     setSnapshotId(undefined)
     setResult(null)
+    resultRef.current = null
     setResultError("")
     setFailedAction(null)
     setMobileTab("data")
@@ -185,6 +252,7 @@ export function IndividualAnalysis({
     setSnapshotId(id)
     setSnapshot(null)
     setResult(null)
+    resultRef.current = null
     setResultError("")
     setFailedAction(null)
     setMobileTab("data")
@@ -281,8 +349,10 @@ export function IndividualAnalysis({
         saveOption,
       )
       if (version !== selectionVersion.current) return
+      resultRef.current = response.data
       setResult(response.data)
       rememberSaved(response.data)
+      if (action === "save" && response.data.saved) setSaveNotice("Đã lưu kết quả vào hồ sơ theo dõi.")
       if (response.data.saved && response.data.predictionId && !response.data.createdAt) {
         void apiRef.current.getResult(response.data.predictionId).then(detail => {
           rememberSaved(detail.data);
@@ -298,7 +368,7 @@ export function IndividualAnalysis({
     } catch (error) {
       if (version !== selectionVersion.current) return
 
-      setResultError(getApiErrorMessage(error, "Không chạy được mô hình AI."))
+      setResultError(getApiErrorMessage(error, "Không hoàn thành được lần đánh giá."))
       setFailedAction({ type: "predict" })
     } finally {
       predictionLock.current = false
@@ -309,7 +379,8 @@ export function IndividualAnalysis({
   async function openResult(id: number) {
     if (busy) return
     setBusy("result")
-    setResult(null)
+      setResult(null)
+      resultRef.current = null
     setResultError("")
     setFailedAction(null)
     setMobileTab("result")
@@ -318,6 +389,7 @@ export function IndividualAnalysis({
       const nextSnapshot = response.data.preview
       if (employeeId && nextSnapshot.employee.id !== employeeId) throw new Error("Kết quả không thuộc nhân viên đang chọn.");
       rememberSaved(response.data)
+      resultRef.current = response.data
       setResult(response.data)
       setSnapshot(nextSnapshot)
       setEmployeeId(nextSnapshot.employee.id)
@@ -358,7 +430,7 @@ export function IndividualAnalysis({
     busy === "result"
       ? "Đang mở kết quả đã lưu…"
       : busy === "save"
-        ? "Đang dự đoán và lưu kết quả…"
+        ? "Đang đánh giá và lưu kết quả…"
         : "Đang phân tích dữ liệu…"
   const dataVisible =
     mobileTab === "data" ? "block h-full" : "hidden h-full min-[1200px]:block"
@@ -507,7 +579,7 @@ export function IndividualAnalysis({
 
       <div
         role="tablist"
-        aria-label="Nội dung dự đoán cá nhân"
+        aria-label="Nội dung đánh giá cá nhân"
         className="grid grid-cols-2 rounded-lg bg-slate-100 p-1 min-[1200px]:hidden"
       >
         {(["data", "result"] as const).map((tab) => (
@@ -528,33 +600,35 @@ export function IndividualAnalysis({
         ))}
       </div>
 
-      <div className="grid items-stretch gap-6 min-[1200px]:grid-cols-[minmax(0,39fr)_minmax(0,61fr)]">
+      <div className="grid items-start gap-5 min-[1200px]:grid-cols-[minmax(0,38fr)_minmax(0,62fr)]">
         <div className={dataVisible}>
           <section
-            className="panel flex h-full flex-col overflow-hidden"
+            className="panel flex flex-col overflow-hidden"
             aria-labelledby="prediction-input-heading"
           >
-            <div className="flex flex-wrap items-start justify-between gap-3 border-b px-5 py-4">
-              <div>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-orange-600">
-                  Dữ liệu đánh giá
-                </p>
-                <h2
-                  id="prediction-input-heading"
-                  className="mt-1 text-base font-semibold"
-                >
-                  {snapshot?.snapshotId
-                    ? `Bản dữ liệu #${snapshot.snapshotId}`
-                    : "Chưa chọn bản dữ liệu"}
-                </h2>
-                <p className="mt-1 text-xs text-slate-500">
-                  Ngày tạo:{" "}
-                  {formatDateTime(
-                    snapshot?.snapshotDate || snapshot?.capturedAt,
-                  )}
-                </p>
+            <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-200 px-5 py-4">
+              <div className="flex min-w-0 items-center gap-3">
+                <span className={`grid h-11 w-11 shrink-0 place-items-center rounded-full bg-slate-100 text-sm font-semibold text-slate-700 ${snapshot ? 'ring-2 ring-emerald-400 ring-offset-2' : ''}`}>
+                  {getInitials(snapshot?.employee.fullName)}
+                </span>
+                <div className="min-w-0">
+                  <p className="metadata-label">Hồ sơ nhân viên</p>
+                  <h2 id="prediction-input-heading" className="mt-1 truncate font-semibold text-slate-900">
+                    {snapshot?.employee.fullName || "Chưa chọn nhân viên"}
+                  </h2>
+                  {snapshot?.employee.employeeCode && <span className="mt-1 inline-flex rounded-md bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">{snapshot.employee.employeeCode}</span>}
+                  {snapshot && <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-slate-600">
+                    <span>{snapshot.features.Age} tuổi</span><span aria-hidden>•</span>
+                    <span>{formatDisplayValue(snapshot, 'Gender')}</span><span aria-hidden>•</span>
+                    <span>{educationTag(snapshot.features.Education_Level)}</span><span aria-hidden>•</span>
+                    <span>{snapshot.features.Department}</span>
+                  </div>}
+                </div>
               </div>
-              <SnapshotStatus status={snapshotStatus} />
+              <div className="flex flex-col items-end gap-1.5">
+                <SnapshotStatus status={snapshotStatus} />
+                {snapshot?.snapshotId && <span className="text-xs font-medium text-slate-500">Bản ghi #{snapshot.snapshotId}</span>}
+              </div>
             </div>
             {dataError && (
               <div className="px-5 pt-4">
@@ -571,15 +645,6 @@ export function IndividualAnalysis({
                 </Empty>
               ) : (
                 <>
-                  <div className="mb-4 rounded-lg bg-slate-100 px-3 py-2.5 text-sm">
-                    <span className="font-medium">
-                      {snapshot.employee.fullName}
-                    </span>
-                    <span className="text-slate-500">
-                      {" "}
-                      · {snapshot.employee.employeeCode}
-                    </span>
-                  </div>
                   {snapshotStatus !== "ready" && (
                     <Notice
                       tone="warning"
@@ -607,14 +672,10 @@ export function IndividualAnalysis({
               )}
             </div>
             <div className="flex flex-wrap items-center justify-between gap-3 border-t bg-white px-5 py-4">
-              <label className="flex items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  checked={save}
-                  disabled={!!busy}
-                  onChange={(event) => setSave(event.target.checked)}
-                />
-                Lưu kết quả
+              <label className="flex cursor-pointer items-center gap-2.5 text-sm font-medium text-slate-700">
+                <input className="peer sr-only" type="checkbox" checked={save} disabled={!!busy} onChange={(event) => setSave(event.target.checked)} />
+                <span className="relative h-6 w-10 rounded-full bg-slate-200 transition peer-checked:bg-orange-500 after:absolute after:left-1 after:top-1 after:h-4 after:w-4 after:rounded-full after:bg-white after:shadow-sm after:transition-transform peer-checked:after:translate-x-4" aria-hidden />
+                Lưu vào hồ sơ theo dõi định kỳ
               </label>
               <button
                 type="button"
@@ -622,8 +683,8 @@ export function IndividualAnalysis({
                 disabled={!snapshot?.ready || !!busy}
                 onClick={() => setConfirmation(true)}
               >
-                <Play className="h-4 w-4" aria-hidden />
-                {busy === "predict" ? "Đang dự đoán…" : "Dự đoán"}
+                {busy === "predict" ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <BrainCircuit className="h-4 w-4" aria-hidden />}
+                {busy === "predict" ? "Đang đánh giá…" : "Đánh giá mức độ gắn kết"}
               </button>
             </div>
           </section>
@@ -631,6 +692,8 @@ export function IndividualAnalysis({
         <div className={resultVisible}>
           <EmployeePredictionDashboard
             history={savedResults.filter(item => item.preview.employee.id === employeeId)}
+            historyLoading={historyLoading}
+            historyError={historyError}
             ref={headingRef}
             state={dashboardState}
             result={result}
@@ -650,6 +713,7 @@ export function IndividualAnalysis({
                 : undefined
             }
             onPredict={() => setConfirmation(true)}
+            onSave={() => void runPrediction(true, "save")}
             onOpenSaved={(id) => void openResult(id)}
           />
         </div>
@@ -657,11 +721,11 @@ export function IndividualAnalysis({
       <Dialog open={confirmation} onOpenChange={setConfirmation}>
         <DialogContent>
           <DialogTitle>
-            {save ? "Xác nhận dự đoán và lưu kết quả" : "Xác nhận dự đoán"}
+            {save ? "Xác nhận đánh giá và lưu kết quả" : "Xác nhận đánh giá"}
           </DialogTitle>
           <DialogDescription>
             {save
-              ? "Kết quả dự đoán thành công sẽ được lưu vào lịch sử của nhân viên."
+              ? "Kết quả đánh giá thành công sẽ được lưu vào lịch sử của nhân viên."
               : "Kết quả sẽ chỉ được hiển thị tạm thời và không được lưu vào lịch sử. Bạn có muốn tiếp tục?"}
           </DialogDescription>
           <div className="mt-5 flex justify-end gap-2">
@@ -677,11 +741,12 @@ export function IndividualAnalysis({
               disabled={!!busy}
               onClick={() => void runPrediction()}
             >
-              {save ? "Dự đoán và lưu" : "Dự đoán không lưu"}
+              {save ? "Đánh giá và lưu" : "Đánh giá không lưu"}
             </button>
           </div>
         </DialogContent>
       </Dialog>
+      {saveNotice && <div role="status" className="fixed bottom-5 right-5 z-50 flex items-center gap-2 rounded-xl border border-emerald-200 bg-white px-4 py-3 text-sm font-medium text-emerald-800 shadow-lg"><CheckCircle2 className="h-4 w-4" aria-hidden />{saveNotice}</div>}
     </div>
   )
 }
@@ -723,43 +788,69 @@ function SnapshotStatus({
 }
 
 function FeatureGroups({ snapshot }: { snapshot: AiSnapshot }) {
-  const grouped = new Set(FEATURE_GROUPS.flatMap((group) => group.keys))
-  const extra = Object.keys(snapshot.features).filter(
-    (key) => !grouped.has(key),
-  )
-  const groups = [
-    ...FEATURE_GROUPS,
-    ...(extra.length ? [{ title: "Thông tin khác", keys: extra }] : []),
-  ]
-  return groups.map((group) => {
-    const keys = group.keys.filter((key) => key in snapshot.features)
-    if (!keys.length) return null
-    return (
-      <details key={group.title} open>
-        <summary className="cursor-pointer text-sm font-semibold">
-          {group.title}
-        </summary>
-        <dl className="mt-2">
-          {keys.map((key) => (
-            <div
-              key={key}
-              className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] items-baseline gap-3 border-b py-2 text-sm last:border-0"
-            >
-              <dt className="text-slate-500">{featureLabel(key)}</dt>
-              <dd className="tabular break-words text-right font-medium">
-                {key === "Hire_Date"
-                  ? formatDateTime(String(snapshot.features[key]))
-                  : String(snapshot.features[key] ?? "—")}
-                {FEATURE_UNITS[key] && key !== "Hire_Date" && (
-                  <span className="ml-1 text-xs font-normal text-slate-500">
-                    {FEATURE_UNITS[key]}
-                  </span>
-                )}
-              </dd>
-            </div>
-          ))}
-        </dl>
-      </details>
-    )
-  })
+  const f = snapshot.features
+  const satisfaction = Number(f.Employee_Satisfaction_Score)
+  return <div className="grid gap-3">
+    <section className="rounded-lg bg-slate-50 p-3.5">
+      <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-900"><BriefcaseBusiness className="size-4 text-slate-500" />Đãi ngộ & Thâm niên</div>
+      <div className="grid gap-2 sm:grid-cols-2">
+        <Metric label="Ngày vào làm" value={formatDisplayValue(snapshot, 'Hire_Date')} note={`Thâm niên ${f.Years_At_Company} năm`} />
+        <Metric label="Lương cơ bản" value={formatDisplayValue(snapshot, 'Monthly_Salary')} icon={<Banknote className="size-4 text-slate-500" />} />
+        <Metric label="Đã thăng chức" value={`${f.Promotions} lần`} />
+      </div>
+    </section>
+    <section>
+      <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-slate-900"><Activity className="size-4 text-slate-500" />Vận hành & Cảm xúc</div>
+      <div className="grid grid-cols-2 gap-2">
+        <Metric label="Giờ làm / tuần" value={`${formatNumber(f.Work_Hours_Per_Week)}h`} />
+        <Metric label="Tăng ca YTD" value={`${formatNumber(f.Overtime_Hours)}h`} />
+        <Metric label="Vắng mặt YTD" value={`${formatNumber(f.Sick_Days)} ngày`} />
+        <div className="rounded-lg border border-slate-200 bg-white p-3">
+          <p className="text-xs font-medium text-slate-500">Điểm hài lòng</p>
+          <p className="mt-1 text-base font-semibold tabular-nums text-slate-900">{Number.isFinite(satisfaction) ? satisfaction.toFixed(2) : '—'} <span className="text-xs font-medium text-slate-500">/ 5.0</span></p>
+          <SatisfactionBar value={satisfaction} />
+        </div>
+      </div>
+    </section>
+  </div>
+}
+
+function Metric({label, value, note, icon}: {label: string; value: string; note?: string; icon?: ReactNode}) {
+  return <div className="rounded-lg border border-slate-200 bg-white p-3">
+    <p className="text-xs font-medium text-slate-500">{label}</p>
+    <div className="mt-1 flex items-center gap-1.5">{icon}<p className="text-base font-semibold tabular-nums text-slate-900">{value}</p></div>
+    {note && <p className="mt-0.5 text-xs text-slate-500">{note}</p>}
+  </div>
+}
+function formatNumber(value: unknown) {
+  const number = Number(value)
+  return Number.isFinite(number) ? number.toLocaleString('vi-VN', {maximumFractionDigits: 2}) : '—'
+}
+function educationTag(value: unknown) {
+  return ({Bachelor: 'Cử nhân (Đại học)', Master: 'Thạc sĩ', PhD: 'Tiến sĩ', 'High School': 'Trung học phổ thông'} as Record<string,string>)[String(value)] ?? String(value ?? '—')
+}
+
+function getInitials(name?: string) {
+  if (!name) return "—"
+  const parts = name.trim().split(/\s+/)
+  return `${parts.at(-2)?.[0] ?? ""}${parts.at(-1)?.[0] ?? ""}`.toUpperCase()
+}
+
+function formatDisplayValue(snapshot: AiSnapshot, key: string) {
+  const value = snapshot.features[key]
+  if (value === null || value === undefined || value === "") return "—"
+  if (key === "Gender") return ({ Male: "Nam", Female: "Nữ" } as Record<string, string>)[String(value)] ?? String(value)
+  if (key === "Education_Level") return ({ Master: "Thạc sĩ", Bachelor: "Đại học", PhD: "Tiến sĩ", "High School": "Trung học phổ thông" } as Record<string, string>)[String(value)] ?? String(value)
+  if (key === "Hire_Date") return formatDateTime(String(value))
+  if (key === "Monthly_Salary" && Number.isFinite(Number(value)))
+    return `${Number(value).toLocaleString("en-US")} USD/tháng`
+  if (key === "Employee_Satisfaction_Score" && Number.isFinite(Number(value)))
+    return `${Number(value).toFixed(2)} / 5.0`
+  return String(value)
+}
+
+function SatisfactionBar({ value }: { value: number }) {
+  const score = Number.isFinite(value) ? Math.max(0, Math.min(5, value)) : 0
+  const colors = ['bg-orange-300', 'bg-amber-300', 'bg-lime-300', 'bg-teal-300', 'bg-emerald-400']
+  return <span className="mt-2 flex gap-1" aria-hidden>{colors.map((color, index) => <span key={color} className="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-100"><span className={`block h-full rounded-full ${color}`} style={{width: `${Math.max(0, Math.min(1, score - index)) * 100}%`}} /></span>)}</span>
 }

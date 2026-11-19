@@ -58,13 +58,17 @@ export default function AiAnalysis() {
   }, [reload])
 
   return (
-    <AppShell breadcrumb={["Retention", "AI analysis"]}>
+    <AppShell breadcrumb={["Quản lý nhân tài", "Đánh giá mức độ gắn kết"]}>
       <SectionHeader
-        title={t("Phân tích AI nhân viên")}
+        title={t("Hồ sơ sức khỏe nhân sự & Kế hoạch giữ chân")}
         description={t(
           "Kiểm tra dữ liệu và xem kết quả hỗ trợ cho từng nhân viên.",
         )}
       />
+      <div className="mb-5 flex flex-wrap gap-2">
+        <Button variant="secondary" onClick={() => window.print()}>{t("Tải bản tóm tắt nhân sự (PDF)")}</Button>
+        <Button variant="secondary" onClick={() => setReload(v => v + 1)}>{t("Cập nhật dữ liệu từ HRIS")}</Button>
+      </div>
       <div className="ai-workspace text-slate-900">
         {error && (
           <div

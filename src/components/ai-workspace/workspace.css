@@ -1,4 +1,5 @@
-.ai-workspace .panel { background: white; border: 1px solid #e2e8f0; border-radius: 20px; box-shadow: 0 4px 20px #0f172a05; }
+.ai-workspace { color:#334155; font-family:Inter,"Plus Jakarta Sans",ui-sans-serif,system-ui,sans-serif; }
+.ai-workspace .panel { background:#fff; border:1px solid #e2e8f0; border-radius:12px; box-shadow:0 1px 2px rgb(15 23 42 / .05); }
 .ai-workspace .field { width:100%; min-width:0; border:1px solid #cbd5e1; border-radius:12px; background:white; padding:10px 12px; color:#0f172a; }
 .ai-workspace .field:focus-visible, .ai-workspace button:focus-visible, .ai-workspace summary:focus-visible { outline:2px solid #f97316; outline-offset:3px; }
 .ai-workspace .btn { display:inline-flex; align-items:center; justify-content:center; gap:8px; padding:10px 16px; border-radius:12px; font-weight:600; font-size:14px; cursor:pointer; }
@@ -8,4 +9,5 @@
 .ai-workspace :disabled { opacity:.55; cursor:not-allowed; }
 .ai-workspace .tabular { font-variant-numeric:tabular-nums; }
 .ai-workspace input[type=checkbox] { accent-color:#f97316; }
+.ai-workspace .metadata-label { font-size:11px; line-height:1rem; font-weight:600; letter-spacing:.1em; text-transform:uppercase; color:#94a3b8; }
 

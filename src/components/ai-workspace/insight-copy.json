@@ -1,0 +1,182 @@
+{
+  "Overtime_Hours": {
+    "positiveModerate": {
+      "insight": "Cần xem giờ tăng ca phát sinh từ đợt cao điểm, việc đột xuất hay cách phân công trong nhóm.",
+      "policy": "Quản lý đối chiếu chấm công với đầu việc và lý do tăng ca. Nếu việc phát sinh có thể chuyển ca hoặc giao lại, thống nhất cách điều chỉnh và kiểm tra số giờ làm thêm sau hai tuần."
+    },
+    "positiveStrong": {
+      "insight": "Ưu tiên kiểm tra xem việc làm thêm có lặp lại ở cùng ca trực hoặc cùng nhóm nhiệm vụ hay không.",
+      "policy": "Trưởng bộ phận cùng HR rà lịch trực, số người bố trí và các đầu việc thường phải xử lý ngoài giờ. Nếu xác nhận tình trạng lặp lại, điều chỉnh tiến độ hoặc bổ sung người hỗ trợ. Theo dõi số giờ tăng ca hằng tuần trong một tháng."
+    },
+    "negativeModerate": {
+      "insight": "Tăng ca đang trong phạm vi kế hoạch. Số giờ làm thêm của nhân viên nằm trong mức đã thống nhất cho kỳ này.",
+      "policy": "Tiếp tục cách phân công hiện tại nếu nhân viên xác nhận phù hợp. Quản lý rà các nhiệm vụ sắp tới và chuẩn bị người hỗ trợ trước cao điểm, đồng thời kiểm tra việc ghi nhận đầy đủ công việc ngoài giờ."
+    },
+    "negativeStrong": {
+      "insight": "Nên duy trì cách phân công giúp hạn chế làm thêm khi tiến độ và chất lượng công việc vẫn được bảo đảm.",
+      "policy": "Quản lý trao đổi với nhân viên về cách sắp xếp công việc hiện tại. Nếu cách làm phù hợp, duy trì và kiểm tra lại sau đợt cao điểm tiếp theo, đồng thời bảo đảm công việc ngoài giờ được ghi nhận đầy đủ."
+    }
+  },
+  "Work_Hours_Per_Week": {
+    "positiveModerate": {
+      "insight": "Cần đối chiếu giờ làm thực tế với lịch đã thống nhất để xem khối lượng công việc có vừa với thời gian được bố trí hay không.",
+      "policy": "Quản lý cùng nhân viên rà thời gian dành cho nhiệm vụ chính, họp và việc phát sinh. Nếu lịch làm không đủ để hoàn thành công việc, sắp lại thứ tự ưu tiên và kiểm tra sau hai tuần."
+    },
+    "positiveStrong": {
+      "insight": "Ưu tiên kiểm tra khả năng hoàn thành công việc trong giờ làm chính thức, nhất là khi thời hạn hoặc phạm vi nhiệm vụ thay đổi.",
+      "policy": "Quản lý và HR trao đổi riêng với nhân viên, đối chiếu lịch làm với tiến độ công việc. Nếu xác nhận quá tải, giảm, giãn hoặc chuyển giao một phần nhiệm vụ. Theo dõi giờ làm và tiến độ hằng tuần đến khi lịch làm ổn định."
+    },
+    "negativeModerate": {
+      "insight": "Lịch làm việc đang được duy trì đúng kế hoạch. Giờ làm thực tế của nhân viên phù hợp với lịch đã thống nhất trong kỳ.",
+      "policy": "Duy trì lịch hiện tại và hỏi lại mức độ phù hợp trong buổi trao đổi định kỳ. Khi giao thêm nhiệm vụ, cân đối thời gian ngay trong kế hoạch tuần."
+    },
+    "negativeStrong": {
+      "insight": "Nên giữ lịch làm ổn định khi nhân viên xác nhận có đủ thời gian để hoàn thành nhiệm vụ.",
+      "policy": "Duy trì khoảng thời gian tập trung và nguồn lực hỗ trợ đang phù hợp. Trước khi giao thêm việc, quản lý cân đối lại lịch tuần và hỏi nhân viên về khả năng đáp ứng."
+    }
+  },
+  "Employee_Satisfaction_Score": {
+    "positiveModerate": {
+      "insight": "Mức hài lòng thấp hơn mức mong đợi. Nhân viên đánh giá {x}/5 trong khảo sát gần nhất. Cần làm rõ trải nghiệm nào đang cần cải thiện.",
+      "policy": "HR mời nhân viên trao đổi riêng về các nội dung khảo sát thấp điểm. Chọn một vấn đề nhân viên coi trọng, thống nhất hành động khả thi và phản hồi tiến độ trong 30 ngày."
+    },
+    "positiveStrong": {
+      "insight": "Ưu tiên làm rõ khía cạnh trong trải nghiệm làm việc mà nhân viên muốn cải thiện nhất, như khối lượng công việc, sự hỗ trợ hoặc cơ hội phát triển.",
+      "policy": "HR mời nhân viên trao đổi riêng trên cơ sở tự nguyện. Nếu có vấn đề cụ thể, thống nhất một hoặc hai hành động khả thi, giao người phụ trách và phản hồi tiến độ sau 2–4 tuần. Nếu phản hồi liên quan đến quản lý trực tiếp, bố trí đầu mối HR khác phù hợp."
+    },
+    "negativeModerate": {
+      "insight": "Nhân viên phản hồi tích cực về trải nghiệm làm việc. Điểm hài lòng đạt {x}/5 trong kỳ khảo sát gần nhất.",
+      "policy": "Quản lý hỏi rõ điều gì đang giúp nhân viên làm việc thuận lợi. Duy trì những yếu tố được xác nhận và tiếp tục tạo kênh phản hồi khi nhu cầu thay đổi."
+    },
+    "negativeStrong": {
+      "insight": "Nên xác định điều gì trong công việc hiện tại được nhân viên đánh giá cao để duy trì khi lịch làm, vai trò hoặc cơ cấu nhóm thay đổi.",
+      "policy": "Trong buổi trao đổi định kỳ, hỏi nhân viên muốn giữ lại cách hỗ trợ hoặc điều kiện làm việc nào. Ghi nhận nội dung họ xác nhận và hỏi lại sau thay đổi để biết có cần điều chỉnh hay không."
+    }
+  },
+  "Monthly_Salary": {
+    "positiveModerate": {
+      "insight": "Cần xác minh số liệu lương và đối chiếu với khung của đúng vị trí, cấp bậc và phạm vi công việc.",
+      "policy": "Bộ phận lương thưởng kiểm tra tiền tệ, kỳ lương và việc số liệu đã bao gồm phụ cấp hay chưa. Sau khi xác minh, đối chiếu với khung lương nội bộ. Nếu có chênh lệch cần giải thích, đưa vào kỳ rà soát và thông báo tiêu chí xem xét cho nhân viên."
+    },
+    "positiveStrong": {
+      "insight": "Ưu tiên rà soát xem mức đãi ngộ có còn phù hợp với trách nhiệm thực tế của nhân viên hay không.",
+      "policy": "Bộ phận lương thưởng cùng quản lý đối chiếu mô tả công việc, nhiệm vụ đang đảm nhiệm và cấp bậc hiện tại. Nếu xác nhận vai trò đã thay đổi đáng kể, lập hồ sơ đánh giá lại vị trí và trình phương án theo quy trình phê duyệt của doanh nghiệp."
+    },
+    "negativeModerate": {
+      "insight": "Lương hiện tại nằm trong khung của vị trí và cấp bậc. Hồ sơ đãi ngộ phù hợp với phạm vi công việc được ghi nhận.",
+      "policy": "Duy trì chu kỳ rà soát lương, giải thích rõ tiêu chí tăng lương và các thành phần thu nhập. Cập nhật lại khi nhân viên nhận thêm trách nhiệm đáng kể."
+    },
+    "negativeStrong": {
+      "insight": "Nên duy trì việc rà soát đãi ngộ theo vai trò và giải thích rõ cách doanh nghiệp xem xét điều chỉnh lương.",
+      "policy": "Bộ phận lương thưởng giữ lịch rà soát định kỳ và cập nhật khi phạm vi công việc thay đổi. Trao đổi với nhân viên về chu kỳ xét lương, tiêu chí áp dụng và đầu mối giải đáp khi có thắc mắc."
+    }
+  },
+  "Promotions": {
+    "positiveModerate": {
+      "insight": "Bước phát triển tiếp theo chưa được làm rõ. Nhân viên mong muốn tiến triển nghề nghiệp nhưng chưa có tiêu chí hoặc mốc đánh giá được thống nhất.",
+      "policy": "Quản lý làm rõ hướng phát triển mong muốn, đối chiếu yêu cầu của vai trò tiếp theo và thống nhất tối đa hai năng lực cần củng cố. Giao cơ hội thực hành và hẹn đánh giá trong 60–90 ngày."
+    },
+    "positiveStrong": {
+      "insight": "Ưu tiên làm rõ bước phát triển tiếp theo và kiểm tra xem nhân viên có đang chờ phản hồi về cơ hội tiến triển hay không.",
+      "policy": "HR cùng quản lý xác minh nguyện vọng và các cam kết đã trao đổi. Nếu có nội dung còn tồn, phản hồi về tiến độ, lựa chọn khả thi và thời hạn xử lý. Thống nhất tiêu chí cho bước tiếp theo, như ứng tuyển nội bộ, dự án mở rộng hoặc đào tạo."
+    },
+    "negativeModerate": {
+      "insight": "Nên duy trì trao đổi về mục tiêu nghề nghiệp và mức hỗ trợ cần thiết cho vai trò hiện tại.",
+      "policy": "Trong buổi trao đổi định kỳ, quản lý xác nhận nhân viên hiểu phạm vi trách nhiệm và biết nơi nhận hỗ trợ. Nếu nhân viên mới chuyển vai trò, thống nhất một mốc đánh giá khả năng thích nghi trong 30–60 ngày."
+    },
+    "negativeStrong": {
+      "insight": "Lộ trình nghề nghiệp đang tiến triển phù hợp với mục tiêu cá nhân. Nhân viên đã hoàn thành các mốc phát triển và đáp ứng yêu cầu của vai trò mới theo kỳ đánh giá gần nhất.",
+      "policy": "Ghi nhận kết quả cụ thể, cùng nhân viên chọn mục tiêu phát triển tiếp theo. Bảo đảm trách nhiệm, quyền hạn và đãi ngộ được xem xét đồng bộ khi mở rộng vai trò."
+    }
+  },
+  "Years_At_Company": {
+    "positiveModerate": {
+      "insight": "Cần cập nhật xem nhân viên muốn tiếp tục phát triển chuyên môn, mở rộng trách nhiệm hay thử hướng công việc khác.",
+      "policy": "Quản lý hỏi nhân viên muốn giữ, mở rộng hoặc thay đổi phần nào trong công việc hiện tại. Nếu có nhu cầu rõ ràng, chọn một cơ hội thực hành phù hợp, giao người hỗ trợ và hẹn đánh giá sau 60 ngày."
+    },
+    "positiveStrong": {
+      "insight": "Ưu tiên kiểm tra xem các nhu cầu phát triển nghề nghiệp đã trao đổi có còn chờ phản hồi hoặc thiếu phương án thực hiện hay không.",
+      "policy": "HR cùng quản lý rà lại các nội dung đã trao đổi với nhân viên. Với nhu cầu được xác nhận, thống nhất phương án, người chịu trách nhiệm và ngày phản hồi. Kiểm tra tiến độ trong 30–60 ngày."
+    },
+    "negativeModerate": {
+      "insight": "Nên duy trì các buổi trao đổi nghề nghiệp để công việc hiện tại tiếp tục phù hợp với định hướng của nhân viên.",
+      "policy": "Quản lý hỏi nhân viên muốn phát triển năng lực nào trong kỳ tới. Khi hai bên thống nhất được mục tiêu, chọn một đầu việc để thực hành và dùng kết quả công việc để đánh giá tiến độ."
+    },
+    "negativeStrong": {
+      "insight": "Kinh nghiệm tích lũy đang được sử dụng trong vai trò phù hợp. Nhân viên xác nhận hài lòng với phạm vi công việc và hướng phát triển hiện tại.",
+      "policy": "Ghi nhận đóng góp chuyên môn, thảo luận cơ hội phát triển chuyên gia hoặc hướng dẫn đồng nghiệp theo nguyện vọng. Nếu thêm trách nhiệm, thống nhất thời gian, nguồn lực và cách ghi nhận."
+    }
+  },
+  "Hire_Date": {
+    "positiveModerate": {
+      "insight": "Với nhân viên còn trong giai đoạn hội nhập, cần kiểm tra họ đã có đủ công cụ, hướng dẫn và đầu mối hỗ trợ để bắt đầu công việc hay chưa.",
+      "policy": "HR và quản lý rà checklist hội nhập. Nếu còn quyền truy cập, tài liệu hoặc buổi hướng dẫn chưa hoàn tất, giao người xử lý và kiểm tra lại trong một đến hai tuần."
+    },
+    "positiveStrong": {
+      "insight": "Với nhân viên còn trong giai đoạn hội nhập, ưu tiên xác minh có vướng mắc nào đang cản trở việc thực hiện nhiệm vụ ban đầu hay không.",
+      "policy": "HR phối hợp quản lý và bộ phận hỗ trợ để kiểm tra các hạng mục thiết yếu. Nếu vướng mắc đã ảnh hưởng tiến độ, xử lý trước hạng mục cản trở công việc, điều chỉnh mốc bàn giao hợp lý và kiểm tra lại sau hai tuần."
+    },
+    "negativeModerate": {
+      "insight": "Nhân viên đang hội nhập đúng tiến độ. Các hạng mục theo kế hoạch đến thời điểm hiện tại đã hoàn thành.",
+      "policy": "Duy trì người hướng dẫn và lịch trao đổi, kiểm tra mức độ hiểu vai trò bằng nhiệm vụ thực tế. Bổ sung hỗ trợ khi chuyển sang đầu việc phức tạp hơn."
+    },
+    "negativeStrong": {
+      "insight": "Nhân viên đã hoàn thành hội nhập và chủ động thực hiện công việc chính. Quản lý xác nhận đạt các mục tiêu ban đầu, nhân viên phản hồi đã có đủ hỗ trợ.",
+      "policy": "Chuyển sang kế hoạch phát triển định kỳ, thống nhất mục tiêu tiếp theo và thu thập phản hồi cải tiến onboarding. Ghi nhận các hoạt động hữu ích để áp dụng cho đợt tuyển sau."
+    }
+  },
+  "Department": {
+    "positiveModerate": {
+      "insight": "Cần kiểm tra xem nhân viên có gặp khó khi bàn giao công việc, chờ phê duyệt hoặc xác định người chịu trách nhiệm hay không.",
+      "policy": "Quản lý hỏi về một tình huống phối hợp gần đây. Nếu xác nhận có điểm vướng, thống nhất đầu mối, thời gian phản hồi và cách xử lý khi bị chậm. Kiểm tra lại trong buổi trao đổi sau 30 ngày."
+    },
+    "positiveStrong": {
+      "insight": "Ưu tiên xác định khó khăn trong phối hợp là trường hợp riêng hay vấn đề chung của nhóm.",
+      "policy": "HR cùng trưởng bộ phận đối chiếu phản hồi từ nhiều nguồn với quy trình phân công và bàn giao. Chỉ triển khai thay đổi cấp nhóm khi có bằng chứng vấn đề lặp lại. Đánh giá lại qua thời gian xử lý và phản hồi của nhóm sau 30–60 ngày."
+    },
+    "negativeModerate": {
+      "insight": "Nhân viên hiểu rõ trách nhiệm và biết nơi nhận hỗ trợ. Phản hồi hiện tại cho thấy phân công và đầu mối phối hợp đáp ứng nhu cầu công việc.",
+      "policy": "Duy trì cách phân công và lịch trao đổi hiện tại. Khi thay đổi nhân sự hoặc quy trình, cập nhật lại đầu mối và xác nhận nhân viên hiểu trách nhiệm mới."
+    },
+    "negativeStrong": {
+      "insight": "Nhóm duy trì phối hợp hiệu quả và hỗ trợ nhất quán. Các kỳ phản hồi gần đây ghi nhận vai trò rõ ràng và vướng mắc được xử lý kịp thời.",
+      "policy": "Trưởng bộ phận ghi nhận các thực hành hiệu quả và chuẩn hóa những bước có thể lặp lại. Theo dõi khả năng duy trì khi khối lượng tăng hoặc cơ cấu nhóm thay đổi."
+    }
+  },
+  "Education_Level": {
+    "positiveModerate": {
+      "insight": "Cần đối chiếu yêu cầu công việc với kỹ năng đã thể hiện để xác định nhân viên có cần hỗ trợ thêm hay không.",
+      "policy": "Quản lý xem một nhiệm vụ gần đây và hỏi nhân viên về phần họ cần hướng dẫn. Nếu có khoảng trống được xác nhận, chọn hình thức kèm cặp hoặc thực hành phù hợp và đánh giá lại qua công việc sau 30–60 ngày."
+    },
+    "positiveStrong": {
+      "insight": "Ưu tiên kiểm tra liệu khó khăn trong thực hiện công việc có liên quan đến kỹ năng, hướng dẫn hay điều kiện thực hành.",
+      "policy": "Quản lý và bộ phận đào tạo xem lại yêu cầu nhiệm vụ, mức hướng dẫn đã cung cấp và kết quả thực tế. Nếu xác nhận cần phát triển kỹ năng, chia kế hoạch thành từng chặng, giao người hướng dẫn và đánh giá bằng đầu ra ở mỗi chặng."
+    },
+    "negativeModerate": {
+      "insight": "Nên tiếp tục tạo cơ hội để nhân viên áp dụng kiến thức và phát triển kỹ năng qua nhiệm vụ thực tế.",
+      "policy": "Quản lý cùng nhân viên chọn một nhiệm vụ phù hợp với hướng phát triển, xác định người phản hồi và thống nhất đầu ra cần đạt. Chia sẻ phản hồi ngay sau khi hoàn thành để nhân viên biết phần nào có thể tiếp tục phát triển."
+    },
+    "negativeStrong": {
+      "insight": "Có thể mở rộng cơ hội vận dụng chuyên môn khi kết quả công việc và nguyện vọng của nhân viên phù hợp.",
+      "policy": "Quản lý thảo luận về dự án chuyên sâu hoặc cơ hội chia sẻ kiến thức trên cơ sở tự nguyện. Trước khi giao thêm trách nhiệm, thống nhất thời gian, nguồn lực và kỳ vọng. Đánh giá giá trị áp dụng sau một quý."
+    }
+  },
+  "Sick_Days": {
+    "positiveModerate": {
+      "insight": "Cần xác minh loại nghỉ/vắng được ghi nhận và xem nhân viên có cần cập nhật công việc khi trở lại hay không.",
+      "policy": "HR đối chiếu hồ sơ với quy định ghi nhận nghỉ/vắng nội bộ. Khi phù hợp với quy trình trở lại làm việc, quản lý trao đổi riêng về thông tin cần bàn giao và hỗ trợ nhân viên mong muốn. Không yêu cầu thông tin sức khỏe để giải thích điểm dự đoán."
+    },
+    "positiveStrong": {
+      "insight": "Ưu tiên kiểm tra nhu cầu hỗ trợ khi nhân viên quay lại làm việc, tập trung vào lịch làm, nhiệm vụ và bàn giao.",
+      "policy": "Nếu nhân viên xác nhận cần hỗ trợ, HR và quản lý thống nhất điều chỉnh tạm thời, người phụ trách và ngày rà soát. Chỉ lưu thông tin cần thiết để thực hiện hỗ trợ. Không dùng số ngày nghỉ hoặc điểm dự đoán để tự động mở quy trình kỷ luật."
+    },
+    "negativeModerate": {
+      "insight": "Nhân viên đã trở lại và được cập nhật công việc đầy đủ. Các nhiệm vụ, thay đổi và đầu mối hỗ trợ đã được bàn giao.",
+      "policy": "Duy trì đầu mối hỗ trợ, hỏi lại mức phù hợp của khối lượng trong buổi trao đổi tiếp theo. Bảo đảm nhân viên biết cách đề nghị điều chỉnh khi cần."
+    },
+    "negativeStrong": {
+      "insight": "Quá trình trở lại làm việc đang diễn ra thuận lợi theo kế hoạch đã thống nhất. Nhân viên xác nhận các điều chỉnh hiện tại đáp ứng nhu cầu.",
+      "policy": "Tiếp tục hỗ trợ đến mốc rà soát, thống nhất với nhân viên trước khi kết thúc điều chỉnh. Ghi nhận cách bàn giao hiệu quả và chuẩn bị phương án nếu nhu cầu thay đổi."
+    }
+  }
+}
