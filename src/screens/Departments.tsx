@@ -1,3 +1,5 @@
+import { Button as TableButton } from '../components/ui/button';
+import { CreateRecordDialog } from '../components/CreateRecordDialog';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AppShell } from '../components/AppShell';
@@ -10,9 +12,10 @@ const control = 'mt-2 w-full rounded-xl border border-slate-300 bg-white p-3 tex
 const pageSize = 20;
 
 export default function Departments() {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const navigate = useNavigate();
   const [departments, setDepartments] = useState<ApiDepartment[]>([]);
+  const [total, setTotal] = useState<number | null>(null);
   const [hasMore, setHasMore] = useState(false);
   const [page, setPage] = useState(1);
   const [query, setQuery] = useState('');
@@ -24,6 +27,7 @@ export default function Departments() {
   const [revision, setRevision] = useState(0);
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
+  const [createOpen, setCreateOpen] = useState(false);
   const nameInput = useRef<HTMLInputElement>(null);
   useEffect(() => {
     const controller = new AbortController();
@@ -33,6 +37,7 @@ export default function Departments() {
       .then(result => {
         if (controller.signal.aborted) return;
         setDepartments(result.data);
+        setTotal(result.pagination?.total ?? null);
         setHasMore(result.pagination?.has_more ?? false);
       })
       .catch(cause => {
@@ -52,6 +57,7 @@ export default function Departments() {
       const input = { name: name.trim(), description: description.trim() || null };
       await createDepartment(input);
       setMessage('Department created.');
+      setCreateOpen(false);
       setName(''); setDescription('');
       setPage(1);
       setRevision(value => value + 1);
@@ -87,46 +93,49 @@ export default function Departments() {
   }
 
   return <AppShell breadcrumb={['Workforce', 'Departments']}>
-    <SectionHeader title="Departments" description="Manage department names and descriptions." />
-    {message && <p role="status" className="mb-5 rounded-xl bg-emerald-50 p-4 text-sm text-emerald-800">{t(message)}</p>}
-    {error && <p role="alert" className="mb-5 rounded-xl bg-red-50 p-4 text-sm text-red-800">{t(error)}</p>}
-    <Card className="mb-5 p-5 sm:p-6">
-      <h2 className="text-lg font-bold text-slate-900">{t('Add department')}</h2>
-      <form onSubmit={save} className="mt-4 grid gap-4 lg:grid-cols-2">
+    <SectionHeader title="Departments" description="Manage department names and descriptions.">
+<CreateRecordDialog title={t('Add department')} open={createOpen} onOpenChange={value => { setCreateOpen(value); setError(''); }} pending={pending}>
+      {error && <p role="alert" className="mt-4 rounded-md bg-red-50 p-3 text-sm text-red-800">{t(error)}</p>}
+      <form onSubmit={save} className="mt-4 grid gap-4 sm:grid-cols-2">
         <label className="text-sm font-medium text-slate-700">{t('Department name')}<input ref={nameInput} required maxLength={150} value={name} disabled={pending} onChange={event => setName(event.target.value)} className={`${control} h-12`} /></label>
         <label className="text-sm font-medium text-slate-700">{t('Department description')}<textarea rows={1} value={description} disabled={pending} onChange={event => setDescription(event.target.value)} className={`${control} h-12 resize-none overflow-y-auto`} /></label>
-        <div className="flex flex-wrap gap-2 lg:col-span-2">
+        <div className="flex flex-wrap gap-2 sm:col-span-2">
           <Button type="submit" disabled={pending}>{t(pending ? 'Saving department...' : 'Add department')}</Button>
         </div>
+          <Button type="button" variant="secondary" disabled={pending} onClick={() => setCreateOpen(false)}>{t('Cancel')}</Button>
       </form>
-    </Card>
+    </CreateRecordDialog>
+    </SectionHeader>
+    {message && <p role="status" className="mb-5 rounded-xl bg-emerald-50 p-4 text-sm text-emerald-800">{t(message)}</p>}
+    {error && !createOpen && <p role="alert" className="mb-5 rounded-xl bg-red-50 p-4 text-sm text-red-800">{t(error)}</p>}
+
     <Card className="p-5 sm:p-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-lg font-bold text-slate-900">{t('Department list')}</h2>
-        <Button variant="secondary" disabled={pending || loading} onClick={() => setRevision(value => value + 1)}>{t('Reload departments')}</Button>
+        <TableButton variant="outline" className="h-9 rounded-lg border-slate-200 bg-white px-3 text-sm text-slate-700 hover:bg-slate-50" disabled={pending || loading} onClick={() => setRevision(value => value + 1)}>{t('Reload departments')}</TableButton>
       </div>
       <form onSubmit={find} className="my-4 flex flex-col items-stretch gap-3 sm:flex-row sm:items-end">
-        <label className="flex-1 text-sm font-medium text-slate-700">{t('Search departments')}<input type="search" maxLength={100} value={query} disabled={pending || loading} onChange={event => changeSearch(event.target.value)} className={control} /></label>
-        <Button type="submit" variant="secondary" disabled={pending || loading}>{t('Search')}</Button>
+        <label className="flex-1 text-sm font-medium text-slate-700">{t('Search departments')}<input type="search" maxLength={100} value={query} disabled={pending || loading} onChange={event => changeSearch(event.target.value)} className={`${control} h-12`} /></label>
+        <TableButton type="submit" variant="outline" className="h-12 rounded-lg border-slate-300 bg-white px-5 text-sm font-bold text-slate-900 hover:bg-slate-50" disabled={pending || loading}>{t('Search')}</TableButton>
       </form>
-      {loading ? <p role="status" className="py-6 text-sm text-slate-600">{t('Loading departments...')}</p> : listError ? <div role="alert" className="rounded-xl bg-red-50 p-4 text-sm text-red-800"><p>{t(listError)}</p><Button className="mt-3" variant="secondary" onClick={() => setRevision(value => value + 1)}>{t('Retry departments')}</Button></div> : <>
+      {loading ? <p role="status" className="py-6 text-sm text-slate-600">{t('Loading departments...')}</p> : listError ? <div role="alert" className="rounded-xl bg-red-50 p-4 text-sm text-red-800"><p>{t(listError)}</p><TableButton variant="outline" className="mt-3 h-9 rounded-lg border-slate-200 bg-white px-3 text-sm text-slate-700 hover:bg-slate-50" onClick={() => setRevision(value => value + 1)}>{t('Retry departments')}</TableButton></div> : <>
         {!departments.length ? <p role="status" className="py-6 text-sm text-slate-600">{t('No departments found.')}</p> : <div className="overflow-x-auto"><table className="w-full text-left text-sm">
           <caption className="sr-only">{t('Department list')}</caption>
           <thead><tr className="border-b text-slate-500"><th scope="col" className="p-3">{t('Department code')}</th><th scope="col" className="p-3">{t('Department name')}</th><th scope="col" className="p-3">{t('Department status')}</th><th scope="col" className="p-3">{t('Department actions')}</th></tr></thead>
           <tbody>{departments.map(department => <tr key={department.id} className="border-b border-slate-100">
             <td className="p-3">{department.code || '—'}</td>
             <th scope="row" className="max-w-64 break-words p-3 font-medium text-slate-800">{department.name}</th>
-            <td className="p-3">{t(department.status === 'INACTIVE' ? 'Department inactive' : 'Department active')}</td>
+            <td className="p-3"><span className={'inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium ' + (department.status === 'INACTIVE' ? 'bg-slate-100 text-slate-700' : 'bg-emerald-50 text-emerald-700')}><span aria-hidden="true" className={'size-1.5 rounded-full ' + (department.status === 'INACTIVE' ? 'bg-slate-500' : 'bg-emerald-500')} />{t(department.status === 'INACTIVE' ? 'Department inactive' : 'Department active')}</span></td>
             <td className="w-px p-3"><div className="flex flex-nowrap gap-2">
-              <Button size="sm" variant="info" disabled={pending || loading} onClick={() => navigate(`/departments/${department.id}`)} aria-label={t('View department {name}', { name: department.name })}>{t('View details')}</Button>
-              <Button size="sm" variant="warning" disabled={pending || loading} onClick={() => navigate(`/departments/${department.id}/edit`)} aria-label={t('Edit department {name}', { name: department.name })}>{t('Edit')}</Button>
-              <Button size="sm" variant="danger" disabled={pending || loading || department.status === 'INACTIVE'} onClick={() => void deactivate(department)} aria-label={t('Deactivate department {name}', { name: department.name })}>{t('Deactivate department')}</Button>
+              <TableButton size="sm" variant="outline" className="h-auto rounded-lg border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-50" disabled={pending || loading} onClick={() => navigate(`/departments/${department.id}`)} aria-label={t('View department {name}', { name: department.name })}>{t('View details')}</TableButton>
+              <TableButton size="sm" variant="outline" className="h-auto rounded-lg border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 transition-colors hover:border-orange-300 hover:bg-white hover:text-orange-600" disabled={pending || loading} onClick={() => navigate(`/departments/${department.id}/edit`)} aria-label={t('Edit department {name}', { name: department.name })}>{t('Edit')}</TableButton>
+              <TableButton size="sm" variant="outline" className="h-auto rounded-lg border-red-100 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-600 transition-colors hover:bg-red-100 hover:text-red-600" disabled={pending || loading || department.status === 'INACTIVE'} onClick={() => void deactivate(department)} aria-label={t('Deactivate department {name}', { name: department.name })}>{t('Deactivate department')}</TableButton>
             </div></td>
           </tr>)}</tbody>
         </table></div>}
         <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-          <p className="text-sm text-slate-600">{t('Department page {page}', { page })}</p>
-          <div className="flex flex-wrap gap-2"><Button variant="secondary" disabled={page === 1 || pending || loading} onClick={() => setPage(value => value - 1)}>{t('Previous page')}</Button><Button variant="secondary" disabled={!hasMore || pending || loading} onClick={() => setPage(value => value + 1)}>{t('Next page')}</Button></div>
+          <p className="text-sm text-slate-600">{language === 'vi' ? `Trang ${page}${total === null ? '' : ` (Tổng ${total} phòng ban)`}` : `Page ${page}${total === null ? '' : ` (${total} departments total)`}`}</p>
+          <div className="flex flex-wrap gap-2"><TableButton variant="outline" className="h-9 rounded-lg border-slate-200 bg-white px-3 text-sm text-slate-700 hover:bg-slate-50" disabled={page === 1 || pending || loading} onClick={() => setPage(value => value - 1)}>{t('Previous page')}</TableButton><TableButton variant="outline" className="h-9 rounded-lg border-slate-200 bg-white px-3 text-sm text-slate-700 hover:bg-slate-50" disabled={!hasMore || pending || loading} onClick={() => setPage(value => value + 1)}>{t('Next page')}</TableButton></div>
         </div>
       </>}
     </Card>

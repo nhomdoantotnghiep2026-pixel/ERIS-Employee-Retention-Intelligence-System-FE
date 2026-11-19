@@ -1,7 +1,7 @@
 import test from "node:test"
 import assert from "node:assert/strict"
 import { createServer } from "vite"
-test("stale preview and attendance versions preserve conflict codes without automatic overwrite", async () => {
+test("stale preview and attendance fingerprints preserve conflict codes without automatic overwrite", async () => {
   const server = await createServer({
     configFile: false,
     server: { middlewareMode: true, ws: false },
@@ -21,17 +21,13 @@ test("stale preview and attendance versions preserve conflict codes without auto
   try {
     const a = await server.ssrLoadModule("/src/services/attendance.ts")
     await assert.rejects(
-      a.confirmAttendance("batch", {
-        duplicate_strategy: "SKIP",
-        confirm_warnings: false,
-        updates: [],
-      }),
+      a.confirmAttendance(new File(["file"], "attendance.xlsx"), "preview-token", [], false),
       (e: { code: string }) => e.code === "STALE_PREVIEW",
     )
     assert.equal(count, 1)
     code = "ATTENDANCE_CONFLICT"
     await assert.rejects(
-      a.mutateAttendance({ id: 9, version: 1 }, "CANCEL", "Wrong source"),
+      a.cancelAttendance({ id: 9, record_fingerprint: "a".repeat(64) }, "Wrong source"),
       (e: { code: string }) => e.code === "ATTENDANCE_CONFLICT",
     )
     assert.equal(count, 2)

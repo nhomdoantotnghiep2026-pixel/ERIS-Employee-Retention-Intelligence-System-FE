@@ -2,6 +2,7 @@ import { useAutoDismissState } from '../hooks/useAutoDismissState';
 import { useEffect, useState, type FormEvent } from 'react';
 import { BriefcaseBusiness, CalendarDays, GraduationCap, Pencil, Power } from 'lucide-react';
 import { Button, Card } from './ui';
+import { employeeDate } from '../utils/employeeDates';
 import { useLanguage } from '../context/LanguageContext';
 import { useAutoDismissFeedback } from '../hooks/useAutoDismissState';
 import {
@@ -22,7 +23,7 @@ const inputClass = 'mt-1 w-full rounded-xl border border-slate-300 bg-white p-3 
 const sectionTitleClass = 'text-[20px] font-semibold leading-7 text-[#111827]';
 const subsectionTitleClass = 'text-[16px] font-semibold leading-6 text-[#111827]';
 const cardTitleClass = 'break-words text-[16px] font-semibold leading-6 text-[#111827] [overflow-wrap:anywhere]';
-const metadataClass = 'text-[14px] font-normal leading-5 text-[#6B7280]';
+const metadataClass = 'text-[14px] font-normal leading-5 text-slate-600';
 const badgeClass = 'inline-flex min-h-8 items-center rounded-full border border-orange-100 bg-orange-50 px-3 py-1 text-[14px] font-medium leading-5 text-orange-700';
 const historyCardClass = 'relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-4 pl-5 shadow-sm transition duration-200 hover:-translate-y-0.5 hover:border-orange-200 hover:shadow-md';
 const subsectionIconClass = 'flex size-9 shrink-0 items-center justify-center rounded-xl bg-orange-50 text-orange-600 ring-1 ring-orange-100';
@@ -36,7 +37,8 @@ export function EmployeeApiHistory({ employeeId, employeeEmail, dateOfBirth, own
   editable?: boolean;
   initialEducations?: EmployeeEducation[];
 }) {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
+  const formatDate = (value: string) => { const date = employeeDate(value); if (!date) return '—'; const [year, month, day] = date.split('-'); return language === 'vi' ? `${day}/${month}/${year}` : `${month}/${day}/${year}`; };
   const [education, setEducation] = useState<EmployeeEducation[]>(initialEducations);
   const [history, setHistory] = useState<EmployeeJobHistory[]>([]);
   const [loading, setLoading] = useState(true);
@@ -239,8 +241,8 @@ export function EmployeeApiHistory({ employeeId, employeeEmail, dateOfBirth, own
     {editPermissionError && <p role="alert" className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm font-medium text-amber-900">{t(editPermissionError)}</p>}
     {notice && <p role="status" className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-medium text-emerald-900">{t(notice)}</p>}
     {!loading && <>
-      <div className="mt-5 grid items-start gap-5 xl:grid-cols-2">
-      <section className="rounded-2xl border border-slate-200 bg-slate-50/50 p-4 sm:p-5">
+      <div className="mt-5 grid items-stretch gap-5 lg:grid-cols-12">
+      <section className="flex min-w-0 flex-col rounded-2xl border border-slate-200 bg-slate-50/50 p-4 sm:p-5 lg:col-span-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2.5">
             <span className={subsectionIconClass}>
@@ -252,7 +254,7 @@ export function EmployeeApiHistory({ employeeId, employeeEmail, dateOfBirth, own
         </div>
         {educationError && <p role="alert" className="mt-3 rounded-xl border border-red-200 bg-red-50 p-4 text-sm font-medium text-red-800">{t(educationError)}</p>}
         {educationError ? null : education.length === 0 ? <p className="mt-4 rounded-xl border border-dashed border-slate-300 bg-white px-4 py-7 text-center text-sm text-slate-500">{t('No active education records.')}</p>
-          : <div className="mt-4 space-y-4">{education.map(row => <article key={row.id} className={historyCardClass}>
+          : <div className="mt-4 grid flex-1 auto-rows-fr gap-4">{education.map(row => <article key={row.id} className={historyCardClass}>
             <span className="absolute inset-y-0 left-0 w-1 bg-gradient-to-b from-orange-400 to-orange-600" aria-hidden="true" />
             <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
               <div className="min-w-0">
@@ -311,7 +313,7 @@ export function EmployeeApiHistory({ employeeId, employeeEmail, dateOfBirth, own
       </form>}
       </section>
 
-      <section className="rounded-2xl border border-slate-200 bg-slate-50/50 p-4 sm:p-5">
+      <section className="flex min-w-0 flex-col rounded-2xl border border-slate-200 bg-slate-50/50 p-4 sm:p-5 lg:col-span-8">
         <div className="flex items-center gap-2.5">
           <span className={subsectionIconClass}>
             <BriefcaseBusiness size={18} aria-hidden="true" />
@@ -320,11 +322,11 @@ export function EmployeeApiHistory({ employeeId, employeeEmail, dateOfBirth, own
         </div>
         {historyError && <p role="alert" className="mt-3 rounded-xl border border-red-200 bg-red-50 p-4 text-sm font-medium text-red-800">{t(historyError)}</p>}
         {historyError ? null : history.length === 0 ? <p className="mt-4 rounded-xl border border-dashed border-slate-300 bg-white px-4 py-7 text-center text-sm text-slate-500">{t('No job history records.')}</p>
-          : <div className="mt-4 grid gap-4 2xl:grid-cols-2">{history.map(row => <article key={row.id} className={historyCardClass}>
+          : <div className="mt-4 grid flex-1 auto-rows-fr gap-4 md:grid-cols-2">{history.map(row => <article key={row.id} className={historyCardClass}>
             <span className="absolute inset-y-0 left-0 w-1 bg-gradient-to-b from-orange-400 to-orange-600" aria-hidden="true" />
             <h4 className={cardTitleClass}>{t(row.positionName || '—')}</h4>
             <p className={`${metadataClass} mt-2 break-words [overflow-wrap:anywhere]`}>{t(row.departmentName || '—')}</p>
-            <p className={`${metadataClass} mt-2 inline-flex items-center gap-1.5`}><CalendarDays className="size-4 shrink-0" strokeWidth={1.8} aria-hidden="true" />{row.startDate} – {row.endDate || t('Present')}</p>
+            <p className={`${metadataClass} mt-2 inline-flex items-center gap-1.5`}><CalendarDays className="size-4 shrink-0" strokeWidth={1.8} aria-hidden="true" />{formatDate(row.startDate)} – {row.endDate ? formatDate(row.endDate) : t('Present')}</p>
           </article>)}</div>}
       </section>
       </div>

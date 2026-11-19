@@ -1,154 +1,63 @@
+import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
+import { Activity, ArrowRight, RefreshCw, Settings, Users } from 'lucide-react';
 import { AppShell } from '../components/AppShell';
-import { Card, StatusBadge } from '../components/ui';
-import { readAudit } from '../workflows/audit';
-import { isSupabaseConfigured } from '../lib/supabase';
-import { CheckCircle, Database, Cpu, FileText, Settings, ArrowRight, Users as UsersIcon, KeyRound, Activity } from 'lucide-react';
+import { Card, SectionHeader } from '../components/ui';
+import { Button } from '../components/ui/button';
 import { useLanguage } from '../context/LanguageContext';
-import { useNavigate } from 'react-router-dom';
-import { useErd } from '../erd/useErd';
+import { listAuditLogs, listUsers, type ApiUserListResponse, type AuditLogEntry } from '../services/api';
+import { auditDateMatches } from '../utils/auditDateFilter';
+import { employeeDate } from '../utils/employeeDates';
 
+type Source<T> = { data: T | null; failed: boolean };
+type Directory = { page: ApiUserListResponse; active: number; inactive: number; pending: number };
+const modules = [
+  { label: 'Users Management', to: '/users', icon: Users, vi: 'Xem tài khoản, tạo tài khoản HR và quản lý trạng thái theo quyền được cấp.', en: 'View accounts, create HR accounts and manage permitted account statuses.' },
+  { label: 'System Configuration', to: '/system', icon: Settings, vi: 'Thiết lập ứng dụng, bảo mật, báo cáo và thông báo. Lưu trên thiết bị này.', en: 'Application, security, reporting and notification preferences. Saved on this device.' },
+  { label: 'Activity Logs', to: '/activity', icon: Activity, vi: 'Tra cứu thao tác đã ghi nhận, người thực hiện và chi tiết thay đổi.', en: 'Review recorded actions, their actors and change details.' },
+];
 export default function AdminOverview() {
   const { t, language } = useLanguage();
-  const navigate = useNavigate();
-  const db = useErd();
-  const users = db.users.map(row => ({ id:row.id,email:String(row.email),name:String(db.employees.find(employee => employee.id === row.employee_id)?.full_name || row.email),role:String(db.role.find(role => role.id === row.role_id)?.name),status:String(row.status) }));
-  const entries = readAudit();
-  const localDay = (value: string | Date) => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' }).format(new Date(value));
-  const activityLog = entries.slice(0, 8).map(entry => ({ time: new Date(entry.created_at).toLocaleString(language === 'vi' ? 'vi-VN' : 'en-US', { timeZone: 'Asia/Ho_Chi_Minh' }), user: entry.user_name, activity: entry.action, module: entry.entity_type, status: 'Success' }));
-  const activitiesToday = entries.filter(entry => localDay(entry.created_at) === localDay(new Date())).length;
-  const activeUsers = users.filter(u => u.status === 'Active').length;
-  const inactiveUsers = users.filter(u => u.status === 'Inactive').length;
-
-  return (
-    <AppShell breadcrumb={['System Administration']}>
-      <section className="mb-5 rounded-[24px] bg-white p-6 shadow-[0_8px_28px_rgba(30,41,59,0.06)]"><div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between"><div><p className="text-xs font-bold uppercase tracking-[0.14em] text-orange-500">{t('Global administration')}</p><h1 className="mt-2 text-2xl font-extrabold text-slate-900">{t('System Administration')}</h1><p className="mt-2 text-sm text-slate-500">{t('Manage access, roles, configuration, and operational health from one workspace.')}</p></div><button onClick={() => navigate('/users')} className="flex min-h-12 items-center justify-center gap-2 rounded-full bg-orange-500 px-5 text-sm font-bold text-white hover:bg-orange-600">{t('Manage users')}<ArrowRight size={17} /></button></div><div className="mt-5 grid grid-cols-2 gap-3 border-t border-slate-100 pt-5 sm:grid-cols-4">{[{label:'Users',icon:UsersIcon,to:'/users'},{label:'Roles & Permissions',icon:KeyRound,to:'/roles'},{label:'System Configuration',icon:Settings,to:'/system'},{label:'Activity Logs',icon:Activity,to:'/activity'}].map(action => <button key={action.label} onClick={() => navigate(action.to)} className="flex min-h-12 items-center justify-center gap-2 rounded-full bg-slate-50 px-3 text-xs font-bold text-slate-700 hover:bg-orange-50 hover:text-orange-700"><action.icon size={16}/>{t(action.label)}</button>)}</div></section>
-
-      {/* Summary strip */}
-      <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          <Card className="px-5 py-3.5">
-            <div className="text-[12px] text-gray-500 mb-1">{t('Total Users')}</div>
-            <div className="text-[24px] font-semibold text-gray-900">{users.length}</div>
-            <div className="text-[12px] text-gray-400">{activeUsers} {t('active')} · {inactiveUsers} {t('inactive')}</div>
-          </Card>
-          <Card className="px-5 py-3.5">
-            <div className="text-[12px] text-gray-500 mb-1">{t('System Roles')}</div>
-            <div className="text-[24px] font-semibold text-gray-900">4</div>
-            <div className="text-[12px] text-gray-400">{t('HR, Analyst, Admin, Employee / ESS')}</div>
-          </Card>
-          <Card className="px-5 py-3.5">
-            <div className="text-[12px] text-gray-500 mb-1">{t('System Status')}</div>
-            <div className="text-[24px] font-semibold text-amber-600">{t('Demo')}</div>
-            <div className="text-[12px] text-gray-400">{t('Backend / AI service health has not been verified')}</div>
-          </Card>
-          <Card className="px-5 py-3.5">
-            <div className="text-[12px] text-gray-500 mb-1">{t('Activities Today')}</div>
-            <div className="text-[24px] font-semibold text-gray-900">{activitiesToday}</div>
-            <div className="text-[12px] text-gray-400">{t('Activity log for the demo session')}</div>
-          </Card>
-      </div>
-
-      <div className="grid grid-cols-1 gap-4 mb-4 xl:grid-cols-[320px_minmax(0,1fr)_300px]">
-        {/* Service status */}
-        <Card className="p-4">
-          <div className="flex items-center justify-between mb-3">
-            <div className="text-[14px] font-semibold text-gray-800">{t('Service Status')}</div>
-          </div>
-          <div className="space-y-0">
-            {[
-              { label: 'Application', icon: <Settings size={13} className="text-green-500" />, status: 'Operational' },
-              { label: 'Database', icon: <Database size={13} className="text-amber-500" />, status: isSupabaseConfigured ? 'Configured, not verified' : 'Not configured' },
-              { label: 'AI Analysis Service', icon: <Cpu size={13} className="text-amber-500" />, status: 'Demo fixtures only' },
-              { label: 'Reporting Service', icon: <FileText size={13} className="text-amber-500" />, status: 'Browser CSV export' },
-            ].map(s => (
-              <div key={s.label} className="flex items-center justify-between py-2.5 border-b border-gray-100 last:border-0">
-                <div className="flex items-center gap-2">
-                  {s.icon}
-                  <span className="text-[13px] text-gray-700">{t(s.label)}</span>
-                </div>
-                <span className={`text-[12px] font-medium flex items-center gap-1 ${s.label === 'Application' ? 'text-green-600' : 'text-amber-700'}`}>
-                  {s.label === 'Application' && <CheckCircle size={11} />} {t(s.status)}
-                </span>
-              </div>
-            ))}
-          </div>
-        </Card>
-
-        {/* Users summary */}
-        <Card className="p-4">
-          <div className="flex items-center justify-between mb-3">
-            <div className="text-[14px] font-semibold text-gray-800">{t('Users')}</div>
-          </div>
-          <div className="space-y-0">
-            {users.map(u => (
-              <div key={u.id} className="flex items-center justify-between py-2 border-b border-gray-100 last:border-0">
-                <div>
-                  <div className="text-[13px] font-medium text-gray-800">{u.name}</div>
-                  <div className="text-[11px] text-gray-400">{t(u.role)}</div>
-                </div>
-                <StatusBadge status={u.status} />
-              </div>
-            ))}
-          </div>
-        </Card>
-
-        {/* Administration status */}
-        <Card className="p-4">
-          <div className="text-[14px] font-semibold text-gray-800 mb-3">{t('Administration')}</div>
-          <div className="space-y-1.5">
-            {[
-              { label: 'Users Management', value: t('{count} accounts', { count: users.length }) },
-              { label: 'Roles & Permissions', value: t('{count} roles', { count: 4 }) },
-              { label: 'System Configuration', value: 'Demo configuration' },
-              { label: 'System Activity Log', value: t('{count} today', { count: activitiesToday }) },
-            ].map(a => (
-              <div
-                key={a.label}
-                className="w-full flex items-center justify-between px-3 py-2 text-[13px] text-gray-700 bg-slate-50 border border-gray-200"
-                style={{ borderRadius: '5px' }}
-              >
-                <span>{t(a.label)}</span>
-                <span className="text-[12px] font-medium text-slate-600">{t(a.value)}</span>
-              </div>
-            ))}
-          </div>
-        </Card>
-      </div>
-
-      {/* Recent activity */}
-      <Card>
-        <div className="px-4 py-2.5 border-b border-gray-200 flex items-center justify-between">
-          <span className="text-[14px] font-medium text-gray-800">{t('Recent Activity')}</span>
-        </div>
-        <table className="w-full table-fixed">
-          <colgroup>
-            <col className="w-[12%]" />
-            <col className="w-[18%]" />
-            <col className="w-[42%]" />
-            <col className="w-[16%]" />
-            <col className="w-[12%]" />
-          </colgroup>
-          <thead>
-            <tr className="border-b border-gray-200 bg-gray-50">
-              {['Time', 'User', 'Activity', 'Module', 'Status'].map(h => (
-                <th key={h} className="px-3 py-2.5 text-left text-[12px] font-medium text-gray-500 uppercase tracking-wide">{t(h)}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-100">
-            {activityLog.slice(0, 5).map((a, i) => (
-              <tr key={i} className="hover:bg-gray-50/60">
-                <td className="px-3 h-[44px] font-mono text-[12px] text-gray-400 whitespace-nowrap">{a.time}</td>
-                <td className="px-3 h-[44px] text-[13px] font-medium text-gray-800">{a.user}</td>
-                <td className="px-3 h-[44px] text-[13px] text-gray-600">{t(a.activity)}</td>
-                <td className="px-3 h-[44px]">
-                  <span className="text-[12px] bg-gray-100 text-gray-500 px-2 py-0.5 rounded">{t(a.module)}</span>
-                </td>
-                <td className="px-3 h-[44px]"><StatusBadge status={a.status} /></td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </Card>
-    </AppShell>
-  );
+  const tr = (vi: string, en: string) => language === 'vi' ? vi : en;
+  const [directory, setDirectory] = useState<Source<Directory>>({ data: null, failed: false });
+  const [audit, setAudit] = useState<Source<AuditLogEntry[]>>({ data: null, failed: false });
+  const [loading, setLoading] = useState(true);
+  const [revision, setRevision] = useState(0);
+  useEffect(() => {
+    const controller = new AbortController();
+    let disposed = false;
+    const timeout = window.setTimeout(() => controller.abort(), 15000);
+    setLoading(true); setDirectory({ data: null, failed: false }); setAudit({ data: null, failed: false });
+    const accounts = Promise.all([
+      listUsers({ limit: 5 }, controller.signal), listUsers({ limit: 1, status: 'ACTIVE' }, controller.signal),
+      listUsers({ limit: 1, status: 'INACTIVE' }, controller.signal), listUsers({ limit: 1, status: 'IN_PROCESS' }, controller.signal),
+    ]).then(([page, active, inactive, pending]) => { if (!disposed) setDirectory({ data: { page, active: active.pagination.total, inactive: inactive.pagination.total, pending: pending.pagination.total }, failed: false }); })
+      .catch(() => { if (!disposed) setDirectory({ data: null, failed: true }); });
+    const logs = listAuditLogs(controller.signal).then(result => { if (!disposed) setAudit({ data: result.data, failed: false }); })
+      .catch(() => { if (!disposed) setAudit({ data: null, failed: true }); });
+    void Promise.all([accounts, logs]).finally(() => { window.clearTimeout(timeout); if (!disposed) setLoading(false); });
+    return () => { disposed = true; window.clearTimeout(timeout); controller.abort(); };
+  }, [revision]);
+  const today = employeeDate(new Date().toISOString()) || '';
+  const todayCount = audit.data?.filter(entry => auditDateMatches(entry.createdAt, today, today)).length;
+  const recent = [...(audit.data || [])].sort((a, b) => (Date.parse(b.createdAt) || 0) - (Date.parse(a.createdAt) || 0) || b.id - a.id).slice(0, 5);
+  const roleName = (role: string) => ({ ADMIN: t('System Administrator'), HR: t('HR'), EMPLOYEE: t('Employee / ESS') })[role.toUpperCase()] || tr('Chưa xác định', 'Unknown');
+  const statusName = (status: string) => ({ ACTIVE: t('Active'), INACTIVE: t('Inactive'), IN_PROCESS: t('In process') })[status] || tr('Chưa xác định', 'Unknown');
+  const unavailable = <p role="status" className="py-5 text-sm leading-6 text-slate-600">{tr('Chưa tải được dữ liệu. Vui lòng làm mới hoặc mở trang quản lý để kiểm tra.', 'Data could not be loaded. Refresh or open the management page to check.')}</p>;
+  return <AppShell breadcrumb={['Admin Overview']}>
+    <SectionHeader title={t('Admin Overview')} description={tr('Tổng hợp tài khoản, cấu hình và hoạt động quản trị của ERIS.', 'An overview of ERIS accounts, settings and administrative activity.')}>
+      <Button variant="outline" className="h-10 gap-2" disabled={loading} onClick={() => setRevision(value => value + 1)}><RefreshCw aria-hidden="true" className={loading ? 'size-4 animate-spin motion-reduce:animate-none' : 'size-4'} />{t('Refresh')}</Button>
+    </SectionHeader>
+    <div className="mb-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{[
+      { label: t('Total Users'), value: directory.data?.page.pagination.total, detail: directory.data ? tr(`${directory.data.inactive} tài khoản không hoạt động`, `${directory.data.inactive} inactive accounts`) : tr('Danh sách tài khoản hệ thống', 'System account directory') },
+      { label: tr('Tài khoản hoạt động', 'Active accounts'), value: directory.data?.active, detail: tr('Trạng thái đang hoạt động', 'Currently active status') },
+      { label: tr('Chờ hoàn tất kích hoạt', 'Pending activation'), value: directory.data?.pending, detail: tr('Tài khoản đang trong quá trình kích hoạt', 'Accounts in the activation process') },
+      { label: tr('Số thao tác hôm nay', 'Actions today'), value: todayCount, detail: tr('Theo ngày Việt Nam · nhật ký đã ghi nhận', 'Vietnam calendar day · recorded activity') },
+    ].map(item => <Card key={item.label} className="p-5"><p className="text-sm text-slate-600">{item.label}</p><p className="mt-3 text-3xl font-semibold tabular-nums text-slate-900">{item.value ?? (loading ? '…' : '—')}</p><p className="mt-2 text-xs leading-5 text-slate-600">{item.detail}</p></Card>)}</div>
+    <section aria-label={tr('Chức năng quản trị', 'Administrative functions')} className="mb-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">{modules.map(module => <Link key={module.to} to={module.to} className="group flex items-start gap-3 rounded-xl border border-slate-200 bg-white p-5 shadow-sm transition-colors hover:border-orange-300 hover:bg-orange-50/30 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-500"><span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-orange-50 text-orange-600"><module.icon aria-hidden="true" size={20} /></span><div className="min-w-0"><h2 className="text-base font-semibold text-slate-900">{t(module.label)}</h2><p className="mt-2 text-sm leading-6 text-slate-600">{language === 'vi' ? module.vi : module.en}</p></div><ArrowRight aria-hidden="true" className="mt-1 size-4 shrink-0 text-slate-600 group-hover:text-orange-600" /></Link>)}</section>
+    <div className="grid items-stretch gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)]">
+      <Card className="flex min-w-0 flex-col p-5"><div className="flex items-center justify-between gap-3"><h2 className="font-semibold text-slate-900">{t('Users')}</h2><Link className="text-sm font-medium text-orange-700 hover:underline" to="/users">{tr('Xem tất cả', 'View all')}</Link></div><p className="mt-1 text-xs leading-5 text-slate-600">{tr('Tối đa 5 tài khoản trong danh sách hiện tại.', 'Up to 5 accounts from the current directory.')}</p>{directory.failed ? unavailable : !directory.data ? <p role="status" className="py-5 text-sm text-slate-600">{tr('Đang tải…', 'Loading…')}</p> : directory.data.page.data.length === 0 ? <p className="py-5 text-sm text-slate-600">{tr('Chưa có tài khoản.', 'No accounts found.')}</p> : <ul className="mt-3 grid auto-rows-fr divide-y divide-slate-100 xl:flex-1">{directory.data.page.data.map(user => <li key={user.id} className="flex items-center justify-between gap-3 py-3"><div className="min-w-0"><p className="break-words text-sm font-semibold text-slate-900 [overflow-wrap:anywhere]">{user.fullName || user.email}</p><p className="mt-1 text-xs text-slate-600">{roleName(typeof user.role === 'string' ? user.role : user.role?.name || user.roleName || '')}</p></div><span className="shrink-0 rounded-md bg-slate-100 px-2 py-1 text-xs font-medium text-slate-700">{statusName(user.status)}</span></li>)}</ul>}</Card>
+      <Card className="flex min-w-0 flex-col overflow-hidden"><div className="flex items-center justify-between gap-3 border-b border-slate-100 p-5"><h2 className="font-semibold text-slate-900">{t('Recent Activity')}</h2><Link className="text-sm font-medium text-orange-700 hover:underline" to="/activity">{tr('Xem nhật ký', 'View logs')}</Link></div>{audit.failed ? <div className="px-5">{unavailable}</div> : !audit.data ? <p role="status" className="p-5 text-sm text-slate-600">{tr('Đang tải…', 'Loading…')}</p> : recent.length === 0 ? <p className="p-5 text-sm text-slate-600">{tr('Chưa có hoạt động được ghi nhận.', 'No activity recorded yet.')}</p> : <div className="overflow-x-auto xl:flex-1"><table className="h-full w-full min-w-[550px] text-left text-sm"><thead className="bg-slate-50 text-xs text-slate-600"><tr>{['Time', 'User', 'Activity', 'Module'].map(label => <th key={label} className="px-4 py-3 font-semibold">{t(label)}</th>)}</tr></thead><tbody className="divide-y divide-slate-100">{recent.map(entry => <tr key={entry.id}><td className="px-4 py-3 text-xs text-slate-600">{Number.isFinite(Date.parse(entry.createdAt)) ? new Date(entry.createdAt).toLocaleString(language === 'vi' ? 'vi-VN' : 'en-US', { timeZone: 'Asia/Ho_Chi_Minh' }) : '—'}</td><td className="max-w-48 break-words px-4 py-3 text-slate-900 [overflow-wrap:anywhere]">{entry.actor?.fullName || entry.actor?.email || tr('Không có thông tin', 'Unavailable')}</td><td className="px-4 py-3 text-slate-700">{({ CREATE: tr('Tạo mới', 'Create'), UPDATE: tr('Cập nhật', 'Update'), DELETE: tr('Xóa', 'Delete'), SOFT_DELETE: tr('Ngừng sử dụng', 'Deactivate') } as Record<string, string>)[entry.action || ''] || entry.action || '—'}</td><td className="px-4 py-3 text-xs text-slate-600">{t(({ employees: 'Employees', users: 'Users', departments: 'Departments', positions: 'Positions', surveys: 'Surveys', role: 'Roles & Permissions' } as Record<string, string>)[entry.entityType || ''] || entry.entityType || '—')}</td></tr>)}</tbody></table></div>}</Card>
+    </div>
+  </AppShell>;
 }

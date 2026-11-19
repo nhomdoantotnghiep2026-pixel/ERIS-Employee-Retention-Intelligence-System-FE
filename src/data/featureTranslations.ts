@@ -1,5 +1,6 @@
 // Display copy only. Stored identifiers, enum values and user-entered content are unchanged.
 export const featureVietnamese: Record<string, string> = {
+  'Manage account information, permissions and system access status.': 'Quản lý thông tin tài khoản, phân quyền và trạng thái truy cập hệ thống.',
   'educationLevel must be High School, Bachelor, Master or PhD.': 'Vui lòng chọn trình độ học vấn hợp lệ.',
   'Institution directory is temporarily unavailable. Please try again later.': 'Danh sách cơ sở đào tạo tạm thời không khả dụng. Vui lòng thử lại sau.',
   'Selected institution no longer exists in its directory.': 'Cơ sở đào tạo đã chọn không còn trong danh sách. Vui lòng chọn lại.',
@@ -1157,6 +1158,7 @@ export const featureVietnamese: Record<string, string> = {
 };
 
 export const featureEnglish: Record<string, string> = {
+  'Quản lý thông tin tài khoản, phân quyền và trạng thái truy cập hệ thống.': 'Manage account information, permissions and system access status.',
   'Xóa': 'Delete',
   'Thêm ngày lễ': 'Add holiday',
   'Chỉnh sửa ngày lễ': 'Edit holiday',

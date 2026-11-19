@@ -24,8 +24,7 @@ const NAV_BY_ROLE: Record<UserRole, NavGroup[]> = {
     {
       group: 'Overview',
       items: [
-        { label: 'Dashboard', icon: LayoutDashboard, to: '/dashboard' },
-        { label: 'Organization Overview', icon: BarChart3, to: '/org-overview' },
+        { label: 'Overview', icon: LayoutDashboard, to: '/dashboard' },
       ],
     },
     {
@@ -110,7 +109,6 @@ const NAV_BY_ROLE: Record<UserRole, NavGroup[]> = {
       group: 'Access Control',
       items: [
         { label: 'Users Management', icon: User, to: '/users' },
-        { label: 'Roles & Permissions', icon: KeyRound, to: '/roles' },
       ],
     },
     {
@@ -118,7 +116,6 @@ const NAV_BY_ROLE: Record<UserRole, NavGroup[]> = {
       items: [
         { label: 'System Configuration', icon: Settings, to: '/system' },
         { label: 'Audit & Activity Logs', icon: ScrollText, to: '/activity' },
-        { label: 'System Health Monitor', icon: MonitorCheck, to: '/system-health' },
       ],
     },
   ],
@@ -187,7 +184,7 @@ function Sidebar({ onNavigate, collapsed, onToggle }: { onNavigate?: () => void;
 
   return (
     <aside aria-label={t('Main navigation')} className={`fixed inset-y-0 left-0 z-50 flex h-dvh max-w-[88vw] flex-shrink-0 flex-col overflow-visible rounded-br-[40px] bg-white shadow-2xl transition-[width,transform] duration-300 ease-out lg:sticky lg:top-0 lg:z-40 lg:translate-x-0 lg:shadow-[5px_0_26px_rgba(30,41,59,0.10)] ${collapsed ? '-translate-x-full w-[292px] lg:w-[96px]' : 'w-[320px] translate-x-0 lg:w-[292px]'}`}>
-      <button type="button" onClick={onToggle} aria-label={collapsed ? t('Expand sidebar') : t('Collapse sidebar')} className={`absolute top-[76px] z-50 hidden h-9 w-9 items-center justify-center rounded-full bg-[#f47721] text-white shadow-lg shadow-orange-700/25 transition-[right,transform] duration-300 hover:scale-105 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-500 lg:flex ${collapsed ? 'right-3' : '-right-4'}`}>
+      <button type="button" onClick={onToggle} aria-label={collapsed ? t('Expand sidebar') : t('Collapse sidebar')} className={`absolute top-[11px] z-50 hidden h-9 w-9 items-center justify-center rounded-full bg-[#f47721] text-white shadow-lg shadow-orange-700/25 transition-[right,transform] duration-300 hover:scale-105 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-500 lg:flex ${collapsed ? 'right-3' : '-right-2'}`}>
         <ChevronLeft size={20} className={`transition-transform duration-300 ${collapsed ? 'rotate-180' : ''}`} />
       </button>
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-br-[40px] bg-white">

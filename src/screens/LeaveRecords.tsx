@@ -1,4 +1,15 @@
 import { useEffect, useState, type FormEvent } from "react"
+import {
+  CalendarRange,
+  FileSpreadsheet,
+  HelpCircle,
+  Inbox,
+  Plus,
+  RefreshCw,
+  Search,
+  Upload,
+  X,
+} from "lucide-react"
 import { AppShell } from "../components/AppShell"
 import { Button, Card, SectionHeader } from "../components/ui"
 import { useLanguage } from "../context/LanguageContext"
@@ -21,7 +32,7 @@ import {
   type RecordFilters,
 } from "../services/attendance"
 const control =
-  "mt-1 w-full rounded-xl border border-slate-300 bg-white p-3 text-sm"
+  "mt-1 h-11 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100"
 const blank: LeaveInput = {
   employee_id: 0,
   leave_type_id: 0,
@@ -44,6 +55,9 @@ export default function LeaveRecords({ own = false }: { own?: boolean }) {
     [file, setFile] = useState<File | null>(null)
   const [preview, setPreview] = useState<LeavePreview | null>(null),
     [result, setResult] = useState<LeaveImportResult | null>(null)
+  const [recordDrawerOpen, setRecordDrawerOpen] = useState(false),
+    [importModalOpen, setImportModalOpen] = useState(false),
+    [dragging, setDragging] = useState(false)
   const [offset, setOffset] = useState(0),
     [revision, setRevision] = useState(0),
     [loading, setLoading] = useState(true),
@@ -53,6 +67,7 @@ export default function LeaveRecords({ own = false }: { own?: boolean }) {
     [summary, setSummary] = useState<Array<{
       employee_id: number
       leave_type_id: number
+      records: number
       total_days: number
       total_hours: null
     }>>([])
@@ -72,9 +87,10 @@ export default function LeaveRecords({ own = false }: { own?: boolean }) {
           )
       })
     if (!own)
-      void listEmployeeProfiles({ limit: 100000 })
-        .then((r) => {
-          if (live) setEmployees(r.data)
+      void listEmployeeProfiles({ limit: 100 })
+        .then(async (first) => {
+          const rest = await Promise.all(Array.from({ length: Math.max(0, first.pagination.totalPages - 1) }, (_, index) => listEmployeeProfiles({ page: index + 2, limit: 100 })))
+          if (live) setEmployees([first, ...rest].flatMap(result => result.data))
         })
         .catch((e) => {
           if (live)
@@ -119,6 +135,21 @@ export default function LeaveRecords({ own = false }: { own?: boolean }) {
       })
     return () => c.abort()
   }, [filters, offset, revision, own])
+  useEffect(() => {
+    if (!recordDrawerOpen && !importModalOpen) return
+    const previousOverflow = document.body.style.overflow
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key !== "Escape" || busy) return
+      setRecordDrawerOpen(false)
+      setImportModalOpen(false)
+    }
+    document.body.style.overflow = "hidden"
+    document.addEventListener("keydown", closeOnEscape)
+    return () => {
+      document.body.style.overflow = previousOverflow
+      document.removeEventListener("keydown", closeOnEscape)
+    }
+  }, [recordDrawerOpen, importModalOpen, busy])
   async function work(action: () => Promise<void>) {
     if (busy) return
     setBusy(true)
@@ -153,6 +184,7 @@ export default function LeaveRecords({ own = false }: { own?: boolean }) {
       else await createLeaveRecord(form)
       setForm(blank)
       setEditing(null)
+      setRecordDrawerOpen(false)
       setRevision((v) => v + 1)
       setNotice(tr("Đã lưu hồ sơ nghỉ.", "Leave record saved."))
     })
@@ -178,7 +210,19 @@ export default function LeaveRecords({ own = false }: { own?: boolean }) {
       setResult(null)
     })
   }
+  function chooseImportFile(nextFile: File | null) {
+    setFile(nextFile)
+    setPreview(null)
+    setResult(null)
+    setError("")
+  }
   const invalid = !!(draft.from && draft.to && draft.from > draft.to)
+  const activeRecordCount = summary.reduce((total, item) => total + item.records, 0)
+  const activeDayCount = summary.reduce((total, item) => total + item.total_days, 0)
+  const activeEmployeeCount = new Set(summary.map((item) => item.employee_id)).size
+  const pageStart = rows.length ? offset + 1 : 0
+  const pageEnd = offset + rows.length
+  const knownTotal = filters.record_status === "ACTIVE" ? activeRecordCount : null
   return (
     <AppShell
       breadcrumb={["Workforce", own ? "My requests" : "Employee requests"]}
@@ -192,7 +236,29 @@ export default function LeaveRecords({ own = false }: { own?: boolean }) {
           "Quản lý ngày nghỉ từ dữ liệu nguồn; tách biệt với đơn xin nghỉ và chấm công.",
           "Manage source leave dates separately from legacy requests and attendance.",
         )}
-      />
+      >
+        {!own && (
+          <>
+            <Button
+              variant="secondary"
+              onClick={() => setImportModalOpen(true)}
+            >
+              <Upload size={16} />
+              {tr("Nhập Excel / CSV", "Import Excel / CSV")}
+            </Button>
+            <Button
+              onClick={() => {
+                setEditing(null)
+                setForm(blank)
+                setRecordDrawerOpen(true)
+              }}
+            >
+              <Plus size={16} />
+              {tr("Ghi nhận nghỉ", "Record leave")}
+            </Button>
+          </>
+        )}
+      </SectionHeader>
       {error && (
         <p role="alert" className="mb-4 rounded-xl bg-red-50 p-4 text-red-800">
           {error}
@@ -208,7 +274,24 @@ export default function LeaveRecords({ own = false }: { own?: boolean }) {
       )}
       {!own && (
         <>
-          <Card className="mb-4 p-5">
+          {recordDrawerOpen && (
+            <div
+              className="fixed inset-0 z-[80] bg-slate-950/40 backdrop-blur-[1px]"
+              onMouseDown={(event) => {
+                if (event.target === event.currentTarget && !busy)
+                  setRecordDrawerOpen(false)
+              }}
+            >
+              <Card className="absolute inset-y-0 right-0 flex w-full max-w-xl flex-col overflow-y-auto rounded-none border-0 p-5 shadow-2xl sm:p-6">
+            <button
+              type="button"
+              aria-label={tr("Đóng", "Close")}
+              disabled={busy}
+              onClick={() => setRecordDrawerOpen(false)}
+              className="absolute right-5 top-5 flex size-10 items-center justify-center rounded-md text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+            >
+              <X size={20} />
+            </button>
             <h2 className="font-bold">
               {tr(
                 editing ? "Sửa hồ sơ nghỉ" : "Ghi nhận nghỉ",
@@ -264,35 +347,53 @@ export default function LeaveRecords({ own = false }: { own?: boolean }) {
                     ))}
                   </select>
                 </label>
-                <label className="text-sm">
-                  {tr("Ngày bắt đầu", "Start date")}
-                  <input
-                    type="date"
-                    required
-                    className={control}
-                    value={form.start_date}
-                    onChange={(e) =>
-                      setForm({ ...form, start_date: e.target.value })
-                    }
-                  />
-                </label>
-                <label className="text-sm">
-                  {tr("Ngày kết thúc", "End date")}
-                  <input
-                    type="date"
-                    required
-                    min={form.start_date}
-                    className={control}
-                    value={form.end_date}
-                    onChange={(e) =>
-                      setForm({ ...form, end_date: e.target.value })
-                    }
-                  />
-                </label>
+                <fieldset className="sm:col-span-2">
+                  <legend className="flex items-center gap-2 text-sm font-semibold text-slate-700">
+                    <CalendarRange size={16} className="text-orange-500" />
+                    {tr("Khoảng ngày nghỉ", "Leave date range")}
+                    <span
+                      title={tr(
+                        "Ghi nhận theo trọn ngày công; không tự quy đổi thành giờ nghỉ hoặc ghi sang chấm công.",
+                        "Recorded as whole work dates; hours and attendance rows are not inferred.",
+                      )}
+                      className="inline-flex cursor-help text-slate-500"
+                    >
+                      <HelpCircle size={15} />
+                    </span>
+                  </legend>
+                  <div className="mt-1 grid gap-3 sm:grid-cols-2">
+                    <label className="text-sm font-medium text-slate-600">
+                      {tr("Từ ngày", "From")}
+                      <input
+                        type="date"
+                        required
+                        className={control}
+                        value={form.start_date}
+                        onChange={(event) =>
+                          setForm({ ...form, start_date: event.target.value })
+                        }
+                      />
+                    </label>
+                    <label className="text-sm font-medium text-slate-600">
+                      {tr("Đến ngày", "To")}
+                      <input
+                        type="date"
+                        required
+                        min={form.start_date}
+                        className={control}
+                        value={form.end_date}
+                        onChange={(event) =>
+                          setForm({ ...form, end_date: event.target.value })
+                        }
+                      />
+                    </label>
+                  </div>
+                </fieldset>
                 <label className="text-sm sm:col-span-2">
                   {tr("Lý do (không bắt buộc)", "Reason (optional)")}
                   <textarea
-                    className={control}
+                    rows={2}
+                    className={`${control} h-auto min-h-20 py-3`}
                     value={form.reason || ""}
                     onChange={(e) =>
                       setForm({ ...form, reason: e.target.value })
@@ -321,29 +422,33 @@ export default function LeaveRecords({ own = false }: { own?: boolean }) {
                 </div>
               </fieldset>
             </form>
-            <p className="mt-3 text-sm text-slate-500">
-              {tr(
-                "Ghi nhận theo trọn ngày công, có thể là dữ liệu quá khứ. Ca đêm dùng ngày bắt đầu ca. Không tự quy đổi thành giờ nghỉ hoặc ghi sang chấm công.",
-                "Whole work dates, including historical records. Overnight leave uses the shift start date. No hours or attendance rows are inferred.",
-              )}
-            </p>
-          </Card>
-          <Card className="mb-4 p-5">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <h2 className="font-bold">
-                {tr(
-                  "Nhập hồ sơ nghỉ Excel / CSV",
-                  "Import leave records from Excel / CSV",
-                )}
-              </h2>
-              <a
-                href="/templates/ERIS_Leave_Records_Template.csv"
-                download
-                className="rounded-full border border-blue-200 bg-blue-50 px-4 py-2 text-sm text-blue-800"
-              >
-                {tr("Tải mẫu CSV", "Download CSV template")}
-              </a>
+              </Card>
             </div>
+          )}
+          {importModalOpen && (
+            <div
+              className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-[1px]"
+              onMouseDown={(event) => {
+                if (event.target === event.currentTarget && !busy)
+                  setImportModalOpen(false)
+              }}
+            >
+              <Card className="relative max-h-[calc(100vh-2rem)] w-full max-w-4xl overflow-y-auto p-5 shadow-2xl sm:p-6">
+            <button
+              type="button"
+              aria-label={tr("Đóng", "Close")}
+              disabled={busy}
+              onClick={() => setImportModalOpen(false)}
+              className="absolute right-5 top-5 flex size-10 items-center justify-center rounded-md text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+            >
+              <X size={20} />
+            </button>
+            <h2 className="pr-12 text-base font-semibold text-slate-950">
+              {tr(
+                "Nhập hồ sơ nghỉ Excel / CSV",
+                "Import leave records from Excel / CSV",
+              )}
+            </h2>
             <p className="mt-2 text-sm text-slate-600">
               {tr(
                 "Tối đa 10 MiB, 10.000 dòng. leave_type phải là mã LTxxx trong danh mục dưới đây, không phải tên hay ID. Xác nhận sẽ kiểm tra lại tệp và lưu dòng hợp lệ; dòng trùng bỏ qua, lỗi/xung đột không được lưu.",
@@ -362,28 +467,71 @@ export default function LeaveRecords({ own = false }: { own?: boolean }) {
                 ))}
               </ul>
             </details>
-            <form
-              onSubmit={upload}
-              className="mt-3 flex flex-wrap items-end gap-3"
-            >
-              <label className="min-w-0 flex-1 text-sm">
-                {tr("Tệp hồ sơ nghỉ", "Leave file")}
+            <form onSubmit={upload} className="mt-4">
+              <label
+                className={`flex min-h-40 cursor-pointer flex-col items-center justify-center rounded-md border-2 border-dashed px-5 py-6 text-center transition ${
+                  dragging
+                    ? "border-orange-400 bg-orange-50"
+                    : "border-slate-300 bg-slate-50 hover:border-orange-300 hover:bg-orange-50/40"
+                } ${busy ? "cursor-not-allowed opacity-60" : ""}`}
+                onDragOver={(event) => {
+                  event.preventDefault()
+                  if (!busy) setDragging(true)
+                }}
+                onDragLeave={() => setDragging(false)}
+                onDrop={(event) => {
+                  event.preventDefault()
+                  setDragging(false)
+                  if (!busy)
+                    chooseImportFile(event.dataTransfer.files?.[0] || null)
+                }}
+              >
                 <input
                   type="file"
-                  required
                   accept=".xlsx,.csv"
                   disabled={busy}
-                  className={control}
-                  onChange={(e) => {
-                    setFile(e.target.files?.[0] || null)
-                    setPreview(null)
-                    setResult(null)
-                  }}
+                  className="sr-only"
+                  onChange={(event) =>
+                    chooseImportFile(event.target.files?.[0] || null)
+                  }
                 />
+                <Upload size={28} className="text-orange-500" />
+                <span className="mt-2 text-sm font-semibold text-slate-800">
+                  {tr(
+                    "Kéo thả tệp vào đây hoặc bấm để chọn",
+                    "Drop a file here or click to browse",
+                  )}
+                </span>
+                <span className="mt-1 text-xs font-medium text-slate-600">
+                  {tr(
+                    "Tệp XLSX hoặc CSV · tối đa 10 MiB",
+                    "XLSX or CSV file · up to 10 MiB",
+                  )}
+                </span>
+                {file && (
+                  <span className="mt-3 inline-flex max-w-full items-center gap-2 rounded-md bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm">
+                    <FileSpreadsheet size={16} className="shrink-0 text-emerald-600" />
+                    <span className="truncate">{file.name}</span>
+                  </span>
+                )}
+                <a
+                  href="/templates/ERIS_Leave_Records_Template.csv"
+                  download
+                  onClick={(event) => event.stopPropagation()}
+                  className="mt-3 text-sm font-semibold text-blue-700 hover:underline"
+                >
+                  {tr("Tải mẫu CSV", "Download CSV template")}
+                </a>
               </label>
-              <Button type="submit" disabled={busy || !file}>
-                {tr("Xem trước tệp nghỉ", "Preview leave file")}
-              </Button>
+              <div className="mt-4 flex justify-end">
+                <Button
+                  type="submit"
+                  disabled={busy || !file}
+                  className="disabled:bg-slate-200 disabled:text-slate-500 disabled:shadow-none"
+                >
+                  {tr("Xem trước tệp nghỉ", "Preview leave file")}
+                </Button>
+              </div>
             </form>
             {(preview || result) && (
               <div className="mt-4">
@@ -479,10 +627,44 @@ export default function LeaveRecords({ own = false }: { own?: boolean }) {
                 {tr("Xác nhận nhập hồ sơ nghỉ", "Confirm leave import")}
               </Button>
             )}
-          </Card>
+              </Card>
+            </div>
+          )}
         </>
       )}
-      <Card className="mb-4 p-5">
+      {!own && (
+        <section className="mb-4">
+          <div className="mb-3 flex items-center gap-2">
+            <h2 className="text-base font-semibold text-slate-950">
+              {tr("Tổng hợp nghỉ đang có hiệu lực", "Active leave summary")}
+            </h2>
+            <span
+              title={tr(
+                "Chỉ tính các ngày giao với bộ lọc hiện tại.",
+                "Counts only dates overlapping the current filters.",
+              )}
+              className="inline-flex cursor-help text-slate-500"
+            >
+              <HelpCircle size={16} />
+            </span>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-3">
+            {[
+              [tr("Hồ sơ hợp lệ", "Valid records"), activeRecordCount],
+              [tr("Nhân viên có nghỉ", "Employees on leave"), activeEmployeeCount],
+              [tr("Tổng ngày nghỉ", "Total leave days"), activeDayCount],
+            ].map(([label, value]) => (
+              <Card key={String(label)} className="p-4">
+                <p className="text-sm font-semibold text-slate-600">{label}</p>
+                <p className="mt-2 text-2xl font-bold tabular-nums text-slate-950">
+                  {value}
+                </p>
+              </Card>
+            ))}
+          </div>
+        </section>
+      )}
+      <Card className="mb-0 rounded-b-none border-b-0 p-5 shadow-none">
         <form
           onSubmit={(e) => {
             e.preventDefault()
@@ -491,7 +673,7 @@ export default function LeaveRecords({ own = false }: { own?: boolean }) {
               setOffset(0)
             }
           }}
-          className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4"
+          className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_auto_auto] xl:items-end"
         >
           <label className="text-sm">
             {tr("Từ ngày", "From date")}
@@ -544,10 +726,11 @@ export default function LeaveRecords({ own = false }: { own?: boolean }) {
             </select>
           </label>
           <Button type="submit" disabled={invalid || loading}>
-            {tr("Lọc hồ sơ", "Apply filters")}
+            <Search size={16} />
+            {tr("Lọc", "Filter")}
           </Button>
           {invalid && (
-            <p role="alert" className="text-red-700">
+            <p role="alert" className="text-red-700 xl:col-span-6">
               {tr("Khoảng ngày không hợp lệ.", "Invalid date range.")}
             </p>
           )}
@@ -557,39 +740,12 @@ export default function LeaveRecords({ own = false }: { own?: boolean }) {
             disabled={loading}
             onClick={() => setRevision((v) => v + 1)}
           >
+            <RefreshCw size={16} />
             {tr("Tải lại", "Refresh")}
           </Button>
         </form>
       </Card>
-      {!own && (
-        <Card className="mb-4 p-5">
-          <h2 className="font-bold">
-            {tr("Tổng hợp nghỉ đang có hiệu lực", "Active leave summary")}
-          </h2>
-          <p className="mt-2 text-sm text-slate-500">
-            {tr(
-              "Chỉ tính các ngày giao với bộ lọc. Chưa có dữ liệu ca/ngày đáng tin cậy nên tổng giờ để trống.",
-              "Counts only dates overlapping the filters. Total hours are unavailable without reliable employee/day schedules.",
-            )}
-          </p>
-          <ul className="mt-3 space-y-2">
-            {summary.map((s) => (
-              <li
-                key={s.employee_id + ":" + s.leave_type_id}
-                className="text-sm"
-              >
-                {employees.find((e) => e.id === s.employee_id)?.employeeCode ||
-                  s.employee_id}{" "}
-                ·{" "}
-                {types.find((t) => t.id === s.leave_type_id)?.code ||
-                  s.leave_type_id}
-                : {s.total_days} {tr("ngày", "days")} · {tr("Giờ", "Hours")}: —
-              </li>
-            ))}
-          </ul>
-        </Card>
-      )}
-      <Card className="p-5">
+      <Card className="rounded-t-none p-5">
         {loading ? (
           <p role="status">{tr("Đang tải…", "Loading…")}</p>
         ) : (
@@ -648,10 +804,7 @@ export default function LeaveRecords({ own = false }: { own?: boolean }) {
                                     end_date: r.end_date,
                                     reason: r.reason,
                                   })
-                                  window.scrollTo({
-                                    top: 0,
-                                    behavior: "smooth",
-                                  })
+                                  setRecordDrawerOpen(true)
                                 }}
                               >
                                 {tr("Chỉnh sửa", "Edit")}
@@ -723,31 +876,63 @@ export default function LeaveRecords({ own = false }: { own?: boolean }) {
               </table>
             </div>
             {!rows.length && (
-              <p className="py-4 text-slate-500">
-                {tr(
-                  "Chưa có hồ sơ trong bộ lọc này.",
-                  "No records match these filters.",
+              <div className="flex flex-col items-center justify-center py-12 text-center">
+                <span className="flex size-12 items-center justify-center rounded-md bg-slate-100 text-slate-500">
+                  <Inbox size={23} />
+                </span>
+                <p className="mt-3 text-sm font-semibold text-slate-800">
+                  {tr(
+                    "Chưa có hồ sơ trong bộ lọc này.",
+                    "No records match these filters.",
+                  )}
+                </p>
+                {!own && (
+                  <Button
+                    className="mt-4"
+                    onClick={() => {
+                      setEditing(null)
+                      setForm(blank)
+                      setRecordDrawerOpen(true)
+                    }}
+                  >
+                    <Plus size={16} />
+                    {tr(
+                      "Tạo hồ sơ nghỉ đầu tiên",
+                      "Create the first leave record",
+                    )}
+                  </Button>
                 )}
-              </p>
+              </div>
             )}
           </>
         )}
-        <div className="mt-4 flex gap-2">
-          <Button
-            variant="secondary"
-            disabled={loading || !offset}
-            onClick={() => setOffset(Math.max(0, offset - 20))}
-          >
-            {tr("Trước", "Previous")}
-          </Button>
-          <span className="p-2">{offset / 20 + 1}</span>
-          <Button
-            variant="secondary"
-            disabled={loading || rows.length < 20}
-            onClick={() => setOffset(offset + 20)}
-          >
-            {tr("Trang sau", "Next page")}
-          </Button>
+        <div className="mt-4 flex flex-col gap-3 border-t border-slate-200 pt-4 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-sm font-medium text-slate-600">
+            {tr("Hiển thị", "Showing")} {pageStart} - {pageEnd}
+            {knownTotal !== null && (
+              <> {tr("trên tổng", "of")} {knownTotal}</>
+            )}{" "}
+            {tr("hồ sơ", "records")}
+          </p>
+          <div className="flex justify-end gap-2">
+            <Button
+              variant="secondary"
+              disabled={loading || !offset}
+              onClick={() => setOffset(Math.max(0, offset - 20))}
+            >
+              {tr("Trước", "Previous")}
+            </Button>
+            <span className="flex min-w-10 items-center justify-center rounded-md bg-slate-100 px-3 text-sm font-semibold text-slate-700">
+              {offset / 20 + 1}
+            </span>
+            <Button
+              variant="secondary"
+              disabled={loading || rows.length < 20}
+              onClick={() => setOffset(offset + 20)}
+            >
+              {tr("Trang sau", "Next page")}
+            </Button>
+          </div>
         </div>
       </Card>
     </AppShell>
