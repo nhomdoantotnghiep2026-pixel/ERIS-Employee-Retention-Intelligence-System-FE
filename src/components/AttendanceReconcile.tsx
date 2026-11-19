@@ -1,6 +1,7 @@
-import { useState, type FormEvent } from "react"
+import { useEffect, useMemo, useState, type FormEvent } from "react"
 import { Button } from "./ui"
 import { useLanguage } from "../context/LanguageContext"
+import { listEmployeeProfiles, type EmployeeProfile } from "../services/api"
 import {
   attendanceMessage,
   confirmAttendanceReconcile,
@@ -22,24 +23,56 @@ export default function AttendanceReconcile({ onSaved, onBusyChange }: Attendanc
   const tr = (vi: string, en: string) => (language === "vi" ? vi : en)
   const [from, setFrom] = useState("")
   const [to, setTo] = useState("")
-  const [employeeIds, setEmployeeIds] = useState("")
+  const [employees, setEmployees] = useState<EmployeeProfile[]>([])
+  const [selectedEmployeeIds, setSelectedEmployeeIds] = useState<number[]>([])
+  const [employeeSearch, setEmployeeSearch] = useState("")
+  const [employeesLoading, setEmployeesLoading] = useState(true)
   const [preview, setPreview] = useState<ReconcilePreview | null>(null)
   const [ack, setAck] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState("")
 
+  useEffect(() => {
+    const controller = new AbortController()
+    setEmployeesLoading(true)
+    void listEmployeeProfiles({ limit: 100 }, controller.signal)
+      .then(async (first) => {
+        const rest = await Promise.all(
+          Array.from({ length: Math.max(0, first.pagination.totalPages - 1) }, (_, index) =>
+            listEmployeeProfiles({ page: index + 2, limit: 100 }, controller.signal),
+          ),
+        )
+        if (!controller.signal.aborted) {
+          setEmployees(
+            [first, ...rest]
+              .flatMap((result) => result.data)
+              .filter((employee) => employee.employmentStatus === "ACTIVE"),
+          )
+        }
+      })
+      .catch((caught) => {
+        if (!controller.signal.aborted) {
+          setError(attendanceMessage(caught, tr("Không tải được danh sách nhân viên.", "Could not load employees.")))
+        }
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setEmployeesLoading(false)
+      })
+    return () => controller.abort()
+  }, [])
+
+  const filteredEmployees = useMemo(() => {
+    const term = employeeSearch.trim().toLocaleLowerCase(language === "vi" ? "vi" : "en")
+    if (!term) return employees
+    return employees.filter((employee) =>
+      `${employee.employeeCode} ${employee.fullName}`.toLocaleLowerCase(language === "vi" ? "vi" : "en").includes(term),
+    )
+  }, [employeeSearch, employees, language])
+
   const scope = (): ReconcileScope => ({
     from,
     to,
-    employee_ids: [
-      ...new Set(
-        employeeIds
-          .split(/[\s,;]+/)
-          .filter(Boolean)
-          .map(Number)
-          .filter(Number.isInteger),
-      ),
-    ],
+    employee_ids: selectedEmployeeIds,
   })
 
   async function run(task: () => Promise<void>) {
@@ -63,8 +96,8 @@ export default function AttendanceReconcile({ onSaved, onBusyChange }: Attendanc
     if (!from || !to || from > to || !value.employee_ids.length) {
       setError(
         tr(
-          "Chọn khoảng ngày hợp lệ và nhập ít nhất một ID nhân viên.",
-          "Choose valid dates and at least one employee ID.",
+          "Chọn khoảng ngày hợp lệ và ít nhất một nhân viên.",
+          "Choose valid dates and at least one employee.",
         ),
       )
       return
@@ -104,7 +137,7 @@ export default function AttendanceReconcile({ onSaved, onBusyChange }: Attendanc
         </p>
       </div>
 
-      <form onSubmit={submit} className="mt-5 grid gap-3 md:grid-cols-3">
+      <form onSubmit={submit} className="mt-5 grid gap-4 md:grid-cols-2">
         <label className="text-sm font-medium text-slate-800">
           {tr("Từ ngày", "From")}
           <input type="date" className={control} value={from} onChange={(event) => { setFrom(event.target.value); setPreview(null) }} />
@@ -113,11 +146,49 @@ export default function AttendanceReconcile({ onSaved, onBusyChange }: Attendanc
           {tr("Đến ngày", "To")}
           <input type="date" className={control} value={to} onChange={(event) => { setTo(event.target.value); setPreview(null) }} />
         </label>
-        <label className="text-sm font-medium text-slate-800">
-          {tr("ID nhân viên", "Employee IDs")}
-          <input className={control} placeholder={tr("Ví dụ: 1, 2, 3", "Example: 1, 2, 3")} value={employeeIds} onChange={(event) => { setEmployeeIds(event.target.value); setPreview(null) }} />
-        </label>
-        <div className="md:col-span-3">
+        <fieldset className="md:col-span-2">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <legend className="text-sm font-semibold text-slate-800">{tr("Nhân viên cần đối soát", "Employees to reconcile")}</legend>
+            <span className="text-sm font-semibold text-orange-700">
+              {tr(`Đã chọn ${selectedEmployeeIds.length}/100`, `${selectedEmployeeIds.length}/100 selected`)}
+            </span>
+          </div>
+          <input
+            className={control}
+            placeholder={tr("Tìm theo tên hoặc mã nhân viên", "Search by name or employee code")}
+            value={employeeSearch}
+            onChange={(event) => setEmployeeSearch(event.target.value)}
+          />
+          <div className="mt-2 max-h-56 overflow-y-auto rounded-md border border-slate-200 bg-slate-50/60 p-2">
+            {employeesLoading ? (
+              <p className="p-3 text-sm font-medium text-slate-600">{tr("Đang tải nhân viên...", "Loading employees...")}</p>
+            ) : filteredEmployees.length ? (
+              <div className="grid gap-1 sm:grid-cols-2">
+                {filteredEmployees.map((employee) => {
+                  const checked = selectedEmployeeIds.includes(employee.id)
+                  return (
+                    <label key={employee.id} className={`flex cursor-pointer items-center gap-3 rounded-md border px-3 py-2.5 text-sm transition-colors ${checked ? "border-orange-300 bg-orange-50 text-orange-950" : "border-transparent bg-white text-slate-700 hover:border-slate-200 hover:bg-slate-50"}`}>
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        disabled={!checked && selectedEmployeeIds.length >= 100}
+                        onChange={(event) => {
+                          setSelectedEmployeeIds((current) => event.target.checked ? [...current, employee.id] : current.filter((id) => id !== employee.id))
+                          setPreview(null)
+                        }}
+                        className="size-4 accent-orange-500"
+                      />
+                      <span className="min-w-0"><strong className="block truncate font-semibold">{employee.employeeCode} · {employee.fullName}</strong></span>
+                    </label>
+                  )
+                })}
+              </div>
+            ) : (
+              <p className="p-3 text-sm font-medium text-slate-600">{tr("Không tìm thấy nhân viên đang hoạt động.", "No active employees found.")}</p>
+            )}
+          </div>
+        </fieldset>
+        <div className="md:col-span-2">
           <Button disabled={busy} type="submit">
             {busy ? tr("Đang kiểm tra...", "Checking...") : tr("Xem trước đối soát", "Preview reconciliation")}
           </Button>

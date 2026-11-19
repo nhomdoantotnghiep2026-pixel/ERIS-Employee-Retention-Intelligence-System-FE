@@ -1,88 +1,285 @@
-import ScheduleImportSettings from '../components/ScheduleImportSettings';
-import { validScheduleTimeline } from '../utils/scheduleTimeline';
-import { useEffect, useState, type FormEvent } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
+import { CalendarDays, ChevronDown, ChevronUp, MoreHorizontal, Plus, RefreshCw, SlidersHorizontal, UserRound, X } from 'lucide-react';
 import { AppShell } from '../components/AppShell';
-import { useLanguage } from '../context/LanguageContext';
+import ScheduleImportSettings from '../components/ScheduleImportSettings';
 import { Button, Card, SectionHeader } from '../components/ui';
-import { assignWorkSchedule, createIndividualSchedule, createWorkSchedule, deleteScheduleAssignment, getApiErrorMessage, listEmployeeProfiles, listScheduleAssignments, listWorkSchedules, updateWorkSchedule, type EmployeeProfile, type ScheduleAssignment, type WorkSchedule, type WorkScheduleInput } from '../services/api';
-import { filterWorkSchedules, type ScheduleFilters } from '../utils/workScheduleFilters';
+import { useLanguage } from '../context/LanguageContext';
+import {
+  assignWorkSchedule,
+  createWorkSchedule,
+  deleteScheduleAssignment,
+  getApiErrorMessage,
+  listEmployeeProfiles,
+  listScheduleAssignments,
+  listWorkSchedules,
+  updateWorkSchedule,
+  type EmployeeProfile,
+  type ScheduleAssignment,
+  type WorkSchedule,
+  type WorkScheduleInput,
+} from '../services/api';
+import { validScheduleTimeline } from '../utils/scheduleTimeline';
 
-const initial: WorkScheduleInput = { name: '', shift_type: '', start_time: '08:00', end_time: '17:00', break_start: '12:00', break_end: '13:00', working_days: [1, 2, 3, 4, 5], status: 'ACTIVE' };
-const control = 'mt-1 w-full rounded-xl border border-slate-300 bg-white p-3 text-sm';
+const days = [
+  [1, 'Thứ hai', 'Monday'], [2, 'Thứ ba', 'Tuesday'], [3, 'Thứ tư', 'Wednesday'],
+  [4, 'Thứ năm', 'Thursday'], [5, 'Thứ sáu', 'Friday'], [6, 'Thứ bảy', 'Saturday'], [7, 'Chủ nhật', 'Sunday'],
+] as const;
+
+const initialSchedule: WorkScheduleInput = {
+  name: '', shift_type: '', start_time: '08:00', end_time: '17:00',
+  break_start: '12:00', break_end: '13:00', working_days: [1, 2, 3, 4, 5], status: 'ACTIVE',
+};
+
+const fieldClass = 'mt-2 h-11 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm text-slate-800 outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-100';
+const time24Pattern = '(?:[01][0-9]|2[0-3]):[0-5][0-9]';
+
+function Time24Field({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
+  return <label className="text-sm font-semibold text-slate-700">{label}
+    <input
+      required
+      type="text"
+      inputMode="numeric"
+      maxLength={5}
+      pattern={time24Pattern}
+      title="HH:mm (00:00–23:59)"
+      placeholder="HH:mm"
+      className={`${fieldClass} font-mono tabular-nums`}
+      value={value}
+      onChange={event => onChange(event.target.value.replace(/[^0-9:]/g, ''))}
+    />
+  </label>;
+}
+
+function ScheduleActions({ tr, onSettings, onRename }: {
+  tr: (vi: string, en: string) => string;
+  onSettings: () => void;
+  onRename: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const closeOnOutsideClick = (event: PointerEvent) => {
+      if (!menuRef.current?.contains(event.target as Node)) setOpen(false);
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setOpen(false);
+    };
+    document.addEventListener('pointerdown', closeOnOutsideClick);
+    document.addEventListener('keydown', closeOnEscape);
+    return () => {
+      document.removeEventListener('pointerdown', closeOnOutsideClick);
+      document.removeEventListener('keydown', closeOnEscape);
+    };
+  }, [open]);
+
+  return <div ref={menuRef} className="relative self-end sm:self-auto">
+    <button type="button" aria-label={tr('Tùy chọn lịch', 'Schedule options')} aria-expanded={open} onClick={() => setOpen(value => !value)} className={`flex h-10 w-10 items-center justify-center rounded-full border transition-all duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-500 ${open ? 'border-orange-300 bg-orange-50 text-orange-700' : 'border-slate-300 text-slate-600 hover:border-orange-300 hover:bg-orange-50 hover:text-orange-700'}`}><MoreHorizontal size={19} /></button>
+    <div aria-hidden={!open} className={`absolute right-0 z-10 mt-2 w-64 origin-top-right rounded-xl border border-slate-200 bg-white p-2 shadow-xl transition-all duration-200 ease-out ${open ? 'visible translate-y-0 scale-100 opacity-100' : 'pointer-events-none invisible -translate-y-1 scale-[0.98] opacity-0'}`}>
+      <button className="w-full rounded-lg px-3 py-2 text-left text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50 focus-visible:bg-orange-50 focus-visible:text-orange-700 focus-visible:outline-none" onClick={() => { setOpen(false); onSettings(); }}>{tr('Cấu hình chấm công nâng cao', 'Advanced attendance settings')}</button>
+      <button className="w-full rounded-lg px-3 py-2 text-left text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50 focus-visible:bg-orange-50 focus-visible:text-orange-700 focus-visible:outline-none" onClick={() => { setOpen(false); onRename(); }}>{tr('Đổi tên', 'Rename')}</button>
+    </div>
+  </div>;
+}
+
 export default function WorkSchedules() {
   const { language } = useLanguage();
   const tr = (vi: string, en: string) => language === 'vi' ? vi : en;
-  const { pathname } = useLocation();
-  const page = pathname.endsWith('/assign') ? 'assign' : pathname.endsWith('/list') ? 'list' : 'create';
-  const days = language === 'vi' ? ['Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7', 'Chủ nhật'] : ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
   const [schedules, setSchedules] = useState<WorkSchedule[]>([]);
   const [employees, setEmployees] = useState<EmployeeProfile[]>([]);
   const [assignments, setAssignments] = useState<ScheduleAssignment[]>([]);
   const [employeeId, setEmployeeId] = useState('');
   const [scheduleId, setScheduleId] = useState('');
-  const [form, setForm] = useState(initial); const [metadata, setMetadata] = useState<WorkSchedule | null>(null);
-  const [individual, setIndividual] = useState(false);
+  const [form, setForm] = useState<WorkScheduleInput>(initialSchedule);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [metadata, setMetadata] = useState<WorkSchedule | null>(null);
   const [loading, setLoading] = useState(true);
   const [assignmentLoading, setAssignmentLoading] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [revision, setRevision] = useState(0);
-  const [filters, setFilters] = useState<ScheduleFilters>({ search: '', shiftType: '', status: 'all', day: null });
-  useEffect(() => {
-    let live = true; setLoading(true); setError('');
-    void (async () => {
-      const [result, first] = await Promise.all([listWorkSchedules(), listEmployeeProfiles({ limit: 100 })]);
-      const rest = await Promise.all(Array.from({ length: Math.max(0, first.pagination.totalPages - 1) }, (_, i) => listEmployeeProfiles({ page: i + 2, limit: 100 })));
-      if (live) { setSchedules(result.data); setEmployees([first, ...rest].flatMap(p => p.data)); }
-    })().catch(e => { if (live) setError(getApiErrorMessage(e, tr('Không tải được lịch hoặc nhân viên.', 'Could not load schedules or employees.'))); }).finally(() => { if (live) setLoading(false); });
-    return () => { live = false; };
-  }, [revision]);
-  useEffect(() => {
-    let live = true; setAssignments([]); setAssignmentLoading(Boolean(employeeId));
-    if (employeeId) void listScheduleAssignments(Number(employeeId)).then(r => { if (live) setAssignments(r.data); }).catch(e => { if (live) setError(getApiErrorMessage(e, tr('Không tải được lịch hiện tại.', 'Could not load current schedule.'))); }).finally(() => { if (live) setAssignmentLoading(false); });
-    return () => { live = false; };
-  }, [employeeId, revision]);
-  async function run(action: () => Promise<unknown>, message: string) {
-    if (busy) return; setBusy(true); setError(''); setNotice('');
-    try { await action(); setNotice(message); setRevision(v => v + 1); }
-    catch (e) { setError(getApiErrorMessage(e, tr('Không thể thực hiện thao tác.', 'Could not complete the action.'))); }
-    finally { setBusy(false); }
-  }
-  function create(event: FormEvent) {
-    event.preventDefault();
+  const [search, setSearch] = useState('');
+  const [status, setStatus] = useState('ALL');
+  const [shiftType, setShiftType] = useState('ALL');
+  const [workingDay, setWorkingDay] = useState<number | null>(null);
+  const [listOpen, setListOpen] = useState(true);
+  const [filterOpen, setFilterOpen] = useState(false);
+  const filterRef = useRef<HTMLDivElement>(null);
 
-    if (!form.working_days.length || !validScheduleTimeline(form.start_time, form.end_time, form.break_start, form.break_end)) { setError(tr('Chọn ngày làm việc và kiểm tra thứ tự giờ làm, giờ nghỉ.', 'Choose working days and check work and break time order.')); return; }
-    const payload = { ...form, name: form.name.trim(), shift_type: (form.shift_type || '').trim() };
-    void run(async () => { if (individual) await createIndividualSchedule({ ...payload, employee_id: Number(employeeId) }); else await createWorkSchedule(payload); setForm(initial); }, tr('Đã tạo ca làm việc.', 'Work schedule created.'));
+  useEffect(() => {
+    if (!filterOpen) return;
+    const closeOnOutsideClick = (event: PointerEvent) => {
+      if (!filterRef.current?.contains(event.target as Node)) setFilterOpen(false);
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setFilterOpen(false);
+    };
+    document.addEventListener('pointerdown', closeOnOutsideClick);
+    document.addEventListener('keydown', closeOnEscape);
+    return () => {
+      document.removeEventListener('pointerdown', closeOnOutsideClick);
+      document.removeEventListener('keydown', closeOnEscape);
+    };
+  }, [filterOpen]);
+
+  useEffect(() => {
+    if (!createOpen) return;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && !busy) setCreateOpen(false);
+    };
+    document.addEventListener('keydown', closeOnEscape);
+    return () => document.removeEventListener('keydown', closeOnEscape);
+  }, [createOpen, busy]);
+
+  useEffect(() => {
+    let active = true;
+    setLoading(true);
+    Promise.all([listWorkSchedules(), listEmployeeProfiles({ limit: 100 })])
+      .then(([scheduleResult, employeeResult]) => {
+        if (!active) return;
+        setSchedules(scheduleResult.data);
+        setEmployees(employeeResult.data);
+      })
+      .catch(reason => active && setError(getApiErrorMessage(reason, tr('Không thể tải dữ liệu lịch làm việc.', 'Unable to load work schedule data.'))))
+      .finally(() => active && setLoading(false));
+    return () => { active = false; };
+  }, [revision, language]);
+
+  useEffect(() => {
+    if (!employeeId) { setAssignments([]); return; }
+    let active = true;
+    setAssignmentLoading(true);
+    listScheduleAssignments(Number(employeeId))
+      .then(result => active && setAssignments(result.data))
+      .catch(reason => active && setError(getApiErrorMessage(reason, tr('Không thể tải lịch hiện tại của nhân viên.', 'Unable to load the employee current schedule.'))))
+      .finally(() => active && setAssignmentLoading(false));
+    return () => { active = false; };
+  }, [employeeId, revision, language]);
+
+  const current = assignments[0] ?? null;
+  const sameSchedule = Boolean(current && scheduleId && current.work_schedule_id === Number(scheduleId));
+  const activeSchedules = schedules.filter(item => item.status === 'ACTIVE');
+  const visibleSchedules = useMemo(() => schedules.filter(item => {
+    const query = search.trim().toLowerCase();
+    return (!query || item.name.toLowerCase().includes(query) || (item.shift_type || '').toLowerCase().includes(query))
+      && (status === 'ALL' || item.status === status)
+      && (shiftType === 'ALL' || item.shift_type === shiftType)
+      && (workingDay === null || item.working_days.includes(workingDay));
+  }), [schedules, search, status, shiftType, workingDay]);
+  const shiftTypes = [...new Set(schedules.map(item => item.shift_type).filter(Boolean))] as string[];
+  const activeFilterCount = Number(status !== 'ALL') + Number(shiftType !== 'ALL') + Number(workingDay !== null);
+
+  async function run(action: () => Promise<unknown>, message: string) {
+    if (busy) return false;
+    setBusy(true); setError(''); setNotice('');
+    try {
+      await action(); setNotice(message); setRevision(value => value + 1); return true;
+    } catch (reason) {
+      setError(getApiErrorMessage(reason, tr('Không thể hoàn tất thao tác. Vui lòng thử lại.', 'Unable to complete the action. Please try again.'))); return false;
+    } finally { setBusy(false); }
   }
-  const employeeSelect = <label className="block text-sm">{tr('Nhân viên', 'Employee')}<select required className={control} value={employeeId} onChange={e => setEmployeeId(e.target.value)}><option value="">{tr('Chọn nhân viên', 'Select employee')}</option>{employees.map(e => <option key={e.id} value={e.id}>{e.employeeCode} · {e.fullName}</option>)}</select></label>;
-  const visible = filterWorkSchedules(schedules, filters);
-  return <AppShell breadcrumb={['Workforce', 'Work schedules']}>
-    <SectionHeader title={page === 'create' ? tr('Tạo lịch làm việc', 'Create a work schedule') : page === 'assign' ? tr('Gán lịch hiện tại', 'Assign current schedule') : tr('Danh sách lịch', 'Schedules')} description={tr('Mỗi nhân viên có một ca hiện tại. Gán lịch có hiệu lực ngay.', 'Each employee has one current schedule. Assignments take effect immediately.')} />
-    {error && <p role="alert" className="mb-4 rounded-xl bg-red-50 p-4 text-red-800">{error}</p>}
-    {notice && <p role="status" className="mb-4 rounded-xl bg-emerald-50 p-4 text-emerald-800">{notice}</p>}
-    <p className="mb-4 rounded-xl bg-amber-50 p-4 text-sm text-amber-900">{tr('Nhập chấm công yêu cầu nhân viên đã được gán ca đang hoạt động và mã shift_type trong tệp phải khớp ca đó. Bản chụp ca được giữ để bảo toàn dữ liệu lịch sử.', 'Attendance import requires an active schedule assignment and the file shift_type must match it. Saved shift snapshots preserve historical calculations.')}</p>
-    {metadata && <ScheduleImportSettings key={metadata.id} schedule={metadata} onClose={() => setMetadata(null)} onSaved={() => setRevision(v => v + 1)} />}{loading && <p role="status" className="mb-4">{tr('Đang tải…', 'Loading…')}</p>}
-    {page === 'create' && <Card className="p-6"><form onSubmit={create}><fieldset disabled={busy || loading} className="space-y-4">
-      <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={individual} onChange={e => setIndividual(e.target.checked)} />{tr('Tạo và gán ngay cho nhân viên', 'Create and assign to an employee immediately')}</label>
-      {individual && employeeSelect}
-      <div className="grid gap-4 sm:grid-cols-2"><label className="text-sm">{tr('Tên lịch', 'Schedule name')}<input required maxLength={150} className={control} value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} /></label><label className="text-sm">{tr('Loại ca (khớp shift_type trong tệp)', 'Shift type (must match the imported file)')}<input required maxLength={100} className={control} value={form.shift_type || ''} onChange={e => setForm({ ...form, shift_type: e.target.value })} /></label></div>
-      <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={form.break_start !== null} onChange={e => setForm({ ...form, break_start: e.target.checked ? '12:00' : null, break_end: e.target.checked ? '13:00' : null })} />{tr('Có giờ nghỉ không tính công', 'Has an unpaid break')}</label>
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">{(['start_time', 'break_start', 'break_end', 'end_time'] as const).filter(k => !k.startsWith('break') || form.break_start !== null).map(key => <label key={key} className="text-sm">{{ start_time: tr('Bắt đầu làm', 'Start work'), end_time: tr('Kết thúc làm', 'End work'), break_start: tr('Bắt đầu nghỉ', 'Start break'), break_end: tr('Kết thúc nghỉ', 'End break') }[key]}<input required type="time" className={control} value={form[key] || ''} onChange={e => setForm({ ...form, [key]: e.target.value })} /></label>)}</div>
-      <fieldset><legend className="mb-2 text-sm">{tr('Ngày làm việc', 'Working days')}</legend><div className="flex flex-wrap gap-4">{days.map((day, i) => <label key={day} className="flex items-center gap-2 text-sm"><input type="checkbox" checked={form.working_days.includes(i + 1)} onChange={e => setForm({ ...form, working_days: e.target.checked ? [...form.working_days, i + 1].sort() : form.working_days.filter(d => d !== i + 1) })} />{day}</label>)}</div></fieldset>
-      <Button type="submit">{tr(busy ? 'Đang lưu…' : 'Tạo lịch', busy ? 'Saving…' : 'Create schedule')}</Button>
-    </fieldset></form></Card>}
-    {page === 'assign' && <Card className="p-6"><fieldset disabled={busy || loading} className="space-y-4">{employeeSelect}
-      <label className="block text-sm">{tr('Ca làm việc', 'Work schedule')}<select className={control} value={scheduleId} onChange={e => setScheduleId(e.target.value)}><option value="">{tr('Chọn ca đang hoạt động', 'Select an active schedule')}</option>{schedules.filter(s => s.status === 'ACTIVE').map(s => <option key={s.id} value={s.id}>{s.name} · {s.shift_type}</option>)}</select></label>
-      <Button disabled={!employeeId || !scheduleId || assignmentLoading} onClick={() => { if (window.confirm(tr('Gán ca này ngay cho nhân viên?', 'Assign this schedule immediately?'))) void run(() => assignWorkSchedule(Number(employeeId), { work_schedule_id: Number(scheduleId) }), tr('Đã gán lịch.', 'Schedule assigned.')); }}>{tr('Gán lịch', 'Assign schedule')}</Button>
-      {assignmentLoading ? <p role="status">{tr('Đang tải lịch hiện tại…', 'Loading current schedule…')}</p> : employeeId && <div><h2 className="font-bold">{tr('Lịch hiện tại', 'Current schedule')}</h2>{!assignments.length ? <p className="mt-2 text-sm text-slate-500">{tr('Chưa có ca được gán.', 'No schedule assigned.')}</p> : assignments.map(a => <div key={a.work_schedule_id} className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 p-4"><span>{a.name} · {a.shift_type} · {a.start_time}–{a.end_time}</span><Button variant="danger" onClick={() => { if (window.confirm(tr('Gỡ ca hiện tại của nhân viên? Nhân viên sẽ không thể nhập chấm công cho đến khi được gán ca mới.', 'Clear the employee schedule? Attendance cannot be imported for this employee until another schedule is assigned.'))) void run(() => deleteScheduleAssignment(Number(employeeId), a.work_schedule_id), tr('Đã gỡ lịch.', 'Schedule cleared.')); }}>{tr('Gỡ lịch', 'Clear schedule')}</Button></div>)}</div>}
-    </fieldset></Card>}
-    {page === 'list' && <Card className="p-6"><div className="mb-4 flex items-center justify-between gap-3"><h2 className="font-bold">{tr('Danh sách lịch', 'Schedules')}</h2><Button variant="secondary" disabled={loading || busy} onClick={() => setRevision(v => v + 1)}>{tr('Tải lại', 'Refresh')}</Button></div>
-      <div className="mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4"><label className="text-sm">{tr('Tìm tên lịch', 'Search schedule name')}<input type="search" className={control} value={filters.search} onChange={e => setFilters({ ...filters, search: e.target.value })} /></label><label className="text-sm">{tr('Loại ca', 'Shift type')}<input className={control} value={filters.shiftType} onChange={e => setFilters({ ...filters, shiftType: e.target.value })} /></label><label className="text-sm">{tr('Trạng thái', 'Status')}<select className={control} value={filters.status} onChange={e => setFilters({ ...filters, status: e.target.value as ScheduleFilters['status'] })}><option value="all">{tr('Tất cả', 'All')}</option><option value="ACTIVE">{tr('Đang hoạt động', 'Active')}</option><option value="INACTIVE">{tr('Ngưng hoạt động', 'Inactive')}</option></select></label><label className="text-sm">{tr('Ngày làm việc', 'Working day')}<select className={control} value={filters.day ?? ''} onChange={e => setFilters({ ...filters, day: e.target.value ? Number(e.target.value) : null })}><option value="">{tr('Tất cả', 'All')}</option>{days.map((d, i) => <option key={d} value={i + 1}>{d}</option>)}</select></label></div>
-      {!loading && !visible.length && <p className="py-5 text-slate-500">{tr('Không tìm thấy lịch.', 'No schedules found.')}</p>}
-      <div className="space-y-3">{visible.map(s => <article key={s.id} className="rounded-xl border border-slate-200 p-4"><div className="flex flex-wrap items-center justify-between gap-3"><div><h3 className="font-bold">{s.name} · {s.shift_type || tr('Chưa có mã ca', 'No shift code')}</h3><p className="mt-1 text-sm text-slate-600">{s.start_time}–{s.end_time} · {s.break_start && s.break_end ? tr('Nghỉ: ', 'Break: ') + s.break_start + '–' + s.break_end : tr('Không nghỉ giữa giờ', 'No unpaid break')}</p><p className="mt-1 text-sm text-slate-600">{s.working_days.map(d => days[d - 1]).join(', ')} · {s.status === 'ACTIVE' ? tr('Đang hoạt động', 'Active') : tr('Ngưng hoạt động', 'Inactive')}</p></div><Button variant="info" disabled={busy} onClick={() => setMetadata(s)}>{tr('Mã ca & ngưỡng nhập','Shift code & import windows')}</Button><Button variant="warning" disabled={busy} onClick={() => { const name = window.prompt(tr('Tên lịch mới', 'New schedule name'), s.name); if (name?.trim() && name.trim() !== s.name) void run(() => updateWorkSchedule(s.id, { name: name.trim() }), tr('Đã đổi tên lịch.', 'Schedule renamed.')); }}>{tr('Đổi tên', 'Rename')}</Button></div></article>)}</div>
-    </Card>}
+
+  async function create(event: FormEvent) {
+    event.preventDefault();
+    if (!form.working_days.length) { setError(tr('Vui lòng chọn ít nhất một ngày làm việc.', 'Select at least one working day.')); return; }
+    if (!validScheduleTimeline(form.start_time, form.end_time, form.break_start, form.break_end)) {
+      setError(tr('Giờ làm việc hoặc giờ nghỉ chưa hợp lệ.', 'Work or break times are invalid.')); return;
+    }
+    const saved = await run(() => createWorkSchedule({ ...form, name: form.name.trim(), shift_type: form.shift_type?.trim() || null }), tr('Đã tạo lịch làm việc.', 'Work schedule created.'));
+    if (saved) { setForm(initialSchedule); setCreateOpen(false); }
+  }
+
+  async function rename(schedule: WorkSchedule) {
+    const name = window.prompt(tr('Nhập tên lịch mới', 'Enter a new schedule name'), schedule.name)?.trim();
+    if (name && name !== schedule.name) await run(() => updateWorkSchedule(schedule.id, { name }), tr('Đã đổi tên lịch.', 'Schedule renamed.'));
+  }
+
+  const dayNames = (values: number[]) => values.map(value => {
+    const day = days.find(item => item[0] === value);
+    return day ? tr(day[1], day[2]) : value;
+  }).join(', ');
+
+  return <AppShell breadcrumb={['Work schedules']}>
+    <SectionHeader title={tr('Quản lý lịch làm việc', 'Work schedule management')} description={tr('Chọn nhân viên, xem lịch hiện tại và gán lịch phù hợp.', 'Select an employee, review the current schedule and assign the right one.')}>
+      <Button onClick={() => { setError(''); setCreateOpen(true); }}><Plus size={16} />{tr('Tạo lịch mới', 'Create schedule')}</Button>
+    </SectionHeader>
+
+    {error && <div role="alert" className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">{error}</div>}
+    {notice && <div role="status" className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800">{notice}</div>}
+
+    {metadata && <div className="mb-5"><ScheduleImportSettings schedule={metadata} onClose={() => setMetadata(null)} onSaved={() => { setMetadata(null); setRevision(value => value + 1); }} /></div>}
+
+    <div className="grid gap-5 xl:grid-cols-[minmax(340px,0.85fr)_minmax(0,1.5fr)] xl:items-start">
+    <Card className="h-fit min-w-0 p-5 sm:p-6">
+      <div className="flex items-start gap-3">
+        <span className="rounded-xl bg-orange-50 p-2.5 text-orange-600"><UserRound size={22} /></span>
+        <div><h2 className="font-bold text-slate-900">{tr('Gán lịch cho nhân viên', 'Assign an employee schedule')}</h2><p className="mt-1 text-sm leading-6 text-slate-600">{tr('Lịch mới có hiệu lực ngay sau khi xác nhận.', 'The new schedule takes effect immediately after confirmation.')}</p></div>
+      </div>
+      <div className="mt-5 max-w-2xl">
+        <label className="text-sm font-semibold text-slate-700">{tr('1. Chọn nhân viên', '1. Select an employee')}
+          <select className={fieldClass} value={employeeId} onChange={event => { setEmployeeId(event.target.value); setScheduleId(''); setNotice(''); }}>
+            <option value="">{tr('Chọn nhân viên', 'Select an employee')}</option>
+            {employees.map(item => <option key={item.id} value={item.id}>{item.employeeCode} · {item.fullName}</option>)}
+          </select>
+        </label>
+      </div>
+
+      {employeeId && <div className="mt-5 border-t border-slate-100 pt-5">
+        <div className="max-w-2xl rounded-2xl border border-slate-200 bg-slate-50 p-4">
+          {assignmentLoading ? <p className="text-sm text-slate-600">{tr('Đang tải lịch hiện tại...', 'Loading current schedule...')}</p>
+            : current ? <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><div><p className="text-xs font-bold uppercase tracking-wide text-slate-500">{tr('Lịch hiện tại', 'Current schedule')}</p><p className="mt-1 font-bold text-slate-900">{current.name}</p><p className="mt-1 text-sm text-slate-600">{current.start_time}–{current.end_time} · {dayNames(current.working_days)}</p></div><span className="w-fit rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700">{tr('Đang áp dụng', 'Current')}</span></div>
+            : <p className="text-sm text-slate-600">{tr('Nhân viên này chưa được gán lịch làm việc.', 'This employee does not have a work schedule yet.')}</p>}
+          {current && !assignmentLoading && <details className="mt-3"><summary className="cursor-pointer list-none text-sm font-semibold text-slate-600 hover:text-orange-700">{tr('Tùy chọn khác', 'More options')}</summary><div className="mt-2"><Button variant="danger" size="sm" disabled={busy} onClick={() => run(() => deleteScheduleAssignment(Number(employeeId), current.work_schedule_id), tr('Đã gỡ lịch khỏi nhân viên.', 'Schedule removed from employee.'))}>{tr('Gỡ lịch hiện tại', 'Remove current schedule')}</Button></div></details>}
+        </div>
+
+        {!assignmentLoading && <div className="mt-5 max-w-2xl">
+          <label className="text-sm font-semibold text-slate-700">{tr('2. Chọn lịch muốn áp dụng', '2. Select a schedule to apply')}
+            <select className={fieldClass} value={scheduleId} onChange={event => setScheduleId(event.target.value)}>
+              <option value="">{tr('Chọn lịch làm việc', 'Select a work schedule')}</option>
+              {activeSchedules.map(item => <option key={item.id} value={item.id}>{item.name}{current?.work_schedule_id === item.id ? ` · ${tr('Đang áp dụng', 'Current')}` : ''}</option>)}
+            </select>
+          </label>
+          {scheduleId && <div className="mt-4"><Button disabled={sameSchedule || busy} onClick={() => run(() => assignWorkSchedule(Number(employeeId), { work_schedule_id: Number(scheduleId) }), tr('Đã cập nhật lịch cho nhân viên.', 'Employee schedule updated.'))}>
+            <CalendarDays size={16} />{sameSchedule ? tr('Đang áp dụng', 'Current schedule') : current ? tr('Thay lịch', 'Change schedule') : tr('Gán lịch', 'Assign schedule')}
+          </Button></div>}
+        </div>}
+      </div>}
+    </Card>
+
+    <Card className="min-w-0 p-5 sm:p-6">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><div><h2 className="font-bold text-slate-900">{tr('Danh sách lịch làm việc', 'Work schedule list')}</h2><p className="mt-1 text-sm text-slate-600">{tr(`${visibleSchedules.length} lịch`, `${visibleSchedules.length} schedules`)}</p></div><div className="flex flex-wrap gap-2"><Button variant="secondary" size="sm" disabled={loading} onClick={() => setRevision(value => value + 1)}><RefreshCw size={15} />{tr('Tải lại', 'Refresh')}</Button><Button variant="secondary" size="sm" onClick={() => setListOpen(value => !value)}>{listOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}{listOpen ? tr('Ẩn danh sách', 'Hide list') : tr('Hiện danh sách', 'Show list')}</Button></div></div>
+
+      {listOpen && <>
+      <div className="relative mt-5 flex min-h-11 items-center rounded-xl border border-slate-300 bg-white focus-within:border-orange-500 focus-within:ring-2 focus-within:ring-orange-100">
+        <input className="h-11 min-w-0 flex-1 bg-transparent px-4 text-sm text-slate-800 outline-none" value={search} onChange={event => setSearch(event.target.value)} placeholder={tr('Tìm theo tên hoặc mã ca', 'Search name or shift code')} />
+        <div ref={filterRef} className="relative h-full border-l border-slate-200">
+          <button type="button" aria-expanded={filterOpen} aria-controls="schedule-filters" onClick={() => setFilterOpen(value => !value)} className={`flex h-11 items-center gap-2 px-4 text-sm font-semibold transition-colors duration-150 hover:bg-slate-50 hover:text-orange-700 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-orange-500 ${filterOpen ? 'bg-orange-50 text-orange-700' : 'text-slate-700'}`}><SlidersHorizontal size={16} />{tr('Bộ lọc', 'Filters')}{activeFilterCount > 0 && <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-orange-100 px-1 text-xs font-bold text-orange-700">{activeFilterCount}</span>}<ChevronDown size={15} className={`transition-transform duration-200 ${filterOpen ? 'rotate-180' : ''}`} /></button>
+          <div id="schedule-filters" aria-hidden={!filterOpen} style={{ width: 'min(560px, calc(100vw - 2rem))' }} className={`absolute right-0 z-20 mt-2 origin-top-right rounded-2xl border border-slate-200 bg-white p-4 shadow-xl transition-all duration-200 ease-out ${filterOpen ? 'visible translate-y-0 scale-100 opacity-100' : 'pointer-events-none invisible -translate-y-1 scale-[0.98] opacity-0'}`}>
+            <div className="flex items-center justify-between gap-3"><p className="font-bold text-slate-900">{tr('Lọc danh sách', 'Filter schedules')}</p>{activeFilterCount > 0 && <button className="text-sm font-semibold text-orange-700 hover:underline" onClick={() => { setStatus('ALL'); setShiftType('ALL'); setWorkingDay(null); }}>{tr('Xóa bộ lọc', 'Clear filters')}</button>}</div>
+            <fieldset className="mt-4"><legend className="text-sm font-semibold text-slate-700">{tr('Trạng thái', 'Status')}</legend><div className="mt-2 grid grid-cols-3 gap-2">{[['ALL', tr('Tất cả', 'All')], ['ACTIVE', tr('Đang dùng', 'Active')], ['INACTIVE', tr('Ngừng dùng', 'Inactive')]].map(option => <button type="button" key={option[0]} onClick={() => setStatus(option[0])} className={`rounded-lg border px-3 py-2 text-sm font-semibold ${status === option[0] ? 'border-orange-300 bg-orange-50 text-orange-700' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}>{option[1]}</button>)}</div></fieldset>
+            <label className="mt-4 block text-sm font-semibold text-slate-700">{tr('Mã ca', 'Shift code')}<select className={fieldClass} value={shiftType} onChange={event => setShiftType(event.target.value)}><option value="ALL">{tr('Tất cả mã ca', 'All shift codes')}</option>{shiftTypes.map(value => <option key={value} value={value}>{value}</option>)}</select></label>
+            <fieldset className="mt-4"><legend className="text-sm font-semibold text-slate-700">{tr('Ngày làm việc', 'Working day')}</legend><div className="mt-2 flex flex-wrap gap-2">{days.map(day => <label key={day[0]} className={`flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm ${workingDay === day[0] ? 'border-orange-300 bg-orange-50 text-orange-700' : 'border-slate-200 text-slate-700'}`}><input type="checkbox" value={day[0]} checked={workingDay === day[0]} onChange={() => setWorkingDay(workingDay === day[0] ? null : day[0])} />{tr(day[1], day[2])}</label>)}</div></fieldset>
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-5 space-y-3">
+        {loading ? <p className="py-8 text-center text-sm text-slate-600">{tr('Đang tải danh sách...', 'Loading schedules...')}</p> : visibleSchedules.length === 0 ? <p className="py-8 text-center text-sm text-slate-600">{tr('Không tìm thấy lịch phù hợp.', 'No matching schedules found.')}</p> : visibleSchedules.map(schedule => <article key={schedule.id} className="flex flex-col gap-4 rounded-2xl border border-slate-200 p-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><h3 className="font-bold text-slate-900">{schedule.name}</h3><span className={`rounded-full px-2.5 py-1 text-xs font-bold ${schedule.status === 'ACTIVE' ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-600'}`}>{schedule.status === 'ACTIVE' ? tr('Đang dùng', 'Active') : tr('Ngừng dùng', 'Inactive')}</span></div><p className="mt-2 text-sm text-slate-600">{schedule.shift_type || tr('Chưa có mã ca', 'No shift code')} · {schedule.start_time}–{schedule.end_time}</p><p className="mt-1 text-sm text-slate-600">{dayNames(schedule.working_days)}</p></div>
+          <ScheduleActions tr={tr} onSettings={() => setMetadata(schedule)} onRename={() => rename(schedule)} />
+        </article>)}
+      </div></>}
+    </Card>
+    </div>
+
+    {createOpen && <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4 animate-in fade-in duration-200" role="dialog" aria-modal="true" aria-labelledby="create-schedule-title"><Card className="max-h-[90vh] w-full max-w-2xl overflow-y-auto p-5 animate-in slide-in-from-bottom-2 zoom-in-95 duration-200 sm:p-6"><div className="flex items-start justify-between gap-4"><div><h2 id="create-schedule-title" className="text-xl font-bold text-slate-900">{tr('Tạo lịch làm việc', 'Create work schedule')}</h2><p className="mt-1 text-sm text-slate-600">{tr('Tạo lịch dùng chung, sau đó gán cho nhân viên ở màn hình chính.', 'Create a shared schedule, then assign it from the main screen.')}</p></div><button aria-label={tr('Đóng', 'Close')} className="rounded-full p-2 text-slate-500 transition-colors hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-orange-500" onClick={() => setCreateOpen(false)}><X size={20} /></button></div>
+      <form className="mt-5 space-y-4" onSubmit={create}><div className="grid gap-4 sm:grid-cols-2"><label className="text-sm font-semibold text-slate-700">{tr('Tên lịch', 'Schedule name')}<input autoFocus required className={fieldClass} value={form.name} onChange={event => setForm({ ...form, name: event.target.value })} /></label><label className="text-sm font-semibold text-slate-700">{tr('Mã ca', 'Shift code')}<input required className={fieldClass} value={form.shift_type || ''} onChange={event => setForm({ ...form, shift_type: event.target.value })} placeholder={tr('Ví dụ: DAY', 'Example: DAY')} /></label><Time24Field label={tr('Giờ bắt đầu (24 giờ)', 'Start time (24-hour)')} value={form.start_time} onChange={value => setForm({ ...form, start_time: value })} /><Time24Field label={tr('Giờ kết thúc (24 giờ)', 'End time (24-hour)')} value={form.end_time} onChange={value => setForm({ ...form, end_time: value })} /></div>
+        <label className="flex items-center gap-2 text-sm font-semibold text-slate-700"><input type="checkbox" checked={form.break_start !== null} onChange={event => setForm({ ...form, break_start: event.target.checked ? '12:00' : null, break_end: event.target.checked ? '13:00' : null })} />{tr('Có giờ nghỉ giữa ca', 'Include a break')}</label>
+        {form.break_start !== null && <div className="grid gap-4 sm:grid-cols-2"><Time24Field label={tr('Bắt đầu nghỉ (24 giờ)', 'Break starts (24-hour)')} value={form.break_start} onChange={value => setForm({ ...form, break_start: value })} /><Time24Field label={tr('Kết thúc nghỉ (24 giờ)', 'Break ends (24-hour)')} value={form.break_end || ''} onChange={value => setForm({ ...form, break_end: value })} /></div>}
+        <fieldset><legend className="text-sm font-semibold text-slate-700">{tr('Ngày làm việc', 'Working days')}</legend><div className="mt-2 flex flex-wrap gap-2">{days.map(day => <label key={day[0]} className="flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700"><input type="checkbox" value={day[0]} checked={form.working_days.includes(day[0])} onChange={() => setForm({ ...form, working_days: form.working_days.includes(day[0]) ? form.working_days.filter(value => value !== day[0]) : [...form.working_days, day[0]] })} />{tr(day[1], day[2])}</label>)}</div></fieldset>
+        <div className="flex justify-end gap-2 border-t border-slate-100 pt-4"><Button type="button" variant="secondary" onClick={() => setCreateOpen(false)}>{tr('Hủy', 'Cancel')}</Button><Button type="submit" disabled={busy}>{tr('Tạo lịch', 'Create schedule')}</Button></div>
+      </form></Card></div>}
   </AppShell>;
 }

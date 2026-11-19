@@ -208,34 +208,34 @@ export default function AttendanceWorkspace({
         tr("Nhân sự", "Workforce"),
         tr(
           own ? "Chấm công của tôi" : "Quản lý chấm công",
-          own ? "My attendance" : "Attendance management",
+          own ? "My attendance" : "Attendance data",
         ),
       ]}
     >
       <SectionHeader
         title={tr(
-          own ? "Chấm công của tôi" : "Quản lý chấm công",
-          own ? "My attendance" : "Attendance management",
+          own ? "Chấm công của tôi" : "Dữ liệu chấm công",
+          own ? "My attendance" : "Attendance data",
         )}
         description={tr(
-          "Dữ liệu nguồn được kiểm tra trước khi lưu. Không suy ra ngày vắng từ dữ liệu bị thiếu.",
-          "Source data is reviewed before saving. Missing data does not imply absence.",
+          own ? "Xem dữ liệu chấm công do HR đã thu thập từ tệp nguồn." : "HR nhập tệp chấm công từ nguồn bên ngoài; hệ thống kiểm tra và lưu dữ liệu, không tự động chấm công.",
+          own ? "View attendance data collected by HR from source files." : "HR imports attendance files from an external source; the system validates and stores data but does not record attendance automatically.",
         )}
       >
         {!own ? (
-          <>
+          <div className="flex flex-wrap items-center gap-2">
             <span
               className="inline-flex"
-              title={!hasAnyRecords ? tr("Cần có dữ liệu chấm công trước khi đối soát.", "Import attendance data before reconciliation.") : undefined}
+              title={scheduleCheck === "missing" ? tr("Cần có lịch làm việc đang hoạt động trước khi đối soát.", "An active work schedule is required before reconciliation.") : undefined}
             >
               <Button
                 type="button"
                 variant="secondary"
-                disabled={!hasAnyRecords}
+                disabled={scheduleCheck === "loading" || scheduleCheck === "missing"}
                 onClick={() => setReconcileOpen(true)}
               >
                 <CalendarRange size={16} />
-                {tr("Đối soát", "Reconcile")}
+                {tr("Đối soát nghỉ và ngày lễ", "Reconcile leave and holidays")}
               </Button>
             </span>
             <span
@@ -248,10 +248,10 @@ export default function AttendanceWorkspace({
               onClick={() => setImportOpen(true)}
             >
               <Upload size={16} />
-              {tr("Nhập chấm công", "Import attendance")}
+              {tr("Nhập tệp chấm công", "Import attendance file")}
             </Button>
             </span>
-          </>
+          </div>
         ) : (
           <Button
             variant="secondary"
@@ -262,6 +262,14 @@ export default function AttendanceWorkspace({
           </Button>
         )}
       </SectionHeader>
+      {!own && <ol aria-label={tr("Quy trình nhập dữ liệu chấm công", "Attendance import workflow")} className="mb-4 grid overflow-hidden rounded-md border border-slate-200 bg-white sm:grid-cols-4">
+        {[
+          tr("Chọn tệp nguồn", "Select source file"),
+          tr("Xem trước và kiểm tra", "Preview and validate"),
+          tr("Xác nhận lưu", "Confirm and save"),
+          tr("Theo dõi dữ liệu", "Review collected data"),
+        ].map((step, index) => <li key={step} className="flex items-center gap-3 border-b border-slate-100 px-4 py-3 text-sm font-semibold text-slate-700 last:border-b-0 sm:border-b-0 sm:border-r sm:last:border-r-0"><span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-orange-100 text-xs font-bold text-orange-700">{index + 1}</span>{step}</li>)}
+      </ol>}
       {error && (
         <p role="alert" className="mb-4 rounded-md bg-red-50 p-4 text-red-800">
           {error}
@@ -331,7 +339,7 @@ export default function AttendanceWorkspace({
       )}
       {reconcileOpen && (
         <div
-          className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-[1px]"
+          className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-[1px] animate-in fade-in duration-200"
           role="dialog"
           aria-modal="true"
           aria-label={tr("Đối soát ngày nghỉ và ngày lễ", "Reconcile leave and holidays")}
@@ -339,12 +347,12 @@ export default function AttendanceWorkspace({
             if (event.target === event.currentTarget && !reconcileBusy) setReconcileOpen(false)
           }}
         >
-          <Card className="relative max-h-[calc(100vh-2rem)] w-full max-w-4xl overflow-y-auto p-5 shadow-2xl sm:p-6">
+          <Card className="relative max-h-[calc(100vh-2rem)] w-full max-w-4xl overflow-y-auto p-5 shadow-2xl animate-in slide-in-from-bottom-2 zoom-in-95 duration-200 sm:p-6">
             <button
               type="button"
               aria-label={tr("Đóng", "Close")}
               disabled={reconcileBusy}
-              className="absolute right-5 top-5 z-10 flex size-10 items-center justify-center rounded-md text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+              className="absolute right-5 top-5 z-10 flex size-10 items-center justify-center rounded-md text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-500"
               onClick={() => setReconcileOpen(false)}
             >
               <X size={20} />
@@ -726,8 +734,8 @@ export default function AttendanceWorkspace({
                         "Change the filters to search again.",
                       )
                     : tr(
-                        "Sử dụng nút Nhập chấm công ở góc trên bên phải để bắt đầu.",
-                        "Use Import attendance in the top-right corner to get started.",
+                        "Sử dụng nút Nhập tệp chấm công để bắt đầu thu thập dữ liệu.",
+                        "Use Import attendance file to start collecting data.",
                       )}
                 </p>
               </div>

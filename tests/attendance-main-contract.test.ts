@@ -106,6 +106,17 @@ test("main attendance contract: stateless preview, explicit row decisions, finge
       }),
       false,
     )
+    const scope = { from: "2026-11-01", to: "2026-11-15", employee_ids: [7, 9] }
+    await api.previewAttendanceReconcile(scope)
+    assert.equal(calls.at(-1)!.url, "/api/v1/attendance/reconcile/preview")
+    assert.deepEqual(JSON.parse(String(calls.at(-1)!.init?.body)), { scope })
+    await api.confirmAttendanceReconcile(scope, "reconcile-token", true)
+    assert.equal(calls.at(-1)!.url, "/api/v1/attendance/reconcile/confirm")
+    assert.deepEqual(JSON.parse(String(calls.at(-1)!.init?.body)), {
+      scope,
+      preview_token: "reconcile-token",
+      confirm_warnings: true,
+    })
   } finally {
     globalThis.fetch = original
     if (storage) Object.defineProperty(globalThis, "sessionStorage", storage)
@@ -113,7 +124,7 @@ test("main attendance contract: stateless preview, explicit row decisions, finge
     await server.close()
   }
 })
-test("leave contract uses catalogue IDs, same previewed file and fingerprint; edit never moves employee", async () => {
+test("leave contract uses catalogue IDs, the previewed file and a reasoned cancellation", async () => {
   const server = await createServer({
     configFile: false,
     server: { middlewareMode: true, ws: false },
@@ -140,20 +151,11 @@ test("leave contract uses catalogue IDs, same previewed file and fingerprint; ed
     const body = calls.at(-1)!.init!.body as FormData
     assert.equal(body.get("fingerprint"), "fingerprint")
     assert.equal(await (body.get("file") as File).text(), "same csv")
-    await api.updateLeaveRecord(7, {
-      employee_id: 9,
-      leave_type_id: 3,
-      start_date: "2026-11-16",
-      end_date: "2026-11-17",
-      reason: null,
+    await api.cancelLeaveRecord(7, "Sai khoảng ngày nghỉ")
+    assert.equal(calls.at(-1)!.url, "/api/leave-records/7/cancel")
+    assert.deepEqual(JSON.parse(String(calls.at(-1)!.init?.body)), {
+      reason: "Sai khoảng ngày nghỉ",
     })
-    assert.equal(calls.at(-1)!.url, "/api/leave-records/7")
-    assert.equal(
-      "employee_id" in JSON.parse(String(calls.at(-1)!.init?.body)),
-      false,
-    )
-    await api.transitionLeaveRecord(7, "restore")
-    assert.equal(calls.at(-1)!.url, "/api/leave-records/7/restore")
     await api.fetchLeaveRecords({}, true)
     assert.equal(calls.at(-1)!.url, "/api/leave-records/me")
   } finally {
