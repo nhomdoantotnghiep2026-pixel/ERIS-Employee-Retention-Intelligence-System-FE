@@ -294,21 +294,10 @@ export const createLeaveRecord = (input: LeaveInput) =>
     method: "POST",
     body: JSON.stringify(input),
   })
-export const updateLeaveRecord = (
-  id: number,
-  { employee_id: _, ...input }: LeaveInput,
-) =>
-  request<LeaveRecord>("/leave-records/" + id, {
+export const cancelLeaveRecord = (id: number, reason: string) =>
+  request<LeaveRecord>("/leave-records/" + id + "/cancel", {
     method: "PATCH",
-    body: JSON.stringify(input),
-  })
-export const transitionLeaveRecord = (
-  id: number,
-  action: "cancel" | "restore",
-) =>
-  request<LeaveRecord>("/leave-records/" + id + "/" + action, {
-    method: "PATCH",
-    body: JSON.stringify({}),
+    body: JSON.stringify({ reason: reason.trim() }),
   })
 export const previewLeaveFile = (file: File) => {
   const body = new FormData()

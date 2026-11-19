@@ -68,6 +68,8 @@ test('all routed feature pages use VI/EN consistently and preserve navigation an
    if (name === 'WorkSchedules' && path === '/work-schedules') {
     for (const html of [english, vietnamese]) {
      assert.ok(html.includes('type="checkbox"'));
+       assert.ok(html.includes('value="7"'), 'Sunday must use the BE convention 7');
+       assert.ok(!html.includes('value="0"'), 'Sunday must never be submitted as 0');
      assert.ok(!html.includes('value="default"'));
      assert.ok(!html.includes('value="template"'), 'Schedule creation must not offer a template mode');
     }

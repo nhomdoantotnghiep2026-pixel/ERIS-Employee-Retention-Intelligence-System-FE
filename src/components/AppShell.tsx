@@ -33,8 +33,9 @@ const NAV_BY_ROLE: Record<UserRole, NavGroup[]> = {
         { label: 'Employee Directory', icon: Users, to: '/employees' },
         { label: 'Departments', icon: Network, to: '/departments' },
         { label: 'Positions', icon: ClipboardList, to: '/positions' },
-        { label: 'Attendance History', icon: Activity, to: '/attendance' },
-        { label: 'Leave records', icon: ClipboardList, to: '/employee-requests' },
+        { label: 'Work schedules', icon: CalendarDays, to: '/work-schedules' },
+        { label: 'Attendance data', icon: Activity, to: '/attendance' },
+        { label: 'Leave data', icon: ClipboardList, to: '/employee-requests' },
       ],
     },
     {
@@ -124,7 +125,7 @@ const NAV_BY_ROLE: Record<UserRole, NavGroup[]> = {
 function SidebarLink({ to, icon: Icon, label, onNavigate, collapsed = false, nested = false }: NavItem & { onNavigate?: () => void; collapsed?: boolean; nested?: boolean }) {
   const { pathname } = useLocation();
   const { t } = useLanguage();
-  const isActive = pathname === to || ((to === '/work-schedules' || to === '/positions' || to === '/departments' || to.startsWith('/departments/')) ? false : pathname.startsWith(to + '/'));
+  const isActive = pathname === to || ((to === '/positions' || to === '/departments' || to.startsWith('/departments/')) ? false : pathname.startsWith(to + '/'));
   return (
     <NavLink
       to={to}
@@ -147,7 +148,6 @@ function Sidebar({ onNavigate, collapsed, onToggle }: { onNavigate?: () => void;
   const { t } = useLanguage();
   const { pathname } = useLocation();
   const [navQuery, setNavQuery] = useState('');
-  const [schedulesOpen, setSchedulesOpen] = useState(() => pathname.startsWith('/work-schedules'));
   const [historyOpen, setHistoryOpen] = useState(() => ['/employee-history', '/employee-education', '/employee-job-history'].includes(pathname));
   const navigationRef = useRef<HTMLElement>(null);
   const scrollStorageKey = `eris-sidebar-scroll:${user.role}`;
@@ -235,9 +235,6 @@ function Sidebar({ onNavigate, collapsed, onToggle }: { onNavigate?: () => void;
             <div aria-hidden={!expanded} inert={!expanded} className={`grid transition-[grid-template-rows,opacity] duration-200 ${expanded ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'}`}><div className="min-h-0 overflow-hidden space-y-0.5 pb-1">{group.items.map(item => item.to === '/employee-history' ? <div key={item.to}>
               <button type="button" aria-expanded={historyOpen} onClick={() => setHistoryOpen(open => !open)} className="ml-5 flex min-h-10 w-[calc(100%-1.25rem)] items-center gap-3 rounded-full px-4 text-left text-[15px] font-semibold text-slate-700 hover:bg-orange-50 hover:text-orange-700"><History size={17} className="shrink-0"/><span className="min-w-0 flex-1 truncate">{t(item.label)}</span><ChevronDown size={16} className={historyOpen ? 'rotate-180' : ''}/></button>
               {historyOpen && <div className="ml-5"><SidebarLink to="/employee-education" icon={ClipboardList} label="Education" nested onNavigate={onNavigate}/><SidebarLink to="/employee-job-history" icon={History} label="Job history" nested onNavigate={onNavigate}/></div>}
-            </div> : item.to === '/work-schedules' ? <div key={item.to}>
-              <button type="button" aria-expanded={schedulesOpen} onClick={() => setSchedulesOpen(open => !open)} className="ml-5 flex min-h-10 w-[calc(100%-1.25rem)] items-center gap-3 rounded-full px-4 text-left text-[15px] font-semibold text-slate-700 hover:bg-orange-50 hover:text-orange-700"><ClipboardList size={17} className="shrink-0"/><span className="min-w-0 flex-1 truncate">{t(item.label)}</span><ChevronDown size={16} className={schedulesOpen ? 'rotate-180' : ''}/></button>
-              {schedulesOpen && <div className="ml-5"><SidebarLink to="/work-schedules" icon={CalendarDays} label="Create a work schedule" nested onNavigate={onNavigate}/><SidebarLink to="/work-schedules/assign" icon={Users} label="Assign current schedule" nested onNavigate={onNavigate}/><SidebarLink to="/work-schedules/list" icon={ClipboardList} label="Schedules" nested onNavigate={onNavigate}/></div>}
             </div> : <SidebarLink key={item.to} {...item} nested onNavigate={onNavigate} />)}</div></div>
           </div>;
         })}

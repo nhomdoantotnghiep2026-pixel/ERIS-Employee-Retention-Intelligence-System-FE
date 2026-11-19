@@ -13,13 +13,11 @@ import {
   ArrowDown,
   ArrowUp,
   ArrowUpDown,
-  CalendarRange,
   Eye,
   FileSpreadsheet,
   HelpCircle,
   Inbox,
   MoreHorizontal,
-  Plus,
   RotateCcw,
   Search,
   Upload,
@@ -34,21 +32,16 @@ import { useLanguage } from "../context/LanguageContext"
 
 import { useAutoDismissFeedback } from "../hooks/useAutoDismissState"
 
-import { listEmployeeProfiles, type EmployeeProfile } from "../services/api"
-
 import {
   fetchLeaveTypes,
   fetchLeaveRecords,
   fetchLeaveSummary,
-  createLeaveRecord,
-  updateLeaveRecord,
-  transitionLeaveRecord,
+  cancelLeaveRecord,
   previewLeaveFile,
   confirmLeaveFile,
   attendanceMessage,
   type LeaveType,
   type LeaveRecord,
-  type LeaveInput,
   type LeavePreview,
   type LeaveImportResult,
   type RecordFilters,
@@ -56,18 +49,6 @@ import {
 
 const control =
   "mt-1 h-11 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100"
-
-const blank: LeaveInput = {
-  employee_id: 0,
-
-  leave_type_id: 0,
-
-  start_date: "",
-
-  end_date: "",
-
-  reason: "",
-}
 
 function RowActionsMenu({
   disabled,
@@ -78,7 +59,7 @@ function RowActionsMenu({
 
   moreLabel,
 
-  destructive,
+  destructive = false,
 
   onDetail,
 
@@ -88,15 +69,15 @@ function RowActionsMenu({
 
   detailLabel: string
 
-  toggleLabel: string
+  toggleLabel?: string
 
   moreLabel: string
 
-  destructive: boolean
+  destructive?: boolean
 
   onDetail: () => void
 
-  onToggle: () => void
+  onToggle?: () => void
 }) {
   const [open, setOpen] = useState(false)
 
@@ -193,21 +174,23 @@ function RowActionsMenu({
             >
               <Eye size={16} /> {detailLabel}
             </button>
-            <button
-              type="button"
-              role="menuitem"
-              onClick={() => {
-                setOpen(false)
-                onToggle()
-              }}
-              className={`flex h-10 w-full items-center gap-2 rounded-md px-3 text-sm font-semibold ${
-                destructive
-                  ? "text-red-700 hover:bg-red-50"
-                  : "text-emerald-700 hover:bg-emerald-50"
-              }`}
-            >
-              <AlertTriangle size={16} /> {toggleLabel}
-            </button>
+            {toggleLabel && onToggle && (
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  setOpen(false)
+                  onToggle()
+                }}
+                className={`flex h-10 w-full items-center gap-2 rounded-md px-3 text-sm font-semibold ${
+                  destructive
+                    ? "text-red-700 hover:bg-red-50"
+                    : "text-emerald-700 hover:bg-emerald-50"
+                }`}
+              >
+                <AlertTriangle size={16} /> {toggleLabel}
+              </button>
+            )}
           </div>,
 
           document.body,
@@ -222,7 +205,6 @@ export default function LeaveRecords({ own = false }: { own?: boolean }) {
   const tr = (vi: string, en: string) => (language === "vi" ? vi : en)
 
   const [types, setTypes] = useState<LeaveType[]>([]),
-    [employees, setEmployees] = useState<EmployeeProfile[]>([]),
     [rows, setRows] = useState<LeaveRecord[]>([])
 
   const [filters, setFilters] = useState<RecordFilters>({
@@ -230,20 +212,19 @@ export default function LeaveRecords({ own = false }: { own?: boolean }) {
     }),
     [draft, setDraft] = useState<RecordFilters>({ record_status: "ACTIVE" })
 
-  const [form, setForm] = useState(blank),
-    [editing, setEditing] = useState<LeaveRecord | null>(null),
-    [file, setFile] = useState<File | null>(null)
+  const [file, setFile] = useState<File | null>(null)
 
   const [preview, setPreview] = useState<LeavePreview | null>(null),
     [result, setResult] = useState<LeaveImportResult | null>(null)
 
-  const [recordDrawerOpen, setRecordDrawerOpen] = useState(false),
-    [importModalOpen, setImportModalOpen] = useState(false),
+  const [importModalOpen, setImportModalOpen] = useState(false),
     [dragging, setDragging] = useState(false)
 
   const [detailRecord, setDetailRecord] = useState<LeaveRecord | null>(null)
 
   const [confirmRecord, setConfirmRecord] = useState<LeaveRecord | null>(null)
+
+  const [cancellationReason, setCancellationReason] = useState("")
 
   const [sort, setSort] = useState<{
     key: "employee" | "dates"
@@ -299,33 +280,6 @@ export default function LeaveRecords({ own = false }: { own?: boolean }) {
             ),
           )
       })
-
-    if (!own)
-      void listEmployeeProfiles({ limit: 100 })
-
-        .then(async (first) => {
-          const rest = await Promise.all(
-            Array.from(
-              { length: Math.max(0, first.pagination.totalPages - 1) },
-              (_, index) =>
-                listEmployeeProfiles({ page: index + 2, limit: 100 }),
-            ),
-          )
-
-          if (live)
-            setEmployees([first, ...rest].flatMap((result) => result.data))
-        })
-
-        .catch((e) => {
-          if (live)
-            setError(
-              attendanceMessage(
-                e,
-
-                tr("Không tải được nhân viên.", "Could not load employees."),
-              ),
-            )
-        })
 
     return () => {
       live = false
@@ -393,7 +347,6 @@ export default function LeaveRecords({ own = false }: { own?: boolean }) {
 
   useEffect(() => {
     if (
-      !recordDrawerOpen &&
       !importModalOpen &&
       !detailRecord &&
       !confirmRecord
@@ -405,7 +358,11 @@ export default function LeaveRecords({ own = false }: { own?: boolean }) {
     const closeOnEscape = (event: KeyboardEvent) => {
       if (event.key !== "Escape" || busy) return
 
-      setRecordDrawerOpen(false)
+      if (confirmRecord) {
+        closeCancellationDialog()
+
+        return
+      }
 
       setImportModalOpen(false)
 
@@ -423,7 +380,7 @@ export default function LeaveRecords({ own = false }: { own?: boolean }) {
 
       document.removeEventListener("keydown", closeOnEscape)
     }
-  }, [recordDrawerOpen, importModalOpen, detailRecord, confirmRecord, busy])
+  }, [importModalOpen, detailRecord, confirmRecord, cancellationReason, busy])
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -461,56 +418,42 @@ export default function LeaveRecords({ own = false }: { own?: boolean }) {
     }
   }
 
-  function toggleLeaveStatus(record: LeaveRecord) {
-    void work(async () => {
-      await transitionLeaveRecord(
-        record.id,
+  function closeCancellationDialog() {
+    if (busy) return
 
-        record.record_status === "ACTIVE" ? "cancel" : "restore",
+    if (
+      cancellationReason.trim() &&
+      !window.confirm(
+        tr(
+          "Bỏ nội dung lý do hủy đang nhập?",
+          "Discard the cancellation reason you entered?",
+        ),
       )
+    )
+      return
 
-      setEditing(null)
+    setConfirmRecord(null)
 
-      setForm(blank)
+    setCancellationReason("")
+  }
+
+  function cancelRecord(record: LeaveRecord) {
+    if (!cancellationReason.trim()) {
+      setError(tr("Vui lòng nhập lý do hủy hồ sơ nghỉ.", "Enter a cancellation reason."))
+      return
+    }
+    void work(async () => {
+      await cancelLeaveRecord(record.id, cancellationReason)
 
       setDetailRecord(null)
 
       setConfirmRecord(null)
 
+      setCancellationReason("")
+
       setRevision((value) => value + 1)
 
-      setNotice(tr("Đã cập nhật trạng thái nghỉ.", "Leave status updated."))
-    })
-  }
-
-  function save(e: FormEvent) {
-    e.preventDefault()
-
-    if (form.end_date < form.start_date) {
-      setError(
-        tr(
-          "Ngày kết thúc không được trước ngày bắt đầu.",
-
-          "End date must be on or after start date.",
-        ),
-      )
-
-      return
-    }
-
-    void work(async () => {
-      if (editing) await updateLeaveRecord(editing.id, form)
-      else await createLeaveRecord(form)
-
-      setForm(blank)
-
-      setEditing(null)
-
-      setRecordDrawerOpen(false)
-
-      setRevision((v) => v + 1)
-
-      setNotice(tr("Đã lưu hồ sơ nghỉ.", "Leave record saved."))
+      setNotice(tr("Đã hủy hồ sơ nghỉ.", "Leave record cancelled."))
     })
   }
 
@@ -706,7 +649,7 @@ export default function LeaveRecords({ own = false }: { own?: boolean }) {
         tr("Nhân sự", "Workforce"),
 
         tr(
-          own ? "Hồ sơ nghỉ của tôi" : "Hồ sơ nghỉ nhân viên",
+          own ? "Ngày nghỉ của tôi" : "Dữ liệu ngày nghỉ nhân viên",
 
           own ? "My leave records" : "Employee leave records",
         ),
@@ -714,42 +657,36 @@ export default function LeaveRecords({ own = false }: { own?: boolean }) {
     >
       <SectionHeader
         title={tr(
-          own ? "Hồ sơ nghỉ của tôi" : "Hồ sơ nghỉ nhân viên",
+          own ? "Ngày nghỉ của tôi" : "Dữ liệu ngày nghỉ nhân viên",
 
-          own ? "My leave records" : "Employee leave records",
+          own ? "My leave data" : "Employee leave data",
         )}
         description={tr(
-          "Quản lý ngày nghỉ từ dữ liệu nguồn; tách biệt với đơn xin nghỉ và chấm công.",
+          own ? "Xem dữ liệu ngày nghỉ do HR đã thu thập từ tệp nguồn." : "HR nhập tệp ngày nghỉ từ nguồn bên ngoài; hệ thống kiểm tra và lưu dữ liệu, không tự tạo ngày nghỉ.",
 
-          "Manage source leave dates separately from legacy requests and attendance.",
+          own ? "View leave data collected by HR from source files." : "HR imports leave files from an external source; the system validates and stores data but does not create leave automatically.",
         )}
       >
         {!own && (
           <>
             <Button
-              variant="secondary"
               disabled={!types.length}
               onClick={() => setImportModalOpen(true)}
             >
               <Upload size={16} />
-              {tr("Nhập Excel / CSV", "Import Excel / CSV")}
-            </Button>
-            <Button
-              disabled={!types.length || !employees.length}
-              onClick={() => {
-                setEditing(null)
-
-                setForm(blank)
-
-                setRecordDrawerOpen(true)
-              }}
-            >
-              <Plus size={16} />
-              {tr("Ghi nhận nghỉ", "Record leave")}
+              {tr("Nhập tệp ngày nghỉ", "Import leave file")}
             </Button>
           </>
         )}
       </SectionHeader>
+      {!own && <ol aria-label={tr("Quy trình nhập dữ liệu ngày nghỉ", "Leave import workflow")} className="mb-4 grid overflow-hidden rounded-md border border-slate-200 bg-white sm:grid-cols-4">
+        {[
+          tr("Chọn tệp nguồn", "Select source file"),
+          tr("Xem trước và kiểm tra", "Preview and validate"),
+          tr("Xác nhận lưu", "Confirm and save"),
+          tr("Theo dõi dữ liệu", "Review collected data"),
+        ].map((step, index) => <li key={step} className="flex items-center gap-3 border-b border-slate-100 px-4 py-3 text-sm font-semibold text-slate-700 last:border-b-0 sm:border-b-0 sm:border-r sm:last:border-r-0"><span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-orange-100 text-xs font-bold text-orange-700">{index + 1}</span>{step}</li>)}
+      </ol>}
       {error && (
         <p role="alert" className="mb-4 rounded-md bg-red-50 p-4 text-red-800">
           {error}
@@ -767,7 +704,7 @@ export default function LeaveRecords({ own = false }: { own?: boolean }) {
         <p className="mb-4 rounded-md border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
           <span className="font-semibold">
             {tr(
-              "Chưa thể ghi nhận hoặc nhập hồ sơ nghỉ.",
+              "Chưa thể nhập dữ liệu ngày nghỉ.",
               "Leave records are not ready.",
             )}
           </span>{" "}
@@ -871,234 +808,61 @@ export default function LeaveRecords({ own = false }: { own?: boolean }) {
               aria-labelledby="leave-confirm-title"
               className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-[1px]"
               onMouseDown={(event) => {
-                if (event.target === event.currentTarget && !busy)
-                  setConfirmRecord(null)
+                if (event.target === event.currentTarget) closeCancellationDialog()
               }}
             >
-              <Card className="w-full max-w-md p-5 shadow-2xl sm:p-6">
-                <div
-                  className={`flex size-11 items-center justify-center rounded-md ${
-                    confirmRecord.record_status === "ACTIVE"
-                      ? "bg-red-50 text-red-700"
-                      : "bg-emerald-50 text-emerald-700"
-                  }`}
-                >
+              <Card className="w-full max-w-md animate-in fade-in zoom-in-95 p-5 shadow-2xl duration-200 sm:p-6">
+                <div className="flex size-11 items-center justify-center rounded-md bg-red-50 text-red-700">
                   <AlertTriangle size={22} />
                 </div>
                 <h2
                   id="leave-confirm-title"
                   className="mt-4 text-lg font-bold text-slate-950"
                 >
-                  {confirmRecord.record_status === "ACTIVE"
-                    ? tr(
-                        "Xác nhận hủy hồ sơ nghỉ?",
-                        "Cancel this leave record?",
-                      )
-                    : tr(
-                        "Xác nhận khôi phục hồ sơ nghỉ?",
-                        "Restore this leave record?",
-                      )}
+                  {tr("Xác nhận hủy hồ sơ nghỉ?", "Cancel this leave record?")}
                 </h2>
                 <p className="mt-2 text-sm leading-6 text-slate-600">
-                  {confirmRecord.record_status === "ACTIVE"
-                    ? tr(
-                        `Hồ sơ của ${confirmRecord.employee_code || `ID ${confirmRecord.employee_id}`} (${confirmRecord.start_date} - ${confirmRecord.end_date}) sẽ chuyển sang trạng thái Đã hủy và có thể khôi phục sau.`,
-
-                        `The record for ${confirmRecord.employee_code || `ID ${confirmRecord.employee_id}`} (${confirmRecord.start_date} - ${confirmRecord.end_date}) will be cancelled and can be restored later.`,
-                      )
-                    : tr(
-                        `Hồ sơ của ${confirmRecord.employee_code || `ID ${confirmRecord.employee_id}`} (${confirmRecord.start_date} - ${confirmRecord.end_date}) sẽ được sử dụng trở lại.`,
-
-                        `The record for ${confirmRecord.employee_code || `ID ${confirmRecord.employee_id}`} (${confirmRecord.start_date} - ${confirmRecord.end_date}) will become active again.`,
-                      )}
+                  {tr(
+                    `Hồ sơ của ${confirmRecord.employee_code || `ID ${confirmRecord.employee_id}`} (${confirmRecord.start_date} - ${confirmRecord.end_date}) sẽ chuyển sang trạng thái Đã hủy. Nếu cần sửa, hãy tạo hồ sơ mới sau khi hủy.`,
+                    `The record for ${confirmRecord.employee_code || `ID ${confirmRecord.employee_id}`} (${confirmRecord.start_date} - ${confirmRecord.end_date}) will be cancelled. Create a new record after cancellation when a correction is needed.`,
+                  )}
                 </p>
+                <label className="mt-4 block text-sm font-semibold text-slate-800">
+                  {tr("Lý do hủy", "Cancellation reason")}
+                  <textarea
+                    autoFocus
+                    required
+                    rows={3}
+                    maxLength={500}
+                    value={cancellationReason}
+                    onChange={(event) => setCancellationReason(event.target.value)}
+                    placeholder={tr("Ví dụ: Sai khoảng ngày nghỉ", "Example: Incorrect leave dates")}
+                    className="mt-2 min-h-24 w-full resize-y rounded-md border border-slate-300 bg-white px-3 py-2.5 text-sm font-normal text-slate-900 outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100"
+                  />
+                  <span className="mt-1 block text-xs font-medium text-slate-600">
+                    {tr("BE yêu cầu lý do để lưu dấu vết thay đổi.", "A reason is required for the audit trail.")}
+                  </span>
+                </label>
                 <div className="mt-6 flex justify-end gap-2">
                   <Button
                     type="button"
                     variant="secondary"
                     disabled={busy}
-                    onClick={() => setConfirmRecord(null)}
+                    onClick={closeCancellationDialog}
                   >
                     {tr("Giữ lại", "Keep record")}
                   </Button>
                   <button
                     type="button"
-                    disabled={busy}
-                    onClick={() => toggleLeaveStatus(confirmRecord)}
-                    className={`h-10 rounded-md px-4 text-sm font-semibold text-white transition disabled:opacity-50 ${
-                      confirmRecord.record_status === "ACTIVE"
-                        ? "bg-red-600 hover:bg-red-700"
-                        : "bg-emerald-600 hover:bg-emerald-700"
-                    }`}
+                    disabled={busy || !cancellationReason.trim()}
+                    onClick={() => cancelRecord(confirmRecord)}
+                    className="h-10 rounded-md bg-red-600 px-4 text-sm font-semibold text-white transition hover:bg-red-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-600 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     {busy
                       ? tr("Đang xử lý...", "Processing...")
-                      : confirmRecord.record_status === "ACTIVE"
-                        ? tr("Xác nhận hủy", "Confirm cancellation")
-                        : tr("Xác nhận khôi phục", "Confirm restoration")}
+                      : tr("Xác nhận hủy", "Confirm cancellation")}
                   </button>
                 </div>
-              </Card>
-            </div>
-          )}
-          {recordDrawerOpen && (
-            <div
-              className="fixed inset-0 z-[80] bg-slate-950/40 backdrop-blur-[1px]"
-              onMouseDown={(event) => {
-                if (event.target === event.currentTarget && !busy)
-                  setRecordDrawerOpen(false)
-              }}
-            >
-              <Card className="absolute inset-y-0 right-0 flex w-full max-w-xl flex-col overflow-y-auto rounded-none border-0 p-5 shadow-2xl sm:p-6">
-                <button
-                  type="button"
-                  aria-label={tr("Đóng", "Close")}
-                  disabled={busy}
-                  onClick={() => setRecordDrawerOpen(false)}
-                  className="absolute right-5 top-5 flex size-10 items-center justify-center rounded-md text-slate-600 hover:bg-slate-100 hover:text-slate-900"
-                >
-                  <X size={20} />
-                </button>
-                <h2 className="font-bold">
-                  {tr(
-                    editing ? "Sửa hồ sơ nghỉ" : "Ghi nhận nghỉ",
-
-                    editing ? "Edit leave record" : "Record leave",
-                  )}
-                </h2>
-                <form onSubmit={save}>
-                  <fieldset
-                    disabled={busy}
-                    className="mt-3 grid gap-3 sm:grid-cols-2"
-                  >
-                    <label className="text-sm">
-                      {tr("Nhân viên", "Employee")}
-                      <select
-                        required
-                        disabled={!!editing}
-                        className={control}
-                        value={form.employee_id || ""}
-                        onChange={(e) =>
-                          setForm({
-                            ...form,
-                            employee_id: Number(e.target.value),
-                          })
-                        }
-                      >
-                        <option value="">
-                          {tr("Chọn nhân viên", "Select employee")}
-                        </option>
-                        {employees.map((e) => (
-                          <option key={e.id} value={e.id}>
-                            {e.employeeCode} · {e.fullName}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                    <label className="text-sm">
-                      {tr("Loại nghỉ", "Leave type")}
-                      <select
-                        required
-                        className={control}
-                        value={form.leave_type_id || ""}
-                        onChange={(e) =>
-                          setForm({
-                            ...form,
-
-                            leave_type_id: Number(e.target.value),
-                          })
-                        }
-                      >
-                        <option value="">
-                          {tr("Chọn loại nghỉ", "Select leave type")}
-                        </option>
-                        {types.map((t) => (
-                          <option key={t.id} value={t.id}>
-                            {t.code} · {t.name}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                    <fieldset className="sm:col-span-2">
-                      <legend className="flex items-center gap-2 text-sm font-semibold text-slate-700">
-                        <CalendarRange size={16} className="text-orange-500" />
-                        {tr("Khoảng ngày nghỉ", "Leave date range")}
-                        <span
-                          title={tr(
-                            "Ghi nhận theo trọn ngày công; không tự quy đổi thành giờ nghỉ hoặc ghi sang chấm công.",
-
-                            "Recorded as whole work dates; hours and attendance rows are not inferred.",
-                          )}
-                          className="inline-flex cursor-help text-slate-500"
-                        >
-                          <HelpCircle size={15} />
-                        </span>
-                      </legend>
-                      <div className="mt-1 grid gap-3 sm:grid-cols-2">
-                        <label className="text-sm font-medium text-slate-600">
-                          {tr("Từ ngày", "From")}
-                          <input
-                            type="date"
-                            required
-                            className={control}
-                            value={form.start_date}
-                            onChange={(event) =>
-                              setForm({
-                                ...form,
-                                start_date: event.target.value,
-                              })
-                            }
-                          />
-                        </label>
-                        <label className="text-sm font-medium text-slate-600">
-                          {tr("Đến ngày", "To")}
-                          <input
-                            type="date"
-                            required
-                            min={form.start_date}
-                            className={control}
-                            value={form.end_date}
-                            onChange={(event) =>
-                              setForm({ ...form, end_date: event.target.value })
-                            }
-                          />
-                        </label>
-                      </div>
-                    </fieldset>
-                    <label className="text-sm sm:col-span-2">
-                      {tr("Lý do (không bắt buộc)", "Reason (optional)")}
-                      <textarea
-                        rows={2}
-                        className={`${control} h-auto min-h-20 py-3`}
-                        value={form.reason || ""}
-                        onChange={(e) =>
-                          setForm({ ...form, reason: e.target.value })
-                        }
-                      />
-                    </label>
-                    <div className="flex gap-2">
-                      <Button
-                        disabled={!form.employee_id || !form.leave_type_id}
-                        type="submit"
-                      >
-                        {tr("Lưu hồ sơ", "Save record")}
-                      </Button>
-                      {editing && (
-                        <Button
-                          variant="secondary"
-                          type="button"
-                          onClick={() => {
-                            setEditing(null)
-
-                            setForm(blank)
-                          }}
-                        >
-                          {tr("Hủy chỉnh sửa", "Cancel editing")}
-                        </Button>
-                      )}
-                    </div>
-                  </fieldset>
-                </form>
               </Card>
             </div>
           )}
@@ -1560,7 +1324,7 @@ export default function LeaveRecords({ own = false }: { own?: boolean }) {
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <div>
               <h2 className="text-base font-semibold text-slate-950">
-                {tr("Dữ liệu hồ sơ nghỉ", "Leave records")}
+                {tr("Dữ liệu ngày nghỉ", "Leave data")}
               </h2>
               <p className="mt-1 text-sm font-medium text-slate-600">
                 {tr(
@@ -1666,32 +1430,6 @@ export default function LeaveRecords({ own = false }: { own?: boolean }) {
                         <td className="w-44 p-3 text-right">
                           {!own && (
                             <div className="inline-flex min-w-36 items-center justify-end gap-2">
-                              {r.record_status === "ACTIVE" && (
-                                <Button
-                                  variant="secondary"
-                                  size="sm"
-                                  disabled={busy}
-                                  onClick={() => {
-                                    setEditing(r)
-
-                                    setForm({
-                                      employee_id: r.employee_id,
-
-                                      leave_type_id: r.leave_type_id,
-
-                                      start_date: r.start_date,
-
-                                      end_date: r.end_date,
-
-                                      reason: r.reason,
-                                    })
-
-                                    setRecordDrawerOpen(true)
-                                  }}
-                                >
-                                  {tr("Sửa", "Edit")}
-                                </Button>
-                              )}
                               <RowActionsMenu
                                 disabled={busy}
                                 moreLabel={tr(
@@ -1702,11 +1440,18 @@ export default function LeaveRecords({ own = false }: { own?: boolean }) {
                                 toggleLabel={
                                   r.record_status === "ACTIVE"
                                     ? tr("Hủy hồ sơ", "Cancel record")
-                                    : tr("Khôi phục hồ sơ", "Restore record")
+                                    : undefined
                                 }
                                 destructive={r.record_status === "ACTIVE"}
                                 onDetail={() => setDetailRecord(r)}
-                                onToggle={() => setConfirmRecord(r)}
+                                onToggle={
+                                  r.record_status === "ACTIVE"
+                                    ? () => {
+                                        setCancellationReason("")
+                                        setConfirmRecord(r)
+                                      }
+                                    : undefined
+                                }
                               />
                             </div>
                           )}
@@ -1748,9 +1493,9 @@ export default function LeaveRecords({ own = false }: { own?: boolean }) {
                             "Leave records will appear here once recorded.",
                           )
                         : tr(
-                            "Sử dụng nút Ghi nhận nghỉ ở góc trên bên phải để bắt đầu.",
+                            "Sử dụng nút Nhập tệp ngày nghỉ để bắt đầu thu thập dữ liệu.",
 
-                            "Use Record leave in the top-right corner to get started.",
+                            "Use Import leave file to start collecting data.",
                           )}
                   </p>
                 </div>

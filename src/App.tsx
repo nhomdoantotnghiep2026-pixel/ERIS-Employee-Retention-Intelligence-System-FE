@@ -133,8 +133,8 @@ export default function App() {
           <Route path="/attendance" element={<RoleGuard><AttendanceHistory /></RoleGuard>} />
           <Route path="/holidays" element={<RoleGuard><AttendanceHistory holidaysPage /></RoleGuard>} />
           <Route path="/work-schedules" element={<RoleGuard><WorkSchedules /></RoleGuard>} />
-          <Route path="/work-schedules/assign" element={<RoleGuard><WorkSchedules /></RoleGuard>} />
-          <Route path="/work-schedules/list" element={<RoleGuard><WorkSchedules /></RoleGuard>} />
+          <Route path="/work-schedules/assign" element={<RoleGuard><Navigate to="/work-schedules" replace /></RoleGuard>} />
+          <Route path="/work-schedules/list" element={<RoleGuard><Navigate to="/work-schedules" replace /></RoleGuard>} />
           <Route path="/employee-requests" element={<RoleGuard><LeaveRecords /></RoleGuard>} />
           <Route path="/company-location" element={<RoleGuard><CompanyLocationScreen /></RoleGuard>} />
           <Route path="/employee-history" element={<RoleGuard><EmployeeHistory /></RoleGuard>} />
