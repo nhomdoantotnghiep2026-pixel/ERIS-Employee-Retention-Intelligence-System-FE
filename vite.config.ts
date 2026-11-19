@@ -10,6 +10,7 @@ import siteConfiguration from './.figma/make/site.json'
 // Vite config — https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), 'VITE_')
+  const backendTarget = process.env.VITE_BACKEND_URL || env.VITE_BACKEND_URL || 'http://127.0.0.1:3000'
   // .figma/make/deploy-preview passes `--mode development` for cached-preview builds.
   const emitSourcemaps = mode === 'development'
 
@@ -44,9 +45,14 @@ react(),
           cookiePathRewrite: { '/api': '/admin-api' },
         },
         '/api': {
-          target: process.env.VITE_BACKEND_URL || env.VITE_BACKEND_URL || 'http://localhost:3000',
+          target: backendTarget,
           changeOrigin: true,
           configure(proxy) {
+            proxy.on('error', (_error, _request, response) => {
+              if (!response || !('writeHead' in response) || response.headersSent || response.writableEnded) return
+              response.writeHead(502, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' })
+              response.end(JSON.stringify({ message: 'Máy chủ ERIS chưa phản hồi. Nếu đang khởi động BE, hãy đợi vài giây rồi thử lại.' }))
+            })
             proxy.on('proxyReq', (proxyRequest, request) => {
               const origin = devProxyOrigin(request.headers.origin, request.headers.host,
                 process.env.VITE_BACKEND_ALLOWED_ORIGIN || env.VITE_BACKEND_ALLOWED_ORIGIN)
@@ -55,7 +61,7 @@ react(),
           },
         },
         '/health': {
-          target: process.env.VITE_BACKEND_URL || env.VITE_BACKEND_URL || 'http://localhost:3000',
+          target: backendTarget,
           changeOrigin: true,
         },
       },
