@@ -32,7 +32,6 @@ import {
   type PredictionDashboardState,
 } from "./EmployeePredictionDashboard"
 import { Empty, Loading, Notice } from "./States"
-import { Dialog, DialogContent, DialogTitle, DialogDescription } from "./dialog"
 
 type Sel = {
   employeeId?: number | undefined
@@ -107,7 +106,6 @@ export function IndividualAnalysis({
   const [snapshotLoading, setSnapshotLoading] = useState(false)
   const [supplement, setSupplement] = useState<Record<string, string>>({})
   const [save, setSave] = useState(false)
-  const [confirmation, setConfirmation] = useState(false)
   const predictionLock = useRef(false)
   const selectionVersion = useRef(0)
   const [busy, setBusy] = useState<Busy>("")
@@ -225,7 +223,15 @@ export function IndividualAnalysis({
   }, [])
 
   useEffect(() => {
-    if (result) headingRef.current?.focus({ preventScroll: true })
+    if (result) {
+      const frame = window.requestAnimationFrame(() => {
+        const main = headingRef.current?.closest("main")
+        main?.scrollTo({ top: 0, behavior: "auto" })
+        headingRef.current?.focus({ preventScroll: true })
+      })
+      resultRef.current = result
+      return () => window.cancelAnimationFrame(frame)
+    }
     resultRef.current = result
   }, [result, mobileTab])
 
@@ -233,7 +239,6 @@ export function IndividualAnalysis({
     selectionVersion.current++
     snapSeq.current++
     setSave(false)
-    setConfirmation(false)
     setEmployeeId(id)
     setSnapshotId(undefined)
     setResult(null)
@@ -248,7 +253,6 @@ export function IndividualAnalysis({
     selectionVersion.current++
     snapSeq.current++
     setSave(false)
-    setConfirmation(false)
     setSnapshotId(id)
     setSnapshot(null)
     setResult(null)
@@ -336,7 +340,6 @@ export function IndividualAnalysis({
       return
     predictionLock.current = true
     const version = selectionVersion.current
-    setConfirmation(false)
     setBusy(action)
     setResult(null)
     setResultError("")
@@ -352,7 +355,7 @@ export function IndividualAnalysis({
       resultRef.current = response.data
       setResult(response.data)
       rememberSaved(response.data)
-      if (action === "save" && response.data.saved) setSaveNotice("Đã lưu kết quả vào hồ sơ theo dõi.")
+      if (response.data.saved) setSaveNotice("Đã lưu kết quả vào hồ sơ theo dõi.")
       if (response.data.saved && response.data.predictionId && !response.data.createdAt) {
         void apiRef.current.getResult(response.data.predictionId).then(detail => {
           rememberSaved(detail.data);
@@ -433,9 +436,9 @@ export function IndividualAnalysis({
         ? "Đang đánh giá và lưu kết quả…"
         : "Đang phân tích dữ liệu…"
   const dataVisible =
-    mobileTab === "data" ? "block h-full" : "hidden h-full min-[1200px]:block"
+    mobileTab === "data" ? "block min-w-0" : "hidden min-w-0 min-[1200px]:block"
   const resultVisible =
-    mobileTab === "result" ? "block h-full" : "hidden h-full min-[1200px]:block"
+    mobileTab === "result" ? "block min-w-0" : "hidden min-w-0 min-[1200px]:block"
 
   return (
     <div className="space-y-5">
@@ -600,10 +603,10 @@ export function IndividualAnalysis({
         ))}
       </div>
 
-      <div className="grid items-start gap-5 min-[1200px]:grid-cols-[minmax(0,38fr)_minmax(0,62fr)]">
+      <div className="grid items-stretch gap-5 min-[1200px]:grid-cols-[minmax(0,38fr)_minmax(0,62fr)]">
         <div className={dataVisible}>
           <section
-            className="panel flex flex-col overflow-hidden"
+            className="panel flex min-h-[680px] w-full flex-col overflow-hidden"
             aria-labelledby="prediction-input-heading"
           >
             <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-200 px-5 py-4">
@@ -672,16 +675,27 @@ export function IndividualAnalysis({
               )}
             </div>
             <div className="flex flex-wrap items-center justify-between gap-3 border-t bg-white px-5 py-4">
-              <label className="flex cursor-pointer items-center gap-2.5 text-sm font-medium text-slate-700">
-                <input className="peer sr-only" type="checkbox" checked={save} disabled={!!busy} onChange={(event) => setSave(event.target.checked)} />
-                <span className="relative h-6 w-10 rounded-full bg-slate-200 transition peer-checked:bg-orange-500 after:absolute after:left-1 after:top-1 after:h-4 after:w-4 after:rounded-full after:bg-white after:shadow-sm after:transition-transform peer-checked:after:translate-x-4" aria-hidden />
-                Lưu vào hồ sơ theo dõi định kỳ
-              </label>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={save}
+                disabled={!!busy}
+                onClick={() => setSave(current => !current)}
+                className="group flex items-center gap-2.5 rounded-md text-left text-sm font-medium text-slate-700 outline-none focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2"
+              >
+                <span
+                  className={`relative h-6 w-10 shrink-0 rounded-full transition-colors ${save ? "bg-orange-500" : "bg-slate-200"}`}
+                  aria-hidden
+                >
+                  <span className={`absolute left-1 top-1 h-4 w-4 rounded-full bg-white shadow-sm transition-transform ${save ? "translate-x-4" : "translate-x-0"}`} />
+                </span>
+                <span>Lưu vào hồ sơ theo dõi định kỳ</span>
+              </button>
               <button
                 type="button"
                 className="btn btn-primary"
                 disabled={!snapshot?.ready || !!busy}
-                onClick={() => setConfirmation(true)}
+                onClick={() => void runPrediction(save, "predict")}
               >
                 {busy === "predict" ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <BrainCircuit className="h-4 w-4" aria-hidden />}
                 {busy === "predict" ? "Đang đánh giá…" : "Đánh giá mức độ gắn kết"}
@@ -708,44 +722,16 @@ export function IndividualAnalysis({
                 ? () => {
                     if (failedAction.type === "result")
                       void openResult(failedAction.id)
-                    else setConfirmation(true)
+                    else void runPrediction(save, "predict")
                   }
                 : undefined
             }
-            onPredict={() => setConfirmation(true)}
+            onPredict={() => void runPrediction(save, "predict")}
             onSave={() => void runPrediction(true, "save")}
             onOpenSaved={(id) => void openResult(id)}
           />
         </div>
       </div>
-      <Dialog open={confirmation} onOpenChange={setConfirmation}>
-        <DialogContent>
-          <DialogTitle>
-            {save ? "Xác nhận đánh giá và lưu kết quả" : "Xác nhận đánh giá"}
-          </DialogTitle>
-          <DialogDescription>
-            {save
-              ? "Kết quả đánh giá thành công sẽ được lưu vào lịch sử của nhân viên."
-              : "Kết quả sẽ chỉ được hiển thị tạm thời và không được lưu vào lịch sử. Bạn có muốn tiếp tục?"}
-          </DialogDescription>
-          <div className="mt-5 flex justify-end gap-2">
-            <button
-              autoFocus
-              className="btn btn-secondary"
-              onClick={() => setConfirmation(false)}
-            >
-              Hủy
-            </button>
-            <button
-              className="btn btn-primary"
-              disabled={!!busy}
-              onClick={() => void runPrediction()}
-            >
-              {save ? "Đánh giá và lưu" : "Đánh giá không lưu"}
-            </button>
-          </div>
-        </DialogContent>
-      </Dialog>
       {saveNotice && <div role="status" className="fixed bottom-5 right-5 z-50 flex items-center gap-2 rounded-xl border border-emerald-200 bg-white px-4 py-3 text-sm font-medium text-emerald-800 shadow-lg"><CheckCircle2 className="h-4 w-4" aria-hidden />{saveNotice}</div>}
     </div>
   )
