@@ -8,8 +8,11 @@ import {
 
 import { createPortal } from "react-dom"
 
+import { useNavigate } from "react-router-dom"
+
 import {
   AlertTriangle,
+  BarChart3,
   ArrowDown,
   ArrowUp,
   ArrowUpDown,
@@ -201,6 +204,8 @@ function RowActionsMenu({
 
 export default function LeaveRecords({ own = false }: { own?: boolean }) {
   const { language } = useLanguage()
+
+  const navigate = useNavigate()
 
   const tr = (vi: string, en: string) => (language === "vi" ? vi : en)
 
@@ -669,6 +674,10 @@ export default function LeaveRecords({ own = false }: { own?: boolean }) {
       >
         {!own && (
           <>
+            <Button variant="secondary" onClick={() => navigate("/employee-requests/dashboard")}>
+              <BarChart3 size={16} />
+              {tr("Xem tổng quan", "View dashboard")}
+            </Button>
             <Button
               disabled={!types.length}
               onClick={() => setImportModalOpen(true)}

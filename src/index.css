@@ -164,6 +164,13 @@ select:focus-visible,
   outline-offset: 2px;
 }
 
+/* The schedule search and filter are one compound control. Keep a single
+   focus ring on the wrapper instead of outlining its children separately. */
+.schedule-search-control > input:focus-visible,
+.schedule-search-control > div > button:focus-visible {
+  outline: none;
+}
+
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: #D1D5DB; border-radius: 3px; }

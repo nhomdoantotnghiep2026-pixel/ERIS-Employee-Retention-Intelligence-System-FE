@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from "react"
-import { Link } from "react-router-dom"
+import { Link, useNavigate } from "react-router-dom"
 import {
+  BarChart3,
   CalendarRange,
   HelpCircle,
   Inbox,
@@ -37,6 +38,7 @@ export default function AttendanceWorkspace({
   own?: boolean
 }) {
   const { language } = useLanguage()
+  const navigate = useNavigate()
   const tr = (vi: string, en: string) => (language === "vi" ? vi : en)
   const [filters, setFilters] = useState<RecordFilters>({
       record_status: "ACTIVE",
@@ -224,6 +226,10 @@ export default function AttendanceWorkspace({
       >
         {!own ? (
           <div className="flex flex-wrap items-center gap-2">
+            <Button type="button" variant="secondary" onClick={() => navigate("/attendance/dashboard")}>
+              <BarChart3 size={16} />
+              {tr("Xem tổng quan", "View dashboard")}
+            </Button>
             <span
               className="inline-flex"
               title={scheduleCheck === "missing" ? tr("Cần có lịch làm việc đang hoạt động trước khi đối soát.", "An active work schedule is required before reconciliation.") : undefined}

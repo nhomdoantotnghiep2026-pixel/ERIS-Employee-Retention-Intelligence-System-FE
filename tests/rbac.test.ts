@@ -19,8 +19,12 @@ test('department management follows the team BE HR permission', () => {
 });
 test('attendance history is available to HR only', () => {
   assert.equal(hasRoutePermission('HR', '/attendance'), true);
+  assert.equal(hasRoutePermission('HR', '/attendance/dashboard'), true);
+  assert.equal(hasRoutePermission('HR', '/employee-requests/dashboard'), true);
   for (const role of ['System Administrator', 'Data / AI Analyst', 'Employee / ESS'] as const) {
     assert.equal(hasRoutePermission(role, '/attendance'), false);
+    assert.equal(hasRoutePermission(role, '/attendance/dashboard'), false);
+    assert.equal(hasRoutePermission(role, '/employee-requests/dashboard'), false);
   }
 });
 test('workforce education and job history is available to HR only', () => {

@@ -37,6 +37,7 @@ test('all routed feature pages use VI/EN consistently and preserve navigation an
    [0,'/holidays','AttendanceHistory',{holidaysPage:true}],
    [0,'/work-schedules','WorkSchedules'],[0,'/work-schedules/assign','WorkSchedules'],[0,'/work-schedules/list','WorkSchedules'],
    [0,'/employee-requests','LeaveRecords',{own:false}],[0,'/company-location','CompanyLocation'],
+   [0,'/attendance/dashboard','AttendanceDashboard'],[0,'/employee-requests/dashboard','LeaveDataDashboard'],
    [3,'/my-requests','LeaveRecords',{own:true}],[3,'/my-attendance','MyAttendance'],
    [0,'/departments','Departments'],[0,'/positions','Positions'],[0,'/employees','HrEmployees'],[0,'/employees/new','HrEmployees'],
    [0,'/org-overview','RiskWorkspace'],[0,'/attrition-risk','RiskWorkspace'],[0,'/executive-reports','RiskWorkspace',{reports:true}],

@@ -29,10 +29,12 @@ import { PUBLIC_TOPICS } from './data/publicTopics';
 import Login from './screens/Login';
 import ForgotPassword from './screens/ForgotPassword';
 import AttendanceHistory from './screens/AttendanceHistory';
+import AttendanceDashboard from './screens/AttendanceDashboard';
 import WorkSchedules from './screens/WorkSchedules';
 import EmployeeHistory from './screens/EmployeeHistory';
 import CompanyLocationScreen from './screens/CompanyLocation';
 import LeaveRecords from './screens/LeaveRecords';
+import LeaveDataDashboard from './screens/LeaveDataDashboard';
 import PolicyDemo from './screens/PolicyDemo';
 import AiAnalysis from './screens/AiAnalysis';
 import PortalHub from './screens/PortalHub';
@@ -133,11 +135,13 @@ export default function App() {
           <Route path="/employees/:id/edit" element={<RoleGuard><EmployeeWorkspace mode="edit" /></RoleGuard>} />
           <Route path="/employees/:id/risk" element={<RoleGuard><RiskAnalysis /></RoleGuard>} />
           <Route path="/attendance" element={<RoleGuard><AttendanceHistory /></RoleGuard>} />
+          <Route path="/attendance/dashboard" element={<RoleGuard><AttendanceDashboard /></RoleGuard>} />
           <Route path="/holidays" element={<RoleGuard><AttendanceHistory holidaysPage /></RoleGuard>} />
           <Route path="/work-schedules" element={<RoleGuard><WorkSchedules /></RoleGuard>} />
           <Route path="/work-schedules/assign" element={<RoleGuard><Navigate to="/work-schedules" replace /></RoleGuard>} />
           <Route path="/work-schedules/list" element={<RoleGuard><Navigate to="/work-schedules" replace /></RoleGuard>} />
           <Route path="/employee-requests" element={<RoleGuard><LeaveRecords /></RoleGuard>} />
+          <Route path="/employee-requests/dashboard" element={<RoleGuard><LeaveDataDashboard /></RoleGuard>} />
           <Route path="/company-location" element={<RoleGuard><CompanyLocationScreen /></RoleGuard>} />
           <Route path="/employee-history" element={<RoleGuard><EmployeeHistory /></RoleGuard>} />
           <Route path="/employee-education" element={<RoleGuard><EmployeeHistory /></RoleGuard>} />
