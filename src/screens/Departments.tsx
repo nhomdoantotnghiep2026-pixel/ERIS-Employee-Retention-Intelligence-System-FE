@@ -116,7 +116,7 @@ export default function Departments() {
       </div>
       <form onSubmit={find} className="my-4 flex flex-col items-stretch gap-3 sm:flex-row sm:items-end">
         <label className="flex-1 text-sm font-medium text-slate-700">{t('Search departments')}<input type="search" maxLength={100} value={query} disabled={pending || loading} onChange={event => changeSearch(event.target.value)} className={`${control} h-12`} /></label>
-        <TableButton type="submit" variant="outline" className="h-12 rounded-lg border-slate-300 bg-white px-5 text-sm font-bold text-slate-900 hover:bg-slate-50" disabled={pending || loading}>{t('Search')}</TableButton>
+        <TableButton type="submit" variant="outline" className="h-12 rounded-lg border-orange-500 bg-orange-500 px-5 text-sm font-bold text-white hover:border-orange-600 hover:bg-orange-600" disabled={pending || loading}>{t('Search')}</TableButton>
       </form>
       {loading ? <p role="status" className="py-6 text-sm text-slate-600">{t('Loading departments...')}</p> : listError ? <div role="alert" className="rounded-xl bg-red-50 p-4 text-sm text-red-800"><p>{t(listError)}</p><TableButton variant="outline" className="mt-3 h-9 rounded-lg border-slate-200 bg-white px-3 text-sm text-slate-700 hover:bg-slate-50" onClick={() => setRevision(value => value + 1)}>{t('Retry departments')}</TableButton></div> : <>
         {!departments.length ? <p role="status" className="py-6 text-sm text-slate-600">{t('No departments found.')}</p> : <div className="overflow-x-auto"><table className="w-full text-left text-sm">

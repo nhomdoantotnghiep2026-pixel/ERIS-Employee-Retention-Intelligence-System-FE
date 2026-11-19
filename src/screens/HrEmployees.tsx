@@ -1,3 +1,4 @@
+import { Button as ListButton } from '../components/ui/button';
 import { useAutoDismissState } from '../hooks/useAutoDismissState';
 import { useEffect, useState, type FormEvent, type MouseEvent, type ReactNode } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
@@ -63,13 +64,14 @@ export default function HrEmployees() {
   const [departments, setDepartments] = useState<Array<{ id: number; name: string }>>([]);
   const [positions, setPositions] = useState<Array<{ id: number; name: string; code: string; jobLevel: number; departmentId?: number | null }>>([]);
   const [catalogError, setCatalogError] = useState('');
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [query, setQuery] = useState(''), [search, setSearch] = useState('');
   const [departmentId, setDepartmentId] = useState(''), [positionId, setPositionId] = useState('');
   const [status, setStatus] = useState('ACTIVE');
   const [draftDepartmentId, setDraftDepartmentId] = useState('');
   const [draftPositionId, setDraftPositionId] = useState('');
   const [draftStatus, setDraftStatus] = useState('ACTIVE');
-  const [filtersOpen, setFiltersOpen] = useState(false);
+  
   const [page, setPage] = useState(1), [total, setTotal] = useState(0), [pages, setPages] = useState(0);
   const [revision, setRevision] = useState(0), [loading, setLoading] = useState(true), [pending, setPending] = useState(false);
   const { error, message, setError, setMessage } = useAutoDismissFeedback();
@@ -412,7 +414,8 @@ export default function HrEmployees() {
           </motion.section>
         </div>
       </motion.form></MotionConfig>
-      : !showingRecord && !creating && <Card className="@container p-4 sm:p-5">
+      : !showingRecord && !creating && <Card className="@container p-5 sm:p-6">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3"><h2 className="text-lg font-bold text-slate-900">{text('Danh sách nhân viên', 'Employee list')}</h2><ListButton variant="outline" className="h-10 rounded-lg border-slate-200 bg-white px-4 text-slate-700 hover:bg-slate-50" disabled={pending} onClick={() => setRevision(v => v + 1)}>{text('Tải lại nhân viên', 'Reload employees')}</ListButton></div>
         <form className="mb-4" onSubmit={e => { e.preventDefault(); setPage(1); setSearch(query.trim()); setDepartmentId(draftDepartmentId); setPositionId(draftPositionId); setStatus(draftStatus); }}>
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
             <label className="relative min-w-0 flex-1">
@@ -421,11 +424,11 @@ export default function HrEmployees() {
               <input type="search" className={`${control} h-11 pl-10 pr-3`} value={query} maxLength={100} placeholder={text('Tìm tên, mã hoặc email', 'Search name, code or email')} onChange={e => setQuery(e.target.value)} />
             </label>
             <div className="grid grid-cols-2 gap-2 sm:flex sm:shrink-0">
-              <Button type="submit" className="w-full sm:w-auto"><Search size={15}/>{text('Tìm kiếm', 'Search')}</Button>
-              <Button type="button" variant="secondary" aria-expanded={filtersOpen} aria-controls="employee-advanced-filters" onClick={() => setFiltersOpen(open => !open)}>
+              <ListButton type="submit" className="h-11 w-full rounded-lg bg-orange-500 px-5 font-bold text-white hover:bg-orange-600 sm:w-auto"><Search size={15}/>{text('Tìm kiếm', 'Search')}</ListButton>
+              <ListButton type="button" variant="outline" className="h-11 rounded-lg border-slate-200 bg-white px-4 text-slate-700 hover:bg-slate-50" aria-expanded={filtersOpen} aria-controls="employee-advanced-filters" onClick={() => setFiltersOpen(open => !open)}>
                 <SlidersHorizontal size={15}/><span>{text('Bộ lọc', 'Filters')}</span>
                 {activeFilterCount > 0 && <span className="inline-flex min-w-5 items-center justify-center rounded-full bg-orange-100 px-1.5 py-0.5 text-xs font-bold text-orange-700">{activeFilterCount}</span>}
-              </Button>
+              </ListButton>
             </div>
           </div>
           {filtersOpen && <div id="employee-advanced-filters" className="mt-3 rounded-xl border border-slate-200 bg-slate-50/70 p-3 sm:p-4">
@@ -449,7 +452,7 @@ export default function HrEmployees() {
                 </select>
               </label>
             </div>
-            <div className="mt-3 flex justify-end"><Button type="submit" size="sm"><Search size={14}/>{text('Áp dụng bộ lọc', 'Apply filters')}</Button></div>
+            <div className="mt-3 flex justify-end"><ListButton type="submit" className="h-10 rounded-lg bg-orange-500 px-4 font-semibold text-white hover:bg-orange-600"><Search size={14}/>{text('Áp dụng bộ lọc', 'Apply filters')}</ListButton></div>
           </div>}
         </form>
         {activeFilterCount > 0 && <div className="mb-4 flex flex-wrap items-center gap-2" aria-label={text('Bộ lọc đang áp dụng', 'Applied filters')}>
@@ -460,9 +463,9 @@ export default function HrEmployees() {
           {status !== 'ACTIVE' && <AppliedFilter label={`${text('Trạng thái', 'Status')}: ${status === 'INACTIVE' ? text('Ngừng hoạt động', 'Inactive') : text('Tất cả', 'All')}`} onRemove={() => { setStatus('ACTIVE'); setDraftStatus('ACTIVE'); setPage(1); }}/>}
         </div>}
         {!error && <><div className="max-w-full overflow-x-auto"><table className="w-full min-w-[1220px] table-fixed whitespace-nowrap text-left text-sm"><colgroup><col className="w-[9%]"/><col className="w-[13%]"/><col className="w-[19%]"/><col className="w-[10%]"/><col className="w-[16%]"/><col className="w-[11%]"/><col className="w-[22%]"/></colgroup><thead className="bg-slate-50 text-slate-500"><tr>{[text('Mã nhân viên', 'Employee code'), text('Họ và tên', 'Full name'), 'Email', text('Phòng ban', 'Department'), text('Chức danh', 'Position'), text('Trạng thái', 'Status'), text('Thao tác', 'Actions')].map(h => <th key={h} scope="col" className="p-3">{h}</th>)}</tr></thead><tbody>
-          {rows.map(row => { const departmentName = departments.find(d => d.id === row.departmentId)?.name || '-'; const positionName = positions.find(p => p.id === row.positionId)?.name || '-'; return <tr key={row.id} className="border-b border-slate-100"><td className="p-3">{row.employeeCode}</td><td className="truncate p-3 font-medium" title={row.fullName}>{row.fullName}</td><td className="truncate p-3" title={row.email}>{row.email}</td><td className="truncate p-3" title={departmentName}>{departmentName}</td><td className="truncate p-3" title={positionName}>{positionName}</td><td className="p-3">{active(row.employmentStatus)}</td><td className="p-3"><div className="flex flex-nowrap items-center gap-2"><Link className="inline-flex h-9 shrink-0 items-center rounded-full border px-3 text-[13px] font-semibold text-orange-700 hover:border-orange-300 hover:bg-orange-50" to={'/employees/' + row.id}>{text('Xem chi tiết', 'View details')}</Link>{row.employmentStatus !== 'INACTIVE' && <Button size="sm" className="shrink-0" variant="secondary" disabled={pending} onClick={() => void deactivate(row)}>{text('Ngừng hoạt động', 'Deactivate')}</Button>}</div></td></tr>; })}
+          {rows.map(row => { const departmentName = departments.find(d => d.id === row.departmentId)?.name || '-'; const positionName = positions.find(p => p.id === row.positionId)?.name || '-'; return <tr key={row.id} className="border-b border-slate-100"><td className="p-3">{row.employeeCode}</td><td className="truncate p-3 font-medium" title={row.fullName}>{row.fullName}</td><td className="truncate p-3" title={row.email}>{row.email}</td><td className="truncate p-3" title={departmentName}>{departmentName}</td><td className="truncate p-3" title={positionName}>{positionName}</td><td className="p-3"><span className={'inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium ' + (row.employmentStatus === 'ACTIVE' ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-700')}><span aria-hidden="true" className={'size-1.5 rounded-full ' + (row.employmentStatus === 'ACTIVE' ? 'bg-emerald-500' : 'bg-slate-500')} />{active(row.employmentStatus)}</span></td><td className="p-3"><div className="flex flex-nowrap items-center gap-2"><Link className="inline-flex shrink-0 items-center rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-50" to={'/employees/' + row.id}>{text('Xem chi tiết', 'View details')}</Link>{row.employmentStatus !== 'INACTIVE' && <ListButton size="sm" variant="outline" className="h-auto shrink-0 rounded-lg border-red-100 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-600 transition-colors hover:bg-red-100 hover:text-red-600" disabled={pending} onClick={() => void deactivate(row)}>{text('Ngừng hoạt động', 'Deactivate')}</ListButton>}</div></td></tr>; })}
         </tbody></table>{!rows.length && <p className="py-8 text-center text-slate-500">{text('Không tìm thấy nhân viên.', 'No employees found.')}</p>}</div>
-        <div className="mt-5 flex flex-wrap items-center justify-between gap-3"><p className="text-sm text-slate-500">{text('Trang', 'Page')} {page} / {Math.max(1, pages)} · {total} {text('nhân viên', 'employees')}</p><div className="flex gap-3"><Button variant="secondary" disabled={page <= 1} onClick={() => setPage(p => p - 1)}>{text('Trang trước', 'Previous')}</Button><Button variant="secondary" disabled={page >= pages} onClick={() => setPage(p => p + 1)}>{text('Trang sau', 'Next')}</Button></div></div></>}
+        <div className="mt-5 flex flex-wrap items-center justify-between gap-3"><p className="text-sm text-slate-500">{text('Trang', 'Page')} {page} / {Math.max(1, pages)} · {total} {text('nhân viên', 'employees')}</p><div className="flex gap-3"><ListButton variant="outline" className="h-10 rounded-lg border-slate-200 bg-white px-4 text-slate-700 hover:bg-slate-50" disabled={page <= 1} onClick={() => setPage(p => p - 1)}>{text('Trang trước', 'Previous')}</ListButton><ListButton variant="outline" className="h-10 rounded-lg border-slate-200 bg-white px-4 text-slate-700 hover:bg-slate-50" disabled={page >= pages} onClick={() => setPage(p => p + 1)}>{text('Trang sau', 'Next')}</ListButton></div></div></>}
       </Card>}
     {showingRecord && detail && <EmployeeApiHistory employeeId={detail.id} employeeEmail={detail.email} dateOfBirth={detail.dateOfBirth} editable={editing && detail.employmentStatus === 'ACTIVE'} />}
     {showingRecord && detail && <CareerGoals employeeId={detail.id} />}
