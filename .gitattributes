@@ -149,3 +149,5 @@
 # These small PNG assets are served directly by Vite and included in production builds.
 /public/product-previews/*.png -filter -diff -merge -text
 /public/login-slides/*.png -filter -diff -merge -text
+/public/employee-import-template.xlsx -filter -diff -merge -text
+/public/employee-import-template-one-sheet.xlsx -filter -diff -merge -text

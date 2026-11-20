@@ -221,6 +221,7 @@ export interface SurveySummary {
   responseCount?: number;
   invitedCount?: number;
   participantCount?: number;
+  targetAudienceCount?: number;
 }
 
 export type SurveyQuestionType = 'TEXT' | 'SINGLE_CHOICE' | 'MULTIPLE_CHOICE' | 'RATING';
@@ -554,7 +555,7 @@ export async function listEmployeeProfiles(options: { page?: number; limit?: num
 export function getEmployeeProfile(id: number, signal?: AbortSignal) {
   return request<EmployeeProfile>(`/employees/${id}`, { signal });
 }
-export async function createEmployeeProfile(input: EmployeeInput) {
+export async function createEmployeeProfile(input: EmployeeInput & { employeeCode: string }) {
   return (await request<{ data: EmployeeProfile }>('/employees', { method: 'POST', body: JSON.stringify(input) })).data;
 }
 export async function updateEmployeeProfile(id: number, changes: EmployeeChanges) {
@@ -1100,6 +1101,29 @@ export interface EmployeeImportResponse {
   created: number;
   failed: number;
   results: EmployeeImportResult[];
+}
+
+export interface EmployeeImportIssue {
+  sheet?: string;
+  row?: number;
+  column?: string;
+  cell?: string;
+  field?: string;
+  message: string;
+}
+
+export interface EmployeeImportPreview {
+  total: number;
+  valid: number;
+  failed: number;
+  fileIssues?: EmployeeImportIssue[];
+  results: Array<{ row: number; status: 'VALID' | 'FAILED'; email?: string; message?: string; issue?: EmployeeImportIssue }>;
+}
+
+export function previewEmployeeImport(file: File) {
+  const body = new FormData();
+  body.append('file', file);
+  return request<EmployeeImportPreview>('/employees/import/preview', { method: 'POST', body });
 }
 
 export function importEmployees(file: File) {

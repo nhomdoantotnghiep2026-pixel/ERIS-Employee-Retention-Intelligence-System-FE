@@ -1,3 +1,4 @@
+import { useAutoDismissState } from '../hooks/useAutoDismissState';
 import { useMemo, useState, type FormEvent } from "react"
 import { Download, Info } from "lucide-react"
 import { Link } from "react-router-dom"
@@ -34,7 +35,7 @@ export default function AttendanceImport({ onImported, onBusyChange, activeShift
   const [ack, setAck] = useState(false)
   const [busy, setBusy] = useState(false)
   const [choicesDirty, setChoicesDirty] = useState(false)
-  const [error, setError] = useState("")
+  const [error, setError] = useAutoDismissState()
   const choiceList = useMemo(() => Object.values(choices).sort((a, b) => a.excel_row - b.excel_row), [choices])
   const isExcluded = (row: PreviewRow) => choices[row.excel_row]?.exclude ?? Boolean(row.excluded)
   const includedRows = preview?.rows.filter(row => !isExcluded(row)) || []
