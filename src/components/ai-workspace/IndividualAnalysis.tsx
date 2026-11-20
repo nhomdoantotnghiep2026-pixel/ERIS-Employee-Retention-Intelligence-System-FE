@@ -1,3 +1,4 @@
+import { useAutoDismissState } from '../../hooks/useAutoDismissState';
 import { useEffect, useRef, useState, type ReactNode } from "react"
 import {
   Activity,
@@ -115,7 +116,7 @@ export function IndividualAnalysis({
   const [savedResults, setSavedResults] = useState<AiPrediction[]>([])
   const [historyLoading, setHistoryLoading] = useState(false)
   const [historyError, setHistoryError] = useState("")
-  const [saveNotice, setSaveNotice] = useState("")
+  const [saveNotice, setSaveNotice] = useAutoDismissState()
   function rememberSaved(value: AiPrediction) {
     if (!value.saved || !value.predictionId) return;
     setSavedResults(current => [value, ...current.filter(item => item.predictionId !== value.predictionId)]
@@ -129,12 +130,6 @@ export function IndividualAnalysis({
   const historySeq = useRef(0)
   const headingRef = useRef<HTMLHeadingElement>(null)
   const openedInitialResult = useRef(false)
-
-  useEffect(() => {
-    if (!saveNotice) return
-    const timer = window.setTimeout(() => setSaveNotice(""), 4000)
-    return () => window.clearTimeout(timer)
-  }, [saveNotice])
 
   useEffect(() => {
     const api = apiRef.current

@@ -1,3 +1,4 @@
+import { useAutoDismissState } from '../hooks/useAutoDismissState';
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Eye, EyeOff, LockKeyhole, Mail, ShieldCheck } from 'lucide-react';
@@ -13,8 +14,8 @@ export default function ForgotPassword() {
   const [showPassword, setShowPassword] = useState(false);
   const [step, setStep] = useState<'email' | 'reset'>('email');
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState('');
-  const [message, setMessage] = useState('');
+  const [error, setError] = useAutoDismissState();
+  const [message, setMessage] = useAutoDismissState();
 
   async function sendOtp(event: React.FormEvent) {
     event.preventDefault(); setBusy(true); setError(''); setMessage('');

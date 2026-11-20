@@ -1,3 +1,4 @@
+import { useAutoDismissState } from '../hooks/useAutoDismissState';
 import { useEffect, useMemo, useState, type FormEvent } from "react"
 import { Button } from "./ui"
 import { useLanguage } from "../context/LanguageContext"
@@ -30,7 +31,7 @@ export default function AttendanceReconcile({ onSaved, onBusyChange }: Attendanc
   const [preview, setPreview] = useState<ReconcilePreview | null>(null)
   const [ack, setAck] = useState(false)
   const [busy, setBusy] = useState(false)
-  const [error, setError] = useState("")
+  const [error, setError] = useAutoDismissState()
 
   useEffect(() => {
     const controller = new AbortController()

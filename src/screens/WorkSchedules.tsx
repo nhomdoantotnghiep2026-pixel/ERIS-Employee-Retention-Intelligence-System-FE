@@ -1,3 +1,4 @@
+import { useAutoDismissState } from '../hooks/useAutoDismissState';
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { CalendarDays, ChevronDown, ChevronUp, MoreHorizontal, Plus, RefreshCw, SlidersHorizontal, UserRound, X } from 'lucide-react';
 import { AppShell } from '../components/AppShell';
@@ -97,8 +98,8 @@ export default function WorkSchedules() {
   const [loading, setLoading] = useState(true);
   const [assignmentLoading, setAssignmentLoading] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState('');
-  const [notice, setNotice] = useState('');
+  const [error, setError] = useAutoDismissState();
+  const [notice, setNotice] = useAutoDismissState();
   const [revision, setRevision] = useState(0);
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('ALL');
