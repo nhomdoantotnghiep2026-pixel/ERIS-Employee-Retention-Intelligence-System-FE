@@ -40,7 +40,7 @@ test('EMP FE uses camelCase queries, bare detail, partial PATCH and bodyless sof
       'graduationYear must be at least 2003 (minimum graduation age: 21 by year).',
     );
     response = Response.json({ data: record }, { status: 201 });
-    const input = { fullName: 'Test', email: 'test@eris.invalid', hireDate: '2025-01-01', departmentId: 1, positionId: 2 };
+    const input = { employeeCode: 'NV-001', fullName: 'Test', email: 'test@eris.invalid', hireDate: '2025-01-01', departmentId: 1, positionId: 2 };
     await api.createEmployeeProfile(input);
     assert.equal(calls.at(-1)!.init?.method, 'POST');
     assert.deepEqual(JSON.parse(String(calls.at(-1)!.init?.body)), input);
