@@ -20,9 +20,9 @@ import { createEmployeeProfile, deactivateEmployeeProfile, getEmployeeProfile, g
 const control = 'mt-1 w-full rounded-xl border border-slate-300 bg-white p-3 text-sm focus:outline-orange-500 disabled:bg-slate-100';
 const createControl = 'mt-1.5 h-12 w-full rounded-xl border border-slate-300 bg-white px-3.5 text-[15px] text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-orange-400 focus:ring-4 focus:ring-orange-100 disabled:cursor-not-allowed disabled:bg-slate-100';
 const EMPLOYEE_DRAFT_KEY = 'eris.employee-create-draft.v2';
-type Form = { fullName: string; email: string; hireDate: string; departmentId: string; positionId: string;
+type Form = { employeeCode: string; fullName: string; email: string; hireDate: string; departmentId: string; positionId: string;
   phone: string; dateOfBirth: string; gender: string; address: string; addressRefId: string; employmentType: string; currentSalary: string };
-const empty: Form = { fullName: '', email: '', hireDate: '', departmentId: '', positionId: '', phone: '', dateOfBirth: '', gender: '', address: '', addressRefId: '', employmentType: '', currentSalary: '' };
+const empty: Form = { employeeCode: '', fullName: '', email: '', hireDate: '', departmentId: '', positionId: '', phone: '', dateOfBirth: '', gender: '', address: '', addressRefId: '', employmentType: '', currentSalary: '' };
 const initialEducation: CreateEducationDraft = { id: 1, educationLevel: 'Bachelor', fieldOfStudy: '', graduationYear: '', institution: '', institutionRefId: '' };
 const createContainerMotion = { hidden: {}, visible: { transition: { staggerChildren: 0.07, delayChildren: 0.04 } } };
 const createItemMotion = {
@@ -31,6 +31,7 @@ const createItemMotion = {
 };
 const dateOnly = employeeDate;
 const toForm = (value: EmployeeProfile): Form => ({
+  employeeCode: value.employeeCode ?? '',
   fullName: value.fullName, email: value.email, hireDate: dateOnly(value.hireDate),
   departmentId: String(value.departmentId), positionId: String(value.positionId), phone: value.phone || '',
   dateOfBirth: dateOnly(value.dateOfBirth), gender: value.gender || '', address: value.address || '',
@@ -81,6 +82,9 @@ export default function HrEmployees() {
   const [revision, setRevision] = useState(0), [loading, setLoading] = useState(true), [pending, setPending] = useState(false);
   const { error, message, setError, setMessage } = useAutoDismissFeedback();
   const [emailError, setEmailError] = useAutoDismissState();
+  const [createValidationError, setCreateValidationError] = useState('');
+  const vietnamDate = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Ho_Chi_Minh' }).format(new Date());
+  const latestBirthDate = String(Number(vietnamDate.slice(0, 4)) - 18) + vietnamDate.slice(4);
 
   const jobDateRestriction = detail ? jobChangeDateRestriction(detail.hireDate) : null;
   const jobDateMessage = jobDateRestriction === 'future'
@@ -98,7 +102,7 @@ export default function HrEmployees() {
 
   useEffect(() => {
     const controller = new AbortController();
-    setError(''); setLoading(true); setDetail(null);
+    setError(''); setCreateValidationError(''); setLoading(true); setDetail(null);
     if (creating) {
       setSelectedPositionTitle('');
       try {
@@ -133,10 +137,36 @@ export default function HrEmployees() {
     return () => controller.abort();
   }, [creating, showingRecord, employeeId, page, search, departmentId, positionId, status, revision]);
 
-  async function save(event: FormEvent) {
+  async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (pending || (editing && !detail)) return;
     setError(''); setMessage(''); setEmailError('');
+    if (creating) {
+      const invalid = Array.from(event.currentTarget.elements).find(
+        (field): field is HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement =>
+          (field instanceof HTMLInputElement || field instanceof HTMLSelectElement || field instanceof HTMLTextAreaElement)
+          && field.willValidate && (!field.validity.valid || Boolean(field.dataset.validationError)),
+      );
+      if (invalid) {
+        const label = invalid.labels?.[0]?.firstChild?.textContent?.trim() || text('Trường này', 'This field');
+        const { validity } = invalid;
+        let reason = text('Giá trị chưa hợp lệ.', 'Enter a valid value.');
+        if (validity.valueMissing) reason = text('Vui lòng điền hoặc chọn giá trị.', 'Enter or select a value.');
+        else if (validity.typeMismatch && invalid instanceof HTMLInputElement && invalid.type === 'email') {
+          reason = text('Vui lòng nhập email đúng định dạng.', 'Enter a valid email address.');
+        } else if (validity.rangeOverflow && invalid instanceof HTMLInputElement && invalid.type === 'date') {
+          reason = text('Nhân viên phải đủ 18 tuổi.', 'The employee must be at least 18 years old.');
+        } else if ((validity.rangeUnderflow || validity.rangeOverflow) && invalid instanceof HTMLInputElement && invalid.min && invalid.max) {
+          reason = text('Vui lòng nhập giá trị từ ' + invalid.min + ' đến ' + invalid.max + '.', 'Enter a value from ' + invalid.min + ' to ' + invalid.max + '.');
+        } else if (validity.patternMismatch && invalid.dataset.patternError) {
+          reason = invalid.dataset.patternError;
+        } else if (validity.customError) reason = invalid.validationMessage;
+        setCreateValidationError(label + ' — ' + (invalid.dataset.validationError || reason));
+        invalid.focus();
+        return;
+      }
+      setCreateValidationError('');
+    }
     if (creating && educations.some(row => !row.institutionRefId)) {
       setError(text('Hãy chọn trường/cơ sở đào tạo từ danh sách gợi ý trước khi lưu.', 'Select every institution from the verified suggestions before saving.'));
       return;
@@ -188,13 +218,18 @@ export default function HrEmployees() {
           return;
         }
         saved = await updateEmployeeProfile(detail.id, changes);
-      } else saved = await createEmployeeProfile(input);
+      } else saved = await createEmployeeProfile({ ...input, employeeCode: form.employeeCode.trim() });
       if (creating) window.localStorage.removeItem(EMPLOYEE_DRAFT_KEY);
       setMessage(saved.emailDelivery === 'FAILED'
         ? text('Đã lưu hồ sơ và tài khoản nhưng gửi email thất bại. Không tạo lại; liên hệ quản trị viên để cấp mật khẩu tạm an toàn.', 'Profile and account saved, but email delivery failed. Do not create again; contact your administrator.')
         : text(editing ? 'Đã cập nhật nhân viên.' : 'Đã tạo nhân viên và tài khoản đăng nhập. Mật khẩu tạm được gửi qua email.', editing ? 'Employee updated.' : 'Employee and login account created. The temporary password is sent by email.'));
       setInlineEditing(false); navigate('/employees/' + saved.id, { replace: editing }); setRevision(value => value + 1);
     } catch (cause) {
+      if (creating && cause instanceof ApiError && cause.status === 409 &&
+        (cause.code === 'EMPLOYEE_CODE_EXISTS' || /employee_code already exists/i.test(cause.message))) {
+        setCreateValidationError(text('Mã nhân viên này đã tồn tại. Vui lòng nhập mã khác.', 'This employee code is already in use. Enter a different code.'));
+        return;
+      }
       if (creating && cause instanceof ApiError && (cause.code === 'EMAIL_EXISTS' ||
         (cause.status === 409 && /email.*(?:already|exists|in use)/i.test(cause.message)))) {
         setEmailError(text('Email này đã tồn tại trong hệ thống. Vui lòng nhập email khác.', 'This email is already in use. Please enter another email.'));
@@ -240,8 +275,10 @@ export default function HrEmployees() {
   const createField = (key: keyof Form, label: string, type = 'text', required = false, placeholder = '') => <label className="block text-sm font-semibold leading-5 text-slate-700">{requiredLabel(label, required)}
     <input className={createControl} type={type} required={required} value={form[key]} disabled={pending || (editing && ownProfile && key !== 'phone')} placeholder={placeholder}
       autoComplete={key === 'email' ? 'email' : key === 'phone' ? 'tel' : key === 'fullName' ? 'name' : undefined}
-      maxLength={key === 'fullName' ? 150 : key === 'phone' ? 30 : key === 'email' ? 255 : undefined}
-      min={type === 'number' ? '0.01' : undefined} step={type === 'number' ? '0.01' : undefined}
+      maxLength={key === 'employeeCode' ? 50 : key === 'fullName' ? 150 : key === 'phone' ? 30 : key === 'email' ? 255 : undefined}
+      pattern={key === 'employeeCode' ? '[A-Za-z0-9][A-Za-z0-9_\\-]{0,49}' : undefined}
+      data-pattern-error={key === 'employeeCode' ? text('Nhập mã bắt đầu bằng chữ hoặc số, chỉ dùng chữ, số, dấu gạch dưới hoặc gạch nối.', 'Start with a letter or digit and use only letters, digits, underscores or hyphens.') : undefined}
+      min={type === 'number' ? '0.01' : undefined} max={creating && key === 'dateOfBirth' ? latestBirthDate : undefined} step={type === 'number' ? '0.01' : undefined}
       aria-invalid={key === 'email' && Boolean(emailError)} aria-describedby={key === 'email' && emailError ? 'employee-email-error' : undefined}
       onChange={event => { if (key === 'email') setEmailError(''); setForm(value => ({ ...value, [key]: event.target.value })); }} />
     {key === 'email' && emailError && <span id="employee-email-error" role="alert" className="mt-1.5 block text-xs font-medium text-red-600">{t(emailError)}</span>}
@@ -323,12 +360,12 @@ export default function HrEmployees() {
     {catalogError && <p role="alert" className="mb-5 rounded-xl bg-red-50 p-4">{t(catalogError)}<Button variant="secondary" onClick={() => setRevision(v => v + 1)}>{text('Thử lại', 'Retry')}</Button></p>}
     {error && <p role="alert" className="mb-5 rounded-xl bg-red-50 p-4 text-red-800">{t(error)}<Button variant="secondary" onClick={() => setRevision(v => v + 1)}>{text('Thử lại', 'Retry')}</Button></p>}
     {loading ? <Card className="p-6"><p role="status">{text('Đang tải nhân viên...', 'Loading employees...')}</p></Card>
-      : creating ? <MotionConfig reducedMotion="user"><motion.form onSubmit={save} initial="hidden" animate="visible" variants={createContainerMotion} className="grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_300px]">
+      : creating ? <MotionConfig reducedMotion="user"><motion.form noValidate onChange={() => setCreateValidationError('')} onSubmit={save} initial="hidden" animate="visible" variants={createContainerMotion} className="grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_300px]">
         <fieldset disabled={pending} className="min-w-0 space-y-5 border-0 p-0">
           <motion.div variants={createItemMotion}><Card className="border-orange-100 bg-gradient-to-r from-orange-50/80 to-white p-5 transition-shadow duration-300 hover:shadow-[0_14px_36px_rgba(249,115,22,0.10)] sm:p-6">
             <div className="flex items-start gap-3"><span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-white text-orange-600 shadow-sm ring-1 ring-orange-100"><CheckCircle2 size={20} aria-hidden="true" /></span>
               <div><h2 className="text-lg font-semibold text-slate-950">{text('Tạo hồ sơ nhân viên đầy đủ', 'Create a complete employee profile')}</h2>
-                <p className="mt-1 text-sm leading-6 text-slate-600">{text('Mã nhân viên được tự sinh. Dữ liệu đang nhập được lưu tạm trên trình duyệt.', 'The employee code is generated automatically. Your draft is saved in this browser.')}</p>
+                <p className="mt-1 text-sm leading-6 text-slate-600">{text('Dữ liệu đang nhập được lưu tạm trên trình duyệt.', 'Your draft is saved in this browser.')}</p>
                 <p className="mt-2 text-sm font-medium text-slate-700">{text('Trường có', 'Fields marked')} <span className="font-bold text-red-600">*</span>{text(' là bắt buộc.', ' are required.')}</p></div>
             </div>
           </Card></motion.div>
@@ -338,6 +375,7 @@ export default function HrEmployees() {
               <div><p className="text-xs font-bold uppercase tracking-[0.12em] text-orange-600">01</p><h3 className="mt-1 text-lg font-semibold text-slate-950">{text('Thông tin cá nhân', 'Personal information')}</h3><p className="mt-1 text-sm leading-6 text-slate-500">{text('Thông tin để tạo hồ sơ và tài khoản đăng nhập.', 'Profile and sign-in account information.')}</p></div>
             </div>
             <div className="grid gap-4 md:grid-cols-2">
+              {createField('employeeCode', text('Mã nhân viên', 'Employee code'), 'text', true, 'NV-001')}
               {createField('fullName', text('Họ và tên', 'Full name'), 'text', true, text('Nguyễn Văn A', 'Nguyen Van A'))}
               {createField('email', 'Email', 'email', true, 'nhanvien@congty.com')}
               {createField('phone', text('Số điện thoại', 'Phone'), 'tel', true, '0901234567')}
@@ -383,7 +421,7 @@ export default function HrEmployees() {
           <Card className="p-5 sm:p-6"><p className="text-xs font-bold uppercase tracking-[0.12em] text-orange-600">{text('Trước khi lưu', 'Before saving')}</p><h2 className="mt-2 text-lg font-semibold text-slate-950">{text('Hồ sơ nhân viên mới', 'New employee profile')}</h2>
             <ol className="mt-4 space-y-3 text-sm leading-6 text-slate-600"><li className="flex gap-2"><span className="font-bold text-orange-600">1.</span>{text('Hồ sơ và tài khoản chờ kích hoạt qua email.', 'Profile and account wait for email activation.')}</li><li className="flex gap-2"><span className="font-bold text-orange-600">2.</span>{text('Học vấn được lưu cùng hồ sơ.', 'Education is saved with the profile.')}</li><li className="flex gap-2"><span className="font-bold text-orange-600">3.</span>{text('Quãng đường được tính khi tạo.', 'Commute distance is calculated on creation.')}</li></ol>
             <div className="my-5 border-t border-slate-200" /><dl className="space-y-3 text-sm"><div><dt className="text-slate-500">{text('Phòng ban', 'Department')}</dt><dd className="mt-1 font-semibold text-slate-900">{departments.find(item => String(item.id) === form.departmentId)?.name || text('Chưa chọn', 'Not selected')}</dd></div><div><dt className="text-slate-500">{text('Học vấn', 'Education')}</dt><dd className="mt-1 font-semibold tabular-nums text-slate-900">{educations.length}</dd></div></dl>
-            <div className="mt-6 grid gap-2"><Button disabled={pending || !!catalogError}>{text(pending ? 'Đang xác minh và lưu...' : 'Tạo hồ sơ nhân viên', pending ? 'Verifying and saving...' : 'Create employee profile')}</Button><Button type="button" variant="secondary" onClick={() => navigate('/employees')}>{text('Hủy', 'Cancel')}</Button></div>
+            <div className="mt-6 grid gap-2">{createValidationError && <p role="alert" className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-800">{createValidationError}</p>}<Button disabled={pending || !!catalogError}>{text(pending ? 'Đang xác minh và lưu...' : 'Tạo hồ sơ nhân viên', pending ? 'Verifying and saving...' : 'Create employee profile')}</Button><Button type="button" variant="secondary" onClick={() => navigate('/employees')}>{text('Hủy', 'Cancel')}</Button></div>
           </Card>
         </motion.aside>
       </motion.form></MotionConfig>

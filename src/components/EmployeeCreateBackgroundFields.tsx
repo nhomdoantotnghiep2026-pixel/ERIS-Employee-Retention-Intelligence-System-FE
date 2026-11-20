@@ -100,11 +100,17 @@ function EducationCard({ value, index, dateOfBirth, disabled, removable, text, o
 
   const query = value.institution.trim();
 
+  const currentYear = Number(new Intl.DateTimeFormat('en', { timeZone: 'Asia/Ho_Chi_Minh', year: 'numeric' }).format(new Date()));
   const minimumGraduationYear = dateOfBirth && /^\d{4}-\d{2}-\d{2}$/.test(dateOfBirth)
 
-    ? Number(dateOfBirth.slice(0, 4)) + (value.educationLevel === 'High School' ? 18 : 21)
+    ? Math.max(1900, Number(dateOfBirth.slice(0, 4)) + (value.educationLevel === 'High School' ? 18 : 21))
 
     : 1900;
+  const graduationRangeAvailable = minimumGraduationYear <= currentYear;
+  const graduationRangeError = text(
+    'Chưa có năm tốt nghiệp hợp lệ cho ngày sinh và trình độ đã chọn. Hãy kiểm tra lại hoặc để trống năm tốt nghiệp.',
+    'No graduation year fits the selected date of birth and education level. Check those fields or leave the graduation year blank.',
+  );
 
 
 
@@ -182,15 +188,16 @@ function EducationCard({ value, index, dateOfBirth, disabled, removable, text, o
 
       <label className={labelClass}>{text('Năm tốt nghiệp', 'Graduation year')}
 
-        <input type="number" min={minimumGraduationYear} max={new Date().getFullYear()} className={inputClass}
+        <input type="number" min={graduationRangeAvailable ? minimumGraduationYear : undefined} max={currentYear} className={inputClass}
 
-          value={value.graduationYear} disabled={disabled} placeholder={String(new Date().getFullYear())}
+          value={value.graduationYear} disabled={disabled} placeholder={graduationRangeAvailable ? String(currentYear) : undefined}
+          data-validation-error={!graduationRangeAvailable && value.graduationYear ? graduationRangeError : undefined}
 
           onChange={event => onChange({ ...value, graduationYear: event.target.value })} />
 
         <span className="mt-1.5 block text-xs font-normal leading-5 text-slate-500">
 
-          {text(`Từ ${minimumGraduationYear} đến năm hiện tại.`, `From ${minimumGraduationYear} to the current year.`)}
+          {graduationRangeAvailable ? text(`Từ ${minimumGraduationYear} đến năm hiện tại.`, `From ${minimumGraduationYear} to the current year.`) : graduationRangeError}
 
         </span>
 
