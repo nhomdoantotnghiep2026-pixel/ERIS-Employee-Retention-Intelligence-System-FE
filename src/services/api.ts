@@ -1121,3 +1121,5 @@ export const updateWorkSchedule = (id: number, input: Partial<WorkScheduleInput>
 export const listScheduleAssignments = (employeeId: number) => request<{data: ScheduleAssignment[]}>('/employees/' + employeeId + '/schedule-assignments', {cache: 'no-store'});
 export const assignWorkSchedule = (employeeId: number, input: {work_schedule_id: number}) => request('/employees/' + employeeId + '/work-schedule', {method: 'PUT', body: JSON.stringify(input)});
 export const deleteScheduleAssignment = (employeeId: number, id: number) => request('/employees/' + employeeId + '/schedule-assignments/' + id, {method: 'DELETE'});
+
+export const downloadEmployeeImportTemplate = () => request<Blob>('/employees/import/template', { cache: 'no-store' }, undefined, 'blob');

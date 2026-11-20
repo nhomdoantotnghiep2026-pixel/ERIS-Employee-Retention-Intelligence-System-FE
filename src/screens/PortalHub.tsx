@@ -35,7 +35,7 @@ const portalFeatures = [
   },
   {
     title: 'Work schedules',
-    description: 'Create schedule templates and assign working schedules to employees.',
+    description: 'Define shift codes and hours to validate imported employee and attendance records.',
     to: '/work-schedules',
     icon: CalendarDays,
     color: 'bg-amber-100 text-amber-700',

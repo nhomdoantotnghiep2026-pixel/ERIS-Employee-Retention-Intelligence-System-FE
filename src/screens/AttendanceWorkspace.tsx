@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom"
 import {
   BarChart3,
   CalendarRange,
+  Download,
   HelpCircle,
   Inbox,
   RotateCcw,
@@ -12,6 +13,7 @@ import {
 } from "lucide-react"
 import { AppShell } from "../components/AppShell"
 import { Button, Card, SectionHeader } from "../components/ui"
+import { downloadAttendanceTemplate } from "../utils/attendanceTemplate"
 import AttendanceImport from "../components/AttendanceImport"
 import AttendanceReconcile from "../components/AttendanceReconcile"
 import { useLanguage } from "../context/LanguageContext"
@@ -244,12 +246,17 @@ export default function AttendanceWorkspace({
                 {tr("Đối soát nghỉ và ngày lễ", "Reconcile leave and holidays")}
               </Button>
             </span>
+            <Button type="button" variant="secondary" onClick={downloadAttendanceTemplate} className="hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900">
+              <Download size={16} aria-hidden="true" />
+              {tr("Tải tệp mẫu", "Download template")}
+            </Button>
             <span
               className="inline-flex"
               title={scheduleCheck === "missing" ? tr("Cần tạo ít nhất một ca đang hoạt động trước khi nhập.", "Create at least one active schedule before importing.") : undefined}
             >
             <Button
               type="button"
+
               disabled={scheduleCheck === "loading" || scheduleCheck === "missing"}
               onClick={() => setImportOpen(true)}
             >
@@ -744,6 +751,18 @@ export default function AttendanceWorkspace({
                         "Use Import attendance file to start collecting data.",
                       )}
                 </p>
+                {!own && hasAnyRecords === false && (
+                  <div className="mt-5 flex flex-wrap items-center justify-center gap-3">
+                    <Button type="button" disabled={scheduleCheck === "loading" || scheduleCheck === "missing"} onClick={() => setImportOpen(true)}>
+                      <Upload size={16} aria-hidden="true" />
+                      {tr("Nhập tệp chấm công", "Import attendance file")}
+                    </Button>
+                    <Button type="button" variant="secondary" onClick={downloadAttendanceTemplate} className="hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900">
+                      <Download size={16} aria-hidden="true" />
+                      {tr("Tải tệp mẫu", "Download template")}
+                    </Button>
+                  </div>
+                )}
               </div>
             )}
           </>

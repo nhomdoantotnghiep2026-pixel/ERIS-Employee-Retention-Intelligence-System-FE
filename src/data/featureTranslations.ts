@@ -18,7 +18,7 @@ export const featureVietnamese: Record<string, string> = {
   'Explore retention policies and recommendations created from prediction results.': 'Khám phá chính sách giữ chân và đề xuất được tạo từ kết quả dự đoán.',
   'Create surveys, publish them and review employee responses.': 'Tạo, phát hành khảo sát và xem phản hồi của nhân viên.',
   'Review leave requests, cancellations and approval history.': 'Xem đơn nghỉ phép, yêu cầu hủy và lịch sử phê duyệt.',
-  'Create schedule templates and assign working schedules to employees.': 'Tạo mẫu lịch và phân công lịch làm việc cho nhân viên.',
+  'Define shift codes and hours to validate imported employee and attendance records.': 'Định nghĩa mã ca và giờ làm để đối chiếu hồ sơ nhân sự, chấm công nhập vào.',
   'AI analysis': 'Phân tích AI',
   'Create a work schedule': 'Tạo lịch làm việc',
   'Assign current schedule': 'Gán lịch hiện tại',

@@ -1,20 +1,14 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
-import { CalendarDays, ChevronDown, ChevronUp, MoreHorizontal, Plus, RefreshCw, SlidersHorizontal, UserRound, X } from 'lucide-react';
+import { ChevronDown, ChevronUp, MoreHorizontal, Plus, RefreshCw, SlidersHorizontal, X } from 'lucide-react';
 import { AppShell } from '../components/AppShell';
 import ScheduleImportSettings from '../components/ScheduleImportSettings';
 import { Button, Card, SectionHeader } from '../components/ui';
 import { useLanguage } from '../context/LanguageContext';
 import {
-  assignWorkSchedule,
   createWorkSchedule,
-  deleteScheduleAssignment,
   getApiErrorMessage,
-  listEmployeeProfiles,
-  listScheduleAssignments,
   listWorkSchedules,
   updateWorkSchedule,
-  type EmployeeProfile,
-  type ScheduleAssignment,
   type WorkSchedule,
   type WorkScheduleInput,
 } from '../services/api';
@@ -87,15 +81,10 @@ export default function WorkSchedules() {
   const { language } = useLanguage();
   const tr = (vi: string, en: string) => language === 'vi' ? vi : en;
   const [schedules, setSchedules] = useState<WorkSchedule[]>([]);
-  const [employees, setEmployees] = useState<EmployeeProfile[]>([]);
-  const [assignments, setAssignments] = useState<ScheduleAssignment[]>([]);
-  const [employeeId, setEmployeeId] = useState('');
-  const [scheduleId, setScheduleId] = useState('');
   const [form, setForm] = useState<WorkScheduleInput>(initialSchedule);
   const [createOpen, setCreateOpen] = useState(false);
   const [metadata, setMetadata] = useState<WorkSchedule | null>(null);
   const [loading, setLoading] = useState(true);
-  const [assignmentLoading, setAssignmentLoading] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
@@ -136,31 +125,16 @@ export default function WorkSchedules() {
   useEffect(() => {
     let active = true;
     setLoading(true);
-    Promise.all([listWorkSchedules(), listEmployeeProfiles({ limit: 100 })])
-      .then(([scheduleResult, employeeResult]) => {
+    listWorkSchedules()
+      .then((scheduleResult) => {
         if (!active) return;
         setSchedules(scheduleResult.data);
-        setEmployees(employeeResult.data);
       })
       .catch(reason => active && setError(getApiErrorMessage(reason, tr('Không thể tải dữ liệu lịch làm việc.', 'Unable to load work schedule data.'))))
       .finally(() => active && setLoading(false));
     return () => { active = false; };
   }, [revision, language]);
 
-  useEffect(() => {
-    if (!employeeId) { setAssignments([]); return; }
-    let active = true;
-    setAssignmentLoading(true);
-    listScheduleAssignments(Number(employeeId))
-      .then(result => active && setAssignments(result.data))
-      .catch(reason => active && setError(getApiErrorMessage(reason, tr('Không thể tải lịch hiện tại của nhân viên.', 'Unable to load the employee current schedule.'))))
-      .finally(() => active && setAssignmentLoading(false));
-    return () => { active = false; };
-  }, [employeeId, revision, language]);
-
-  const current = assignments[0] ?? null;
-  const sameSchedule = Boolean(current && scheduleId && current.work_schedule_id === Number(scheduleId));
-  const activeSchedules = schedules.filter(item => item.status === 'ACTIVE');
   const visibleSchedules = useMemo(() => schedules.filter(item => {
     const query = search.trim().toLowerCase();
     return (!query || item.name.toLowerCase().includes(query) || (item.shift_type || '').toLowerCase().includes(query))
@@ -202,7 +176,7 @@ export default function WorkSchedules() {
   }).join(', ');
 
   return <AppShell breadcrumb={['Work schedules']}>
-    <SectionHeader title={tr('Quản lý lịch làm việc', 'Work schedule management')} description={tr('Chọn nhân viên, xem lịch hiện tại và gán lịch phù hợp.', 'Select an employee, review the current schedule and assign the right one.')}>
+    <SectionHeader title={tr('Danh mục ca làm việc', 'Work schedule catalogue')} description={tr('Định nghĩa ca để đối chiếu hồ sơ nhập. Mã ca của nhân viên được thu thập trong file hồ sơ nhân sự.', 'Define shifts for import validation. Employee shift codes are collected in employee profile imports.')}>
       <Button onClick={() => { setError(''); setCreateOpen(true); }}><Plus size={16} />{tr('Tạo lịch mới', 'Create schedule')}</Button>
     </SectionHeader>
 
@@ -211,43 +185,7 @@ export default function WorkSchedules() {
 
     {metadata && <div className="mb-5"><ScheduleImportSettings schedule={metadata} onClose={() => setMetadata(null)} onSaved={() => { setMetadata(null); setRevision(value => value + 1); }} /></div>}
 
-    <div className="grid gap-5 xl:grid-cols-[minmax(340px,0.85fr)_minmax(0,1.5fr)] xl:items-start">
-    <Card className="h-fit min-w-0 p-5 sm:p-6">
-      <div className="flex items-start gap-3">
-        <span className="rounded-xl bg-orange-50 p-2.5 text-orange-600"><UserRound size={22} /></span>
-        <div><h2 className="font-bold text-slate-900">{tr('Gán lịch cho nhân viên', 'Assign an employee schedule')}</h2><p className="mt-1 text-sm leading-6 text-slate-600">{tr('Lịch mới có hiệu lực ngay sau khi xác nhận.', 'The new schedule takes effect immediately after confirmation.')}</p></div>
-      </div>
-      <div className="mt-5 max-w-2xl">
-        <label className="text-sm font-semibold text-slate-700">{tr('1. Chọn nhân viên', '1. Select an employee')}
-          <select className={fieldClass} value={employeeId} onChange={event => { setEmployeeId(event.target.value); setScheduleId(''); setNotice(''); }}>
-            <option value="">{tr('Chọn nhân viên', 'Select an employee')}</option>
-            {employees.map(item => <option key={item.id} value={item.id}>{item.employeeCode} · {item.fullName}</option>)}
-          </select>
-        </label>
-      </div>
-
-      {employeeId && <div className="mt-5 border-t border-slate-100 pt-5">
-        <div className="max-w-2xl rounded-2xl border border-slate-200 bg-slate-50 p-4">
-          {assignmentLoading ? <p className="text-sm text-slate-600">{tr('Đang tải lịch hiện tại...', 'Loading current schedule...')}</p>
-            : current ? <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><div><p className="text-xs font-bold uppercase tracking-wide text-slate-500">{tr('Lịch hiện tại', 'Current schedule')}</p><p className="mt-1 font-bold text-slate-900">{current.name}</p><p className="mt-1 text-sm text-slate-600">{current.start_time}–{current.end_time} · {dayNames(current.working_days)}</p></div><span className="w-fit rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700">{tr('Đang áp dụng', 'Current')}</span></div>
-            : <p className="text-sm text-slate-600">{tr('Nhân viên này chưa được gán lịch làm việc.', 'This employee does not have a work schedule yet.')}</p>}
-          {current && !assignmentLoading && <details className="mt-3"><summary className="cursor-pointer list-none text-sm font-semibold text-slate-600 hover:text-orange-700">{tr('Tùy chọn khác', 'More options')}</summary><div className="mt-2"><Button variant="danger" size="sm" disabled={busy} onClick={() => run(() => deleteScheduleAssignment(Number(employeeId), current.work_schedule_id), tr('Đã gỡ lịch khỏi nhân viên.', 'Schedule removed from employee.'))}>{tr('Gỡ lịch hiện tại', 'Remove current schedule')}</Button></div></details>}
-        </div>
-
-        {!assignmentLoading && <div className="mt-5 max-w-2xl">
-          <label className="text-sm font-semibold text-slate-700">{tr('2. Chọn lịch muốn áp dụng', '2. Select a schedule to apply')}
-            <select className={fieldClass} value={scheduleId} onChange={event => setScheduleId(event.target.value)}>
-              <option value="">{tr('Chọn lịch làm việc', 'Select a work schedule')}</option>
-              {activeSchedules.map(item => <option key={item.id} value={item.id}>{item.name}{current?.work_schedule_id === item.id ? ` · ${tr('Đang áp dụng', 'Current')}` : ''}</option>)}
-            </select>
-          </label>
-          {scheduleId && <div className="mt-4"><Button disabled={sameSchedule || busy} onClick={() => run(() => assignWorkSchedule(Number(employeeId), { work_schedule_id: Number(scheduleId) }), tr('Đã cập nhật lịch cho nhân viên.', 'Employee schedule updated.'))}>
-            <CalendarDays size={16} />{sameSchedule ? tr('Đang áp dụng', 'Current schedule') : current ? tr('Thay lịch', 'Change schedule') : tr('Gán lịch', 'Assign schedule')}
-          </Button></div>}
-        </div>}
-      </div>}
-    </Card>
-
+    <div className="space-y-5">
     <Card className="min-w-0 p-5 sm:p-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><div><h2 className="font-bold text-slate-900">{tr('Danh sách lịch làm việc', 'Work schedule list')}</h2><p className="mt-1 text-sm text-slate-600">{tr(`${visibleSchedules.length} lịch`, `${visibleSchedules.length} schedules`)}</p></div><div className="flex flex-wrap gap-2"><Button variant="secondary" size="sm" disabled={loading} onClick={() => setRevision(value => value + 1)}><RefreshCw size={15} />{tr('Tải lại', 'Refresh')}</Button><Button variant="secondary" size="sm" onClick={() => setListOpen(value => !value)}>{listOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}{listOpen ? tr('Ẩn danh sách', 'Hide list') : tr('Hiện danh sách', 'Show list')}</Button></div></div>
 

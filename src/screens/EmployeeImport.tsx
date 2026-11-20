@@ -1,10 +1,10 @@
 import { useRef, useState, type DragEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { AlertTriangle, ArrowLeft, Check, FileCheck2, FileSpreadsheet, UploadCloud, X } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, Check, Download, FileCheck2, FileSpreadsheet, UploadCloud, X } from 'lucide-react';
 import { AppShell } from '../components/AppShell';
 import { Card } from '../components/ui';
 import { Button } from '../components/ui/button';
-import { importEmployees, getApiErrorMessage, type EmployeeImportResponse } from '../services/api';
+import { downloadEmployeeImportTemplate, importEmployees, getApiErrorMessage, type EmployeeImportResponse } from '../services/api';
 import { useLanguage } from '../context/LanguageContext';
 import { useAutoDismissFeedback } from '../hooks/useAutoDismissState';
 
@@ -19,6 +19,15 @@ export default function EmployeeImport() {
   const { error, message, setError, setMessage } = useAutoDismissFeedback();
   const [result, setResult] = useState<EmployeeImportResponse | null>(null);
 
+  async function downloadTemplate() {
+    try {
+      const blob = await downloadEmployeeImportTemplate()
+      const url = URL.createObjectURL(blob), link = document.createElement('a')
+      link.href = url; link.download = 'ERIS_Employee_Import_Template.xlsx'
+      document.body.appendChild(link); link.click(); link.remove()
+      setTimeout(() => URL.revokeObjectURL(url), 1000)
+    } catch (cause) { setError(getApiErrorMessage(cause, text('Không tải được mẫu hồ sơ.', 'Could not download employee template.'))) }
+  }
   function selectFile(nextFile: File | null) {
     setMessage('');
     setError('');
@@ -85,6 +94,7 @@ export default function EmployeeImport() {
         </Button>
       </header>
 
+      <div className="mb-5 flex flex-wrap items-center gap-3 rounded-md border border-slate-200 bg-white p-4"><Button type="button" variant="outline" onClick={() => void downloadTemplate()}><Download size={16}/>{text('Tải tệp mẫu', 'Download template')}</Button><p className="text-sm text-slate-600">{text('Điền shift_type (ví dụ GENERAL) của ca ACTIVE đã có. Hệ thống tự tra ID ca. Không cần gán ca riêng sau import.', 'Include an existing ACTIVE shift_type (e.g. GENERAL). The server resolves its ID. No separate assignment is needed after import.')}</p></div>
       <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_340px]">
         <Card className="p-5 sm:p-7">
           <div
