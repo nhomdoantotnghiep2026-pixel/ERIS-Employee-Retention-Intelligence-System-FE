@@ -59,3 +59,47 @@ test("the profile save toggle runs prediction directly without a broken confirma
   assert.match(source, /type="button"[\s\S]*role="switch"/)
   assert.doesNotMatch(source, /className="peer sr-only"/)
 })
+
+test("individual analysis fixes the current employee data and waits for an explicit history selection", async () => {
+  const analysis = await readFile(new URL("../src/components/ai-workspace/IndividualAnalysis.tsx", import.meta.url), "utf8")
+  const dashboard = await readFile(new URL("../src/components/ai-workspace/EmployeePredictionDashboard.tsx", import.meta.url), "utf8")
+
+  assert.doesNotMatch(analysis, /aria-label="Bản dữ liệu"/)
+  assert.doesNotMatch(analysis, /Chọn nhân viên và bản dữ liệu/)
+  assert.doesNotMatch(analysis, /Bản ghi #\{snapshot\.snapshotId\}/)
+  assert.match(analysis, /const previewResponse = await apiRef\.current\.preview\(employeeId, \{\}\)/)
+  assert.doesNotMatch(analysis, /const latest = ordered\[0\][\s\S]*setResult\(latest\)/)
+  assert.match(dashboard, /history\.length\s*\? "Chọn phiên đánh giá"/)
+  assert.match(dashboard, /state === "idle"[\s\S]*<HistoryToolbar/)
+  assert.match(dashboard, /Chọn nhân viên và bấm Đánh giá mức độ gắn kết để bắt đầu/)
+})
+
+test("employee profile validation is presented as an HR data warning", async () => {
+  const source = await readFile(new URL("../src/components/ai-workspace/IndividualAnalysis.tsx", import.meta.url), "utf8")
+
+  assert.match(source, /Hồ sơ nhân viên còn thiếu thông tin/)
+  assert.match(source, /Nhân viên chưa có ngày vào làm hợp lệ/)
+  assert.match(source, /const profileMessage = formatProfileDataIssue\(message\)/)
+  assert.match(source, /setMobileTab\("data"\)[\s\S]*setDataNoticeTone\("warning"\)/)
+  assert.match(source, /setEmployeeId\(id\)[\s\S]*setDataError\(""\)/)
+})
+
+test("missing promotion and yearly metrics use HR-friendly display values", async () => {
+  const source = await readFile(new URL("../src/components/ai-workspace/IndividualAnalysis.tsx", import.meta.url), "utf8")
+
+  assert.match(source, /formatNumber\(f\.Promotions, 0\)/)
+  assert.match(source, /Tăng ca từ đầu năm/)
+  assert.match(source, /Vắng mặt từ đầu năm/)
+  assert.doesNotMatch(source, /Tăng ca YTD|Vắng mặt YTD/)
+  assert.match(source, /Thâm niên chưa cập nhật/)
+})
+
+test("a selected employee remains identified when current profile data is incomplete", async () => {
+  const source = await readFile(new URL("../src/components/ai-workspace/IndividualAnalysis.tsx", import.meta.url), "utf8")
+
+  assert.match(source, /const selectedEmployee = snapshot\?\.employee \?\? employee/)
+  assert.match(source, /selectedEmployee\?\.fullName \|\| "Chưa chọn nhân viên"/)
+  assert.match(source, /selectedEmployee\?\.employeeCode/)
+  assert.match(source, /employeeId[\s\S]*"missing"/)
+  assert.match(source, /Cập nhật các thông tin còn thiếu trong hồ sơ nhân viên/)
+})

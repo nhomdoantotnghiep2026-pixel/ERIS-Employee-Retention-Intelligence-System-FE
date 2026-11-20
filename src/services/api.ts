@@ -221,6 +221,7 @@ export interface SurveySummary {
   responseCount?: number;
   invitedCount?: number;
   participantCount?: number;
+  targetAudienceCount?: number;
 }
 
 export type SurveyQuestionType = 'TEXT' | 'SINGLE_CHOICE' | 'MULTIPLE_CHOICE' | 'RATING';
