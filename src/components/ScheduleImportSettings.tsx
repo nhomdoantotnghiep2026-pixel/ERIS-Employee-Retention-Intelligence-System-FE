@@ -1,3 +1,4 @@
+import { useAutoDismissState } from '../hooks/useAutoDismissState';
 import { useState, type FormEvent } from "react"
 import { Button, Card } from "./ui"
 import { useLanguage } from "../context/LanguageContext"
@@ -28,7 +29,7 @@ export default function ScheduleImportSettings({
       ...schedule.attendance_policy,
     }),
     [busy, setBusy] = useState(false),
-    [error, setError] = useState("")
+    [error, setError] = useAutoDismissState()
   const fields = [
     [
       "early_arrival_minutes",

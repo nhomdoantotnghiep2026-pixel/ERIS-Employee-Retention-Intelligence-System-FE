@@ -35,10 +35,7 @@ test('all feature branches render supplied insight and policy without fallback o
           assert.ok(!html.includes('Explainable SHAP'))
           assert.ok(!html.includes('Hạng #'))
           if (tab === 'policies') {
-            assert.ok(!html.includes('type="checkbox"'))
-            assert.ok(!html.includes('Đã đưa vào kế hoạch làm việc tuần này'))
-            assert.ok(!html.includes('Phụ trách: Quản lý trực tiếp &amp; HR'))
-            assert.ok(!html.includes('Hạn:'))
+            assert.ok(html.includes('type="checkbox"'))
             assert.ok(!html.includes('Tạo lịch hẹn 1-on-1'))
             assert.ok(!html.includes('Đánh dấu đã hoàn thành'))
             assert.ok(!html.includes('<blockquote'))

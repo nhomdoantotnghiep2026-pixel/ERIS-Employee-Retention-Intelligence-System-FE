@@ -173,21 +173,7 @@ export const EmployeePredictionDashboard = forwardRef<
         </div>
 
         <div hidden={activeTab !== 0}>
-          {state === "idle" && (
-            <div className="space-y-5">
-              {(historyLoading || historyError || orderedHistory.length > 0) && (
-                <HistoryToolbar
-                  history={orderedHistory}
-                  result={undefined}
-                  busy={busy}
-                  loading={historyLoading}
-                  error={historyError}
-                  onOpenSaved={onOpenSaved}
-                />
-              )}
-              <EmptyResult />
-            </div>
-          )}
+          {state === "idle" && <EmptyResult />}
           {state === "loading" && (
             <div
               role="status"
@@ -466,14 +452,14 @@ function HistoryToolbar({
   onOpenSaved,
 }: {
   history: AiPrediction[];
-  result?: AiPrediction;
+  result: AiPrediction;
   busy: boolean;
   loading: boolean;
   error: string;
   onOpenSaved: (id: number) => void;
 }) {
   const [compareOpen, setCompareOpen] = useState(false);
-  const selectedId = result?.predictionId ?? "";
+  const selectedId = result.predictionId ?? "";
   const selectedIndex = history.findIndex(
     (item) => Number(item.predictionId) === Number(selectedId),
   );
@@ -507,9 +493,7 @@ function HistoryToolbar({
               <option value="">
                 {loading
                   ? "Đang tải lịch sử…"
-                  : history.length
-                    ? "Chọn phiên đánh giá"
-                    : "Chưa có lịch sử phiên đánh giá"}
+                  : "Chưa có lịch sử phiên đánh giá"}
               </option>
               {history.map((item, index) => (
                 <option key={item.predictionId} value={item.predictionId}>
@@ -776,7 +760,7 @@ function EmptyResult() {
         Chưa có kết quả đánh giá
       </h3>
       <p className="mt-2 max-w-64 text-sm leading-6 text-slate-600">
-        Chọn nhân viên và bấm Đánh giá mức độ gắn kết để bắt đầu.
+        Kiểm tra dữ liệu bên trái và chọn Đánh giá mức độ gắn kết để bắt đầu.
       </p>
     </div>
   );

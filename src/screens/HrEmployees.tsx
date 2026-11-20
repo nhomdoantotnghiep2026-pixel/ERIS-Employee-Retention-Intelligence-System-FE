@@ -252,9 +252,22 @@ export default function HrEmployees() {
       emptyText={text('Không tìm thấy kết quả.', 'No results found.')}
       invalidText={text('Vui lòng chọn một mục trong danh sách.', 'Please select an existing item.')} />;
   const active = (value: string) => value === 'ACTIVE' ? text('Đang hoạt động', 'Active') : value === 'INACTIVE' ? text('Ngừng hoạt động', 'Inactive') : value;
-  const createPositions = form.departmentId
-    ? positions.filter(position => position.departmentId === Number(form.departmentId)).map(position => ({ ...position, name: `${position.name} · ${position.code || text('Chưa có mã', 'No code')} · ${text('Cấp', 'Level')} ${position.jobLevel}` }))
-    : [];
+  const currentPosition = positions.find(position => String(position.id) === (form.positionId || String(detail?.positionId)));
+  const editPositions = new Map<string, (typeof positions)[number]>();
+  for (const position of positions) {
+    const name = position.name.trim();
+    if (!name || String(position.departmentId) !== form.departmentId) continue;
+    const existing = editPositions.get(name);
+    const matchesLevel = position.jobLevel === currentPosition?.jobLevel;
+    const existingMatchesLevel = existing?.jobLevel === currentPosition?.jobLevel;
+    if (!existing || position.id === currentPosition?.id || (
+      existing.id !== currentPosition?.id &&
+      ((matchesLevel && !existingMatchesLevel) ||
+        (matchesLevel === existingMatchesLevel && (position.jobLevel - existing.jobLevel || position.id - existing.id) < 0))
+    )) {
+      editPositions.set(name, { ...position, name });
+    }
+  }
   const currentPositionTitle = selectedPositionTitle || positions.find(position => String(position.id) === form.positionId && String(position.departmentId) === form.departmentId)?.name.trim() || '';
   const creationPositionOptions = positionSelection(positions, form.departmentId, currentPositionTitle);
   const levelNames: Record<number, string> = { 1: 'Entry', 2: 'Junior', 3: 'Intermediate', 4: 'Senior', 5: 'Expert / Leadership' };
@@ -340,7 +353,7 @@ export default function HrEmployees() {
             <div className="grid gap-4 md:grid-cols-2">
               {catalogSelect(text('Phòng ban *', 'Department *'), form.departmentId, value => { setSelectedPositionTitle(''); setForm(current => ({ ...current, departmentId: value, positionId: '' })); }, departments, true)}
               <label className="block text-sm font-semibold leading-5 text-slate-700">{requiredLabel(text('Chức danh / Vị trí', 'Position'), true)}<select required className={createControl} value={currentPositionTitle} disabled={pending || !form.departmentId || !creationPositionOptions.titles.length} onChange={event => { setSelectedPositionTitle(event.target.value); setForm(current => ({ ...current, positionId: '' })); }}><option value="">{text('Chọn chức danh / vị trí', 'Select a position')}</option>{creationPositionOptions.titles.map(title => <option key={title} value={title}>{title}</option>)}</select>{!form.departmentId && <span className="mt-1.5 block text-xs font-normal text-slate-500">{text('Chọn phòng ban trước.', 'Select a department first.')}</span>}</label>
-              {form.departmentId && !createPositions.length && <p className="-mt-2 text-xs font-medium leading-5 text-amber-700 md:col-start-2">{text('Phòng ban này chưa có vị trí đang hoạt động.', 'This department has no active positions.')}</p>}
+              {form.departmentId && !creationPositionOptions.titles.length && <p className="-mt-2 text-xs font-medium leading-5 text-amber-700 md:col-start-2">{text('Phòng ban này chưa có vị trí đang hoạt động.', 'This department has no active positions.')}</p>}
               {form.departmentId && currentPositionTitle && <label className="block text-sm font-semibold leading-5 text-slate-700">{requiredLabel(text('Cấp độ công việc', 'Job level'), true)}<select required className={createControl} value={form.positionId} disabled={pending} onChange={event => setForm(current => ({ ...current, positionId: event.target.value }))}><option value="">{text('Chọn cấp độ công việc', 'Select job level')}</option>{creationPositionOptions.levels.map(position => <option key={position.id} value={position.id}>{levelNames[position.jobLevel] || `${text('Cấp', 'Level')} ${position.jobLevel}`}{creationPositionOptions.levels.filter(item => item.jobLevel === position.jobLevel).length > 1 ? ` · ${position.code || `#${position.id}`}` : ''}</option>)}</select></label>}
               {createField('hireDate', text('Ngày vào làm', 'Hire date'), 'date', true)}
               <label className="block text-sm font-semibold leading-5 text-slate-700">{requiredLabel(text('Loại hợp đồng', 'Employment type'), true)}<select required className={createControl} value={form.employmentType} onChange={event => setForm(value => ({ ...value, employmentType: event.target.value }))}><option value="">{text('Chọn loại hợp đồng', 'Select employment type')}</option><option value="FULL_TIME">{text('Toàn thời gian', 'Full time')}</option><option value="PART_TIME">{text('Bán thời gian', 'Part time')}</option><option value="CONTRACT">{text('Hợp đồng', 'Contract')}</option><option value="INTERNSHIP">{text('Thực tập', 'Internship')}</option></select></label>
@@ -404,7 +417,7 @@ export default function HrEmployees() {
             {editing ? <div className="space-y-4 border-t border-slate-100 pt-4">
               {jobDateRestriction && <p role="status" className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm font-normal leading-6 text-amber-900">{jobDateMessage}</p>}
               {catalogSelect(text('Phòng ban', 'Department'), form.departmentId, value => setForm(current => ({ ...current, departmentId: value, positionId: '' })), departments, true, Boolean(jobDateRestriction))}
-              {catalogSelect(text('Chức danh / Vị trí', 'Position'), form.positionId, value => setForm(current => ({ ...current, positionId: value })), createPositions, true, !form.departmentId || Boolean(jobDateRestriction))}
+              {catalogSelect(text('Chức danh / Vị trí', 'Position'), form.positionId, value => setForm(current => ({ ...current, positionId: value })), [...editPositions.values()], true, !form.departmentId || Boolean(jobDateRestriction))}
               <dl className="rounded-2xl bg-slate-50/70 px-2">{detailItem(<CalendarDays size={17} aria-hidden="true" />, text('Ngày vào làm', 'Hire date'), dateOnly(detail.hireDate))}</dl>
               <label className="block text-sm font-semibold leading-5 text-slate-700">{text('Loại hợp đồng', 'Employment type')}<select aria-label={text('Loại hợp đồng', 'Employment type')} className={createControl} value={form.employmentType} disabled={pending} onChange={event => setForm(value => ({ ...value, employmentType: event.target.value }))}><option value="FULL_TIME">{text('Toàn thời gian', 'Full time')}</option><option value="PART_TIME">{text('Bán thời gian', 'Part time')}</option><option value="CONTRACT">{text('Hợp đồng', 'Contract')}</option><option value="INTERNSHIP">{text('Thực tập', 'Internship')}</option></select></label>
               {createField('currentSalary', text('Lương hiện tại', 'Current salary'), 'number')}

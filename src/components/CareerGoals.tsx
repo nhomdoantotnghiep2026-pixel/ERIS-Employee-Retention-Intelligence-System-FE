@@ -1,3 +1,4 @@
+import { useAutoDismissState } from '../hooks/useAutoDismissState';
 import { useEffect, useState, type FormEvent } from 'react';
 import { Card } from './ui';
 import { Button } from './ui/button';
@@ -10,10 +11,12 @@ import { cancelCareerGoal, completeCareerGoal, createCareerGoal, editCareerGoal,
 const control = 'resize-none mt-1 w-full rounded-md border border-slate-300 bg-white p-3 text-sm text-slate-900 outline-none focus:border-orange-400 focus:ring-4 focus:ring-orange-100';
 export function CareerGoals({ employeeId, own = false }: { employeeId?: number; own?: boolean }) {
   const { language } = useLanguage(), tr = (vi: string, en: string) => language === 'vi' ? vi : en;
-  const [data, setData] = useState<CareerGoalsData | null>(null), [loading, setLoading] = useState(true), [busy, setBusy] = useState(false), [error, setError] = useState(''), [notice, setNotice] = useState('');
+  const [data, setData] = useState<CareerGoalsData | null>(null), [loading, setLoading] = useState(true), [busy, setBusy] = useState(false), [loadError, setLoadError] = useState('');
+  const [error, setError] = useAutoDismissState();
+  const [notice, setNotice] = useAutoDismissState();
   const [loadFailed, setLoadFailed] = useState(false);
   const [aspiration, setAspiration] = useState(''), [description, setDescription] = useState(''), [reason, setReason] = useState(''), [mode, setMode] = useState<'edit' | 'replace' | 'cancel' | null>(null), [revision, setRevision] = useState(0);
-  useEffect(() => { let live = true; setLoading(true); setLoadFailed(false); setError(''); const task = own ? getOwnCareerGoals() : getEmployeeCareerGoals(employeeId!); void task.then(result => { if (live) setData(result) }).catch(cause => { if (live) { setLoadFailed(true); setError(getApiErrorMessage(cause, tr('Không tải được mục tiêu nghề nghiệp.', 'Could not load career goals.'))); } }).finally(() => { if (live) setLoading(false) }); return () => { live = false } }, [employeeId, own, revision]);
+  useEffect(() => { let live = true; setLoading(true); setLoadFailed(false); setLoadError(''); const task = own ? getOwnCareerGoals() : getEmployeeCareerGoals(employeeId!); void task.then(result => { if (live) setData(result) }).catch(cause => { if (live) { setLoadFailed(true); setLoadError(getApiErrorMessage(cause, tr('Không tải được mục tiêu nghề nghiệp.', 'Could not load career goals.'))); } }).finally(() => { if (live) setLoading(false) }); return () => { live = false } }, [employeeId, own, revision]);
   async function run(task: () => Promise<unknown>, message: string) { if (busy) return; setBusy(true); setError(''); setNotice(''); try { await task(); setMode(null); setAspiration(''); setDescription(''); setReason(''); setNotice(message); setRevision(value => value + 1) } catch (cause) { setError(getApiErrorMessage(cause, tr('Không lưu được mục tiêu nghề nghiệp.', 'Could not save the career goal.'))) } finally { setBusy(false) } }
   function submit(event: FormEvent) { event.preventDefault(); const goal = data?.currentGoal; if (!goal) void run(() => createCareerGoal(aspiration.trim(), description.trim()), tr('Đã tạo mục tiêu nghề nghiệp.', 'Career goal created.')); else if (mode === 'edit') void run(() => editCareerGoal(goal.id, description.trim()), tr('Đã cập nhật mục tiêu.', 'Goal updated.')); else if (mode === 'replace') void run(() => replaceCareerGoal(goal.id, { newCareerAspiration: aspiration.trim(), newGoalDescription: description.trim(), goalChangeReason: reason.trim() }), tr('Đã thay mục tiêu mới.', 'Goal replaced.')); else if (mode === 'cancel') void run(() => cancelCareerGoal(goal.id, reason.trim() || null), tr('Đã hủy mục tiêu.', 'Goal cancelled.')) }
   const status: Record<string, string> = { ACTIVE: tr('Đang thực hiện', 'Active'), ACHIEVED: tr('Đã hoàn thành', 'Achieved'), REPLACED: tr('Đã thay thế', 'Replaced'), CANCELLED: tr('Đã hủy', 'Cancelled') };
@@ -24,7 +27,7 @@ export function CareerGoals({ employeeId, own = false }: { employeeId?: number; 
     <h2 className="text-lg font-semibold text-slate-950">{tr('Mục tiêu nghề nghiệp', 'Career goals')}</h2>
     <p className="mt-1 text-sm leading-6 text-slate-600">{tr('Theo dõi định hướng do nhân viên tự khai báo.', 'Track employee-declared career direction.')}</p>
     {loading && <p role="status" className="mt-4 text-sm text-slate-600">{tr('Đang tải...', 'Loading...')}</p>}
-    {error && <div role="alert" className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-md bg-red-50 p-3 text-red-800"><p className="text-sm leading-6">{error}{!loadFailed && <span className="mt-1 block">{tr('Chưa lưu được thay đổi. Nội dung bạn nhập được giữ lại.', 'Changes were not saved. Your input has been preserved.')}</span>}</p>{loadFailed && <Button variant="outline" disabled={loading} onClick={() => setRevision(value => value + 1)}>{tr('Tải lại', 'Retry')}</Button>}</div>}
+    {(loadError || error) && <div role="alert" className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-md bg-red-50 p-3 text-red-800"><p className="text-sm leading-6">{loadError || error}{!loadFailed && <span className="mt-1 block">{tr('Chưa lưu được thay đổi. Nội dung bạn nhập được giữ lại.', 'Changes were not saved. Your input has been preserved.')}</span>}</p>{loadFailed && <Button variant="outline" disabled={loading} onClick={() => setRevision(value => value + 1)}>{tr('Tải lại', 'Retry')}</Button>}</div>}
     {notice && <p role="status" className="mt-4 rounded-md bg-emerald-50 p-3 text-emerald-800">{notice}</p>}
     <div className={own && !loadFailed ? 'mt-5 grid items-start gap-8 lg:grid-cols-12' : 'mt-5'}>
       {own && !loadFailed && <section className="min-w-0 lg:col-span-5 lg:border-r lg:border-slate-100 lg:pr-8">

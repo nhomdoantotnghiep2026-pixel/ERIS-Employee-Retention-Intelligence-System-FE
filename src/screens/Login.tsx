@@ -1,5 +1,5 @@
-import { useAutoDismissState } from '../hooks/useAutoDismissState';
 import { useEffect, useRef, useState } from 'react';
+import { useAutoDismissState } from '../hooks/useAutoDismissState';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft,
