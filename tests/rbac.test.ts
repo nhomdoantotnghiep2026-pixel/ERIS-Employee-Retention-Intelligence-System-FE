@@ -58,3 +58,12 @@ test('unsupported snapshot routes stay closed while outcome permissions keep the
   assert.equal(hasRoutePermission('Data / AI Analyst', '/outcomes'), false);
   assert.equal(hasRoutePermission('Data / AI Analyst', '/predictions'), true);
 });
+
+test('employee provisioning shares the Admin user-management permission and respects revocation', () => {
+  storage.clear();
+  assert.equal(hasRoutePermission('System Administrator', '/users/provisioning'), true);
+  assert.equal(hasRoutePermission('HR', '/users/provisioning'), false);
+  storage.set('eris-rbac-matrix-v3', JSON.stringify([{ items: [{ label: 'Manage Users', access: { 'System Administrator': false } }] }]));
+  assert.equal(hasRoutePermission('System Administrator', '/users/provisioning'), false);
+  storage.clear();
+});

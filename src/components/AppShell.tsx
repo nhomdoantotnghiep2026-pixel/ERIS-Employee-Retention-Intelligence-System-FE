@@ -107,9 +107,10 @@ const NAV_BY_ROLE: Record<UserRole, NavGroup[]> = {
       ],
     },
     {
-      group: 'Access Control',
+      group: 'Users Management',
       items: [
-        { label: 'Users Management', icon: User, to: '/users' },
+        { label: 'System accounts', icon: User, to: '/users' },
+        { label: 'Employee account provisioning', icon: KeyRound, to: '/users/provisioning' },
       ],
     },
     {
@@ -125,7 +126,7 @@ const NAV_BY_ROLE: Record<UserRole, NavGroup[]> = {
 function SidebarLink({ to, icon: Icon, label, onNavigate, collapsed = false, nested = false }: NavItem & { onNavigate?: () => void; collapsed?: boolean; nested?: boolean }) {
   const { pathname } = useLocation();
   const { t } = useLanguage();
-  const isActive = pathname === to || ((to === '/positions' || to === '/departments' || to.startsWith('/departments/')) ? false : pathname.startsWith(to + '/'));
+  const isActive = pathname === to || ((to === '/users' || to === '/positions' || to === '/departments' || to.startsWith('/departments/')) ? false : pathname.startsWith(to + '/'));
   return (
     <NavLink
       to={to}

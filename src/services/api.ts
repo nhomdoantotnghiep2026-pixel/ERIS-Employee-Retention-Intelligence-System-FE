@@ -906,8 +906,8 @@ export function resetPassword(email: string, otp: string, newPassword: string) {
 
 export type EmployeeAccountCandidate = { id: number; employeeCode: string; fullName: string; email: string };
 
-export async function listEmployeeAccountCandidates() {
-  const result = await request<{ data: EmployeeAccountCandidate[] }>('/employees/account-candidates', { cache: 'no-store' });
+export async function listEmployeeAccountCandidates(signal?: AbortSignal) {
+  const result = await request<{ data: EmployeeAccountCandidate[] }>('/employees/account-candidates', { cache: 'no-store', signal });
   return result.data;
 }
 

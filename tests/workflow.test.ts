@@ -81,3 +81,8 @@ test('fixture run preserves input/run/prediction/explanation references without 
   assert.equal(run.results[0].explanations[0].prediction_result_id, run.results[0].id);
   assert.throws(() => createDemoRun(snapshot, { version: 'v1', status: 'Active' }, [employee], []), /fixture/i);
 });
+
+test('employee account provisioning has its own Admin-only route', () => {
+  assert.equal(canAccessRoute('System Administrator', '/users/provisioning'), true);
+  for (const role of ['HR', 'Data / AI Analyst', 'Employee / ESS']) assert.equal(canAccessRoute(role, '/users/provisioning'), false);
+});

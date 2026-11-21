@@ -20,6 +20,7 @@ import DataWorkspace from './screens/DataWorkspace';
 import RiskWorkspace from './screens/RiskWorkspace';
 import ErdSurveys from './screens/ErdSurveys';
 import ErdAccounts from './screens/ErdAccounts';
+import EmployeeAccountProvisioning from './screens/EmployeeAccountProvisioning';
 import ErdOwnProfile from './screens/ErdOwnProfile';
 import ErdSchema from './screens/ErdSchema';
 import ErdEmployeeDetails from './screens/ErdEmployeeDetails';
@@ -172,6 +173,7 @@ export default function App() {
           {/* System Administrator */}
           <Route path="/admin-overview" element={<RoleGuard><AdminOverview /></RoleGuard>} />
           <Route path="/users" element={<RoleGuard><ErdAccounts /></RoleGuard>} />
+          <Route path="/users/provisioning" element={<RoleGuard><EmployeeAccountProvisioning /></RoleGuard>} />
           <Route path="/roles" element={<RoleGuard><Roles /></RoleGuard>} />
           <Route path="/rbac" element={<RoleGuard><Navigate to="/roles?tab=matrix" replace /></RoleGuard>} />
           <Route path="/system" element={<RoleGuard><SystemConfig /></RoleGuard>} />
