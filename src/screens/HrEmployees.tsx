@@ -220,9 +220,7 @@ export default function HrEmployees() {
         saved = await updateEmployeeProfile(detail.id, changes);
       } else saved = await createEmployeeProfile({ ...input, employeeCode: form.employeeCode.trim() });
       if (creating) window.localStorage.removeItem(EMPLOYEE_DRAFT_KEY);
-      setMessage(saved.emailDelivery === 'FAILED'
-        ? text('Đã lưu hồ sơ và tài khoản nhưng gửi email thất bại. Không tạo lại; liên hệ quản trị viên để cấp mật khẩu tạm an toàn.', 'Profile and account saved, but email delivery failed. Do not create again; contact your administrator.')
-        : text(editing ? 'Đã cập nhật nhân viên.' : 'Đã tạo nhân viên và tài khoản đăng nhập. Mật khẩu tạm được gửi qua email.', editing ? 'Employee updated.' : 'Employee and login account created. The temporary password is sent by email.'));
+      setMessage(text(editing ? 'Đã cập nhật nhân viên.' : 'Đã tạo hồ sơ nhân viên. Admin có thể cấp tài khoản đăng nhập sau.', editing ? 'Employee updated.' : 'Employee profile created. Admin can provision a login account separately.'));
       setInlineEditing(false); navigate('/employees/' + saved.id, { replace: editing }); setRevision(value => value + 1);
     } catch (cause) {
       if (creating && cause instanceof ApiError && cause.status === 409 &&
@@ -372,7 +370,7 @@ export default function HrEmployees() {
 
           <motion.section variants={createItemMotion} whileHover={{ y: -2 }} transition={{ duration: 0.22 }} className="rounded-[20px] border border-slate-200 bg-white p-5 shadow-sm transition-shadow duration-300 hover:shadow-[0_14px_38px_rgba(30,41,59,0.09)] sm:p-6">
             <div className="mb-5 flex items-start gap-3"><span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-orange-50 text-orange-600 ring-1 ring-orange-100"><UserRound size={20} aria-hidden="true" /></span>
-              <div><p className="text-xs font-bold uppercase tracking-[0.12em] text-orange-600">01</p><h3 className="mt-1 text-lg font-semibold text-slate-950">{text('Thông tin cá nhân', 'Personal information')}</h3><p className="mt-1 text-sm leading-6 text-slate-500">{text('Thông tin để tạo hồ sơ và tài khoản đăng nhập.', 'Profile and sign-in account information.')}</p></div>
+              <div><p className="text-xs font-bold uppercase tracking-[0.12em] text-orange-600">01</p><h3 className="mt-1 text-lg font-semibold text-slate-950">{text('Thông tin cá nhân', 'Personal information')}</h3><p className="mt-1 text-sm leading-6 text-slate-500">{text('Thông tin để tạo hồ sơ nhân viên.', 'Employee profile information.')}</p></div>
             </div>
             <div className="grid gap-4 md:grid-cols-2">
               {createField('employeeCode', text('Mã nhân viên', 'Employee code'), 'text', true, 'NV-001')}
@@ -419,7 +417,7 @@ export default function HrEmployees() {
         </fieldset>
         <motion.aside variants={createItemMotion} className="xl:sticky xl:top-5">
           <Card className="p-5 sm:p-6"><p className="text-xs font-bold uppercase tracking-[0.12em] text-orange-600">{text('Trước khi lưu', 'Before saving')}</p><h2 className="mt-2 text-lg font-semibold text-slate-950">{text('Hồ sơ nhân viên mới', 'New employee profile')}</h2>
-            <ol className="mt-4 space-y-3 text-sm leading-6 text-slate-600"><li className="flex gap-2"><span className="font-bold text-orange-600">1.</span>{text('Hồ sơ và tài khoản chờ kích hoạt qua email.', 'Profile and account wait for email activation.')}</li><li className="flex gap-2"><span className="font-bold text-orange-600">2.</span>{text('Học vấn được lưu cùng hồ sơ.', 'Education is saved with the profile.')}</li><li className="flex gap-2"><span className="font-bold text-orange-600">3.</span>{text('Quãng đường được tính khi tạo.', 'Commute distance is calculated on creation.')}</li></ol>
+            <ol className="mt-4 space-y-3 text-sm leading-6 text-slate-600"><li className="flex gap-2"><span className="font-bold text-orange-600">1.</span>{text('Hồ sơ được lưu ngay; Admin cấp tài khoản riêng sau đó.', 'The profile is saved immediately; Admin provisions the account separately.')}</li><li className="flex gap-2"><span className="font-bold text-orange-600">2.</span>{text('Học vấn được lưu cùng hồ sơ.', 'Education is saved with the profile.')}</li><li className="flex gap-2"><span className="font-bold text-orange-600">3.</span>{text('Quãng đường được tính khi tạo.', 'Commute distance is calculated on creation.')}</li></ol>
             <div className="my-5 border-t border-slate-200" /><dl className="space-y-3 text-sm"><div><dt className="text-slate-500">{text('Phòng ban', 'Department')}</dt><dd className="mt-1 font-semibold text-slate-900">{departments.find(item => String(item.id) === form.departmentId)?.name || text('Chưa chọn', 'Not selected')}</dd></div><div><dt className="text-slate-500">{text('Học vấn', 'Education')}</dt><dd className="mt-1 font-semibold tabular-nums text-slate-900">{educations.length}</dd></div></dl>
             <div className="mt-6 grid gap-2">{createValidationError && <p role="alert" className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-800">{createValidationError}</p>}<Button disabled={pending || !!catalogError}>{text(pending ? 'Đang xác minh và lưu...' : 'Tạo hồ sơ nhân viên', pending ? 'Verifying and saving...' : 'Create employee profile')}</Button><Button type="button" variant="secondary" onClick={() => navigate('/employees')}>{text('Hủy', 'Cancel')}</Button></div>
           </Card>

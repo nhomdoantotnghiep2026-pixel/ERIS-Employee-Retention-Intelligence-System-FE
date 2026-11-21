@@ -32,8 +32,8 @@ test('EMP FE uses camelCase queries, bare detail, partial PATCH and bodyless sof
     assert.equal((await api.getCurrentUser()).email, 'hr@example.test');
     assert.equal(calls.at(-1)!.url, '/api/auth/me');
     assert.equal(
-      api.getApiErrorMessage(new api.ApiError('Employee account must be ACTIVE to view education.', 409), 'fallback'),
-      'Education is only available when the employee profile and account are active.',
+      api.getApiErrorMessage(new api.ApiError('Employee profile must be ACTIVE.', 409), 'fallback'),
+      'The employee profile must be active to manage education.',
     );
     assert.equal(
       api.getApiErrorMessage(new api.ApiError('graduationYear must be at least 2003 (minimum graduation age: 21 by year).', 400), 'fallback'),
@@ -59,6 +59,19 @@ test('EMP FE uses camelCase queries, bare detail, partial PATCH and bodyless sof
       response = Response.json({ error: { message: 'Validation or configuration error' } }, { status });
       await assert.rejects(api.createEmployeeProfile(input), (error: { status: number }) => error.status === status);
     }
+    const candidate = { id: 7, employeeCode: 'EMP007', fullName: 'Worker', email: 'worker@example.test' };
+    response = Response.json({ data: [candidate] });
+    const controller = new AbortController();
+    assert.deepEqual(await api.listEmployeeAccountCandidates(controller.signal), [candidate]);
+    assert.equal(new URL(calls.at(-1)!.url, 'http://localhost').pathname, '/api/employees/account-candidates');
+    assert.equal(calls.at(-1)!.init?.signal, controller.signal);
+    assert.equal(calls.at(-1)!.init?.cache, 'no-store');
+    response = Response.json({ data: { account: { id: 9, status: 'IN_PROCESS' }, emailDelivery: 'SENT' } });
+    assert.equal((await api.provisionEmployeeAccount(7)).account.status, 'IN_PROCESS');
+    assert.equal(new URL(calls.at(-1)!.url, 'http://localhost').pathname, '/api/employees/7/account');
+    assert.equal(calls.at(-1)!.init?.method, 'POST');
+    response = Response.json({ message: 'An account already uses this profile or email.' }, { status: 409 });
+    await assert.rejects(api.provisionEmployeeAccount(7), { status: 409 });
     let deniedCalls = 0;
     globalThis.fetch = async () => { deniedCalls++; return Response.json({ message: 'Forbidden' }, { status: 403 }); };
     await assert.rejects(api.listEmployeeProfiles(), { status: 403 });
