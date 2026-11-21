@@ -76,6 +76,7 @@ export interface ConfirmResult {
   updated: number
   skipped: number
   excluded: number
+  skipped_invalid?: number
   rows: unknown[]
 }
 export interface AttendanceBatch {
@@ -141,10 +142,10 @@ export const previewAttendance = (file: File, choices: AttendanceChoice[] = []) 
     method: "POST",
     body: importBody(file, { choices }),
   })
-export const confirmAttendance = (file: File, previewToken: string, choices: AttendanceChoice[], confirmWarnings: boolean) =>
+export const confirmAttendance = (file: File, previewToken: string, choices: AttendanceChoice[], confirmWarnings: boolean, skipInvalid = false) =>
   request<ConfirmResult>(root + "/import/confirm", {
     method: "POST",
-    body: importBody(file, { preview_token: previewToken, choices, confirm_warnings: confirmWarnings, duplicate_strategy: "SKIP" }),
+    body: importBody(file, { preview_token: previewToken, choices, confirm_warnings: confirmWarnings, duplicate_strategy: "SKIP", ...(skipInvalid ? { skip_invalid: true } : {}) }),
   })
 export const attendanceErrors = (file: File, choices: AttendanceChoice[] = []) =>
   request<Blob>(root + "/import/errors", { method: "POST", body: importBody(file, { choices }) }, undefined, "blob")
@@ -316,3 +317,7 @@ export const confirmLeaveFile = (file: File, fingerprint: string) => {
     body,
   })
 }
+
+export const saveableAttendanceRows = (rows: PreviewRow[]) => rows.filter(row =>
+  !row.excluded && row.action === "INSERT" && ["VALID", "WARNING"].includes(row.validation_status)
+  && !row.issues.some(issue => issue.severity === "ERROR" || issue.requires_resolution))
