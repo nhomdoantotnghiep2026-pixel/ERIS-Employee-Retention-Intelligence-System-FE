@@ -647,8 +647,8 @@ export function getApiErrorMessage(error: unknown, fallback: string) {
     return error.message;
   }
   if (error.status === 401 && /invalid email or password/.test(technicalMessage)) return messages.LOGIN_FAILED;
-  if (error.status === 409 && /employee account must be active to view education|employee profile must be active/.test(technicalMessage)) {
-    return 'Education is only available when the employee profile and account are active.';
+  if (error.status === 409 && /employee profile must be active/.test(technicalMessage)) {
+    return 'The employee profile must be active to manage education.';
   }
   if (error.status === 409 && /email.*already in use|email.*already exists/.test(technicalMessage)) return messages.EMAIL_EXISTS;
   if (error.status === 409 && /profile.*already exists|already has a profile|already linked/.test(technicalMessage)) return messages.USER_ALREADY_EXISTS;
@@ -901,6 +901,18 @@ export function resetPassword(email: string, otp: string, newPassword: string) {
     method: 'POST',
     body: JSON.stringify({ email, otp, newPassword }),
   });
+}
+
+export type EmployeeAccountCandidate = { id: number; employeeCode: string; fullName: string; email: string };
+
+export async function listEmployeeAccountCandidates() {
+  const result = await request<{ data: EmployeeAccountCandidate[] }>('/employees/account-candidates', { cache: 'no-store' });
+  return result.data;
+}
+
+export async function provisionEmployeeAccount(employeeId: number) {
+  const result = await request<{ data: { emailDelivery: 'SENT' | 'FAILED' } }>(`/employees/${employeeId}/account`, { method: 'POST' });
+  return result.data;
 }
 
 export async function listUsers(params: { page?: number; limit?: number; search?: string; roleId?: number; status?: string } = {}, signal?: AbortSignal) {

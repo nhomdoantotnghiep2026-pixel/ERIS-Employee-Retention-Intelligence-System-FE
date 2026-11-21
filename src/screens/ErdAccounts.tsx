@@ -3,7 +3,7 @@ import { Button as AccountButton } from '../components/ui/button';
 import { useEffect, useRef, useState } from 'react';
 import { AppShell } from '../components/AppShell';
 import { Button, Card, ConfirmationDialog, SectionHeader } from '../components/ui';
-import { ApiError, createUser, getApiErrorMessage, getUserById, listUsers, updateUserStatus, type ApiUser } from '../services/api';
+import { ApiError, createUser, getApiErrorMessage, getUserById, listEmployeeAccountCandidates, listUsers, provisionEmployeeAccount, updateUserStatus, type ApiUser, type EmployeeAccountCandidate } from '../services/api';
 import { useLanguage } from '../context/LanguageContext';
 import { useAutoDismissFeedback } from '../hooks/useAutoDismissState';
 
@@ -37,6 +37,8 @@ export default function ErdAccounts() {
   const [filterStatus, setFilterStatus] = useState('');
   const [pagination, setPagination] = useState({ page: 1, limit: 10, total: 0, hasMore: false });
   const [showCreate, setShowCreate] = useState(false);
+  const [candidates, setCandidates] = useState<EmployeeAccountCandidate[] | null>(null);
+  const [candidateId, setCandidateId] = useState('');
   const [busy, setBusy] = useState(false);
   const listRevision = useRef(0);
   const listRequest = useRef<AbortController | null>(null);
@@ -50,6 +52,44 @@ export default function ErdAccounts() {
   useEffect(() => {
     if (details) detailsPanel.current?.scrollIntoView({ block: 'start', behavior: 'smooth' });
   }, [details]);
+
+  async function loadAccountCandidates() {
+    setBusy(true);
+    setError('');
+    setMessage('');
+    try {
+      setCandidates(await listEmployeeAccountCandidates());
+      setCandidateId('');
+    } catch (cause) {
+      setError(getApiErrorMessage(cause, t('Không tải được hồ sơ chưa cấp tài khoản.')));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleProvision(event: React.FormEvent) {
+    event.preventDefault();
+    const candidate = candidates?.find(item => String(item.id) === candidateId);
+    if (!candidate || busy) return;
+    setBusy(true);
+    setError('');
+    setMessage('');
+    try {
+      const result = await provisionEmployeeAccount(candidate.id);
+      setCandidates(items => items?.filter(item => item.id !== candidate.id) ?? null);
+      setCandidateId('');
+      await refreshUsers();
+      if (result.emailDelivery === 'FAILED') {
+        setError(t('Đã tạo tài khoản nhưng gửi email mời thất bại.'));
+      } else {
+        setMessage(t('Đã cấp tài khoản và gửi lời mời kích hoạt.'));
+      }
+    } catch (cause) {
+      setError(getApiErrorMessage(cause, t('Không cấp được tài khoản nhân viên.')));
+    } finally {
+      setBusy(false);
+    }
+  }
 
   async function refreshUsers() {
     listRequest.current?.abort();
@@ -142,6 +182,27 @@ export default function ErdAccounts() {
 
   return <AppShell breadcrumb={['Access Control', 'Users']}>
     <SectionHeader title="Tài khoản và liên kết nhân viên" description="Quản lý thông tin tài khoản, phân quyền và trạng thái truy cập hệ thống." />
+    <Card className="mb-5 p-5">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h2 className="font-bold text-slate-900">{t('Cấp tài khoản cho nhân viên')}</h2>
+        <Button type="button" variant="secondary" disabled={busy} onClick={() => void loadAccountCandidates()}>
+          {t(candidates === null ? 'Chọn hồ sơ nhân viên' : 'Tải lại hồ sơ')}
+        </Button>
+      </div>
+      {candidates?.length === 0 && <p className="mt-3 text-sm text-slate-600">{t('Không có hồ sơ đủ điều kiện cấp tài khoản.')}</p>}
+      {Boolean(candidates?.length) && <form className="mt-3 flex flex-wrap items-end gap-3" onSubmit={handleProvision}>
+        <label className="min-w-0 flex-1 text-sm text-slate-600">
+          {t('Hồ sơ chưa cấp tài khoản')}
+          <select className={control} value={candidateId} disabled={busy} onChange={event => setCandidateId(event.target.value)} required>
+            <option value="">{t('Chọn nhân viên')}</option>
+            {candidates?.map(item => <option key={item.id} value={item.id}>
+              {item.employeeCode} · {item.fullName} · {item.email}
+            </option>)}
+          </select>
+        </label>
+        <Button type="submit" disabled={busy || !candidateId}>{t('Tạo tài khoản và gửi lời mời')}</Button>
+      </form>}
+    </Card>
     {details && <div ref={detailsPanel} className="mb-5 scroll-mt-24"><Card className="border border-orange-100 p-6"><div className="flex items-start justify-between gap-4"><div><h2 className="font-bold text-slate-900">{t("Chi tiết tài khoản")}</h2><p className="mt-1 text-sm text-slate-500">{t("Account information returned by the backend.")}</p></div><Button size="sm" variant="secondary" onClick={() => setDetails(null)}>{t("Đóng")}</Button></div><dl className="mt-5 grid gap-4 md:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)]"><div><dt className="text-xs text-slate-500">Email</dt><dd className="mt-1 break-all font-semibold text-slate-800">{details.email}</dd></div><div><dt className="text-xs text-slate-500">{t("Role")}</dt><dd className="mt-1 font-semibold text-slate-800">{roleLabel(details.role, details.roleId)}</dd></div><div><dt className="text-xs text-slate-500">{t("Trạng thái")}</dt><dd className="mt-1 font-semibold text-slate-800">{statusLabel(details.status)}</dd></div></dl></Card></div>}
     {editing && <div ref={editPanel} className="mb-5 scroll-mt-24"><Card className="p-6"><h2 className="font-bold text-slate-900">{t("Chỉnh sửa:")}{editing.email}</h2><form onSubmit={handleEdit} className="mt-4 grid gap-4 sm:grid-cols-3"><label className="text-sm text-slate-600">{t("Vai trò")}<input className={control} value={roleLabel(editing.role, editing.roleId)} readOnly /></label><label className="text-sm text-slate-600">{t("Trạng thái")}<select className={control} value={editStatus} onChange={event => setEditStatus(event.target.value)}><option value={editing.status}>{statusLabel(editing.status)}</option>{editing.status !== 'INACTIVE' && <option value="INACTIVE">{t("INACTIVE — Khóa tài khoản")}</option>}</select><span className="mt-1 block text-xs text-slate-500">{t("Theo API UM-04, chỉ hỗ trợ khóa tài khoản sang INACTIVE; không hỗ trợ unlock.")}</span></label><div className="flex items-end gap-2"><Button type="submit" disabled={busy}>{t("Lưu")}</Button><Button type="button" variant="secondary" onClick={() => setEditing(null)}>{t("Hủy")}</Button></div></form></Card></div>}
     <Card className="mb-5 p-5 sm:p-6"><div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-lg font-bold text-slate-900">{t("Tài khoản trong hệ thống")}</h2><p className="mt-1 text-sm text-slate-600">{t("Quản lý danh sách tài khoản và quyền truy cập")}</p></div><div className="flex items-center gap-3">{!directoryUnavailable && <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">{t("{count} accounts", { count: pagination.total })}</span>}<Button type="button" onClick={openCreate}>{t("Tạo tài khoản")}</Button></div></div>
