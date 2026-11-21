@@ -4,6 +4,7 @@ import {
   BarChart3,
   CalendarDays,
   CheckCircle2,
+  ChevronDown,
   Clock3,
   ClipboardList,
   Eye,
@@ -59,6 +60,7 @@ import {
   getSurveyParticipants,
   getSurveyResults,
   listAvailableSurveys,
+  listDepartments,
   listEmployeeProfiles,
   listSurveyCategories,
   listSurveys,
@@ -76,6 +78,7 @@ import {
   type SurveyResults,
   type SurveySummary,
   type EmployeeProfile,
+  type ApiDepartment,
 } from "../services/api"
 
 const control =
@@ -102,11 +105,30 @@ const questionTypeLabels: Record<SurveyQuestionType, string> = {
   MULTIPLE_CHOICE: "Chọn nhiều",
 }
 
-const topicLabel = (name: string) =>
-  name
-    .split("_")
-    .map((word) => word.charAt(0) + word.slice(1).toLocaleLowerCase())
+const topicLabelsVi: Record<string, string> = {
+  "compensation benefits": "Thu nhập & Phúc lợi",
+  "working time": "Thời gian làm việc",
+  "work environment": "Môi trường làm việc",
+  "career development": "Phát triển sự nghiệp",
+  management: "Năng lực quản lý",
+  "employee engagement": "Mức độ gắn kết",
+  "work life balance": "Cân bằng công việc & Cuộc sống",
+  "communication culture": "Văn hóa giao tiếp",
+  "job fit": "Mức độ phù hợp công việc",
+  other: "Chủ đề khác",
+}
+
+const normalizedTopicName = (name: string) =>
+  name.trim().replace(/[_-]+/g, " ").replace(/\s+/g, " ").toLocaleLowerCase()
+
+const topicLabel = (name: string, language = "vi") => {
+  const normalized = normalizedTopicName(name)
+  if (language === "vi" && topicLabelsVi[normalized]) return topicLabelsVi[normalized]
+  return normalized
+    .split(" ")
+    .map((word) => word.charAt(0).toLocaleUpperCase() + word.slice(1))
     .join(" ")
+}
 
 const isChoiceConfig = (config: SurveyAnswerConfig): config is {
   options: Array<{ code: string; label: string }>
@@ -305,6 +327,8 @@ export default function ErdSurveys() {
 
   const [employeeDirectory, setEmployeeDirectory] = useState<EmployeeProfile[]>([])
 
+  const [departments, setDepartments] = useState<ApiDepartment[]>([])
+
   const [directoryLoading, setDirectoryLoading] = useState(false)
 
   const [draft, setDraft] = useState<Draft>(emptyDraft)
@@ -343,6 +367,10 @@ export default function ErdSurveys() {
     participants: SurveyParticipant[]
   } | null>(null)
 
+  const [participantsBySurvey, setParticipantsBySurvey] = useState<
+    Record<number, SurveyParticipant[]>
+  >({})
+
   const [publishTarget, setPublishTarget] = useState<SurveySummary | null>(null)
 
   const [previewSurvey, setPreviewSurvey] = useState<
@@ -353,6 +381,12 @@ export default function ErdSurveys() {
 
   const [statusFilter, setStatusFilter] =
     useState<"ALL" | SurveySummary["status"]>("ALL")
+
+  const [openGroups, setOpenGroups] = useState<Record<SurveySummary["status"], boolean>>({
+    DRAFT: true,
+    ACTIVE: true,
+    CLOSED: false,
+  })
 
   const [sortBy, setSortBy] =
     useState<"NEWEST" | "END_SOON" | "RESPONSE_DESC">(
@@ -436,14 +470,18 @@ export default function ErdSurveys() {
     const controller = new AbortController()
     setDirectoryLoading(true)
 
-    void listEmployeeProfiles({ page: 1, limit: 10_000 }, controller.signal)
-      .then((employeesResult) => {
+    void Promise.all([
+      listEmployeeProfiles({ page: 1, limit: 10_000 }, controller.signal),
+      listDepartments(controller.signal, { page: 1, limit: 1_000 }),
+    ])
+      .then(([employeesResult, departmentsResult]) => {
         if (controller.signal.aborted) return
         setEmployeeDirectory(
           employeesResult.data.filter(
             (employee) => employee.employmentStatus !== "INACTIVE",
           ),
         )
+        setDepartments(departmentsResult.data)
       })
       .catch((cause) => {
         if (!controller.signal.aborted)
@@ -591,6 +629,16 @@ export default function ErdSurveys() {
     setError("")
     try {
       const detail = await getSurveyForEmployee(survey.id)
+      if (isHr && survey.status === "DRAFT" && !managedSurvey) {
+        setManagedSurvey(detail.data)
+        setDraft({
+          title: survey.title,
+          description: survey.description || "",
+          startDate: employeeDate(survey.startDate),
+          endDate: employeeDate(survey.endDate),
+          categoryIds: [...new Set(detail.data.questions.map((question) => question.categoryId))],
+        })
+      }
       setPreviewSurvey(detail.data)
     } catch (cause) {
       setError(getApiErrorMessage(cause, tr("Không thể mở bản xem trước.", "Could not open preview.")))
@@ -603,6 +651,26 @@ export default function ErdSurveys() {
     const submitter = (event.nativeEvent as SubmitEvent)
       .submitter as HTMLButtonElement | null
     const publishNow = submitter?.value === "publish"
+    const mergedCustomQuestions = [...customQuestions]
+    if (customDraft.questionText.trim()) {
+      const needsOptions =
+        customDraft.questionType === "SINGLE_CHOICE" ||
+        customDraft.questionType === "MULTIPLE_CHOICE"
+      const optionCount = customDraft.options
+        .split("\n")
+        .map((option) => option.trim())
+        .filter(Boolean).length
+      if (!customDraft.categoryId || (needsOptions && optionCount < 2)) {
+        setError(
+          tr(
+            "Câu hỏi đang nhập chưa đủ chủ đề hoặc ít nhất 2 phương án trả lời.",
+            "The pending question needs a topic and at least two answer options.",
+          ),
+        )
+        return
+      }
+      mergedCustomQuestions.push(questionInput(customDraft))
+    }
 
     setPending(true)
     setError("")
@@ -614,7 +682,7 @@ export default function ErdSurveys() {
         description: draft.description.trim() || null,
 
         categoryIds: draft.categoryIds,
-        questions: [...stagedQuestions, ...customQuestions],
+        questions: [...stagedQuestions, ...mergedCustomQuestions],
         startDate: dateWithZone(draft.startDate),
         endDate: dateWithZone(draft.endDate, true),
       })
@@ -926,11 +994,24 @@ export default function ErdSurveys() {
       const result = await getSurveyResults(id)
       setResults((current) => ({ ...current, [id]: result.data }))
 
+      const participantResponse = await getSurveyParticipants(id)
+      const employeeById = new Map(employeeDirectory.map((employee) => [employee.id, employee]))
+      const departmentById = new Map(departments.map((department) => [department.id, department.name]))
+      const participants = participantResponse.data.map((participant) => {
+        const employee = employeeById.get(participant.employeeId)
+        return {
+          ...participant,
+          departmentName: employee
+            ? departmentById.get(employee.departmentId) || null
+            : null,
+        }
+      })
+      setParticipantsBySurvey((current) => ({ ...current, [id]: participants }))
+
       if (details) {
-        const participants = await getSurveyParticipants(id)
         setDetailResult({
           result: result.data,
-          participants: participants.data,
+          participants,
         })
       } else setOpenResults(id)
     } catch (cause) {
@@ -1098,7 +1179,7 @@ export default function ErdSurveys() {
       [],
       ["category", "valid_responses", "engagement_score"],
       ...result.categoryScores.map((category) => [
-        topicLabel(category.name),
+        topicLabel(category.name, language),
         category.responseCount,
         category.satisfactionScore ?? "",
       ]),
@@ -1198,8 +1279,7 @@ export default function ErdSurveys() {
             <div className="flex flex-wrap gap-2 lg:flex-col lg:items-stretch">
               {isDraft ? (
                 <>
-                  <Button size="sm" variant="secondary" onClick={() => void loadSurveyContent(survey)}><Pencil size={15} />{tr("Sửa câu hỏi", "Edit questions")}</Button>
-                  <Button size="sm" variant="secondary" onClick={() => void openPreview(survey)}><Eye size={15} />{tr("Xem trước", "Preview")}</Button>
+                  <Button size="sm" variant="secondary" onClick={() => void loadSurveyContent(survey)}><Pencil size={15} />{tr("Chỉnh sửa", "Edit")}</Button>
                   <Button size="sm" disabled={pending} onClick={() => void openPreview(survey)}><PlayCircle size={15} />{tr("Xem trước & xuất bản", "Preview & publish")}</Button>
                 </>
               ) : isClosed ? (
@@ -1219,14 +1299,24 @@ export default function ErdSurveys() {
             <Button size="sm" onClick={() => void openEmployeeSurvey(survey.id)}><PlayCircle size={15} />{tr("Bắt đầu", "Start")}</Button>
           )}
         </div>
-        {isHr && openResults === survey.id && result && <ResultOverview result={result} />}
+        {isHr && openResults === survey.id && result && (
+          <ResultOverview
+            result={result}
+            participants={participantsBySurvey[survey.id] || []}
+          />
+        )}
       </Card>
     )
   }
 
-  const groupedSurveys = (["DRAFT", "ACTIVE", "CLOSED"] as const)
-    .map((status) => ({ status, items: visibleSurveys.filter((survey) => survey.status === status) }))
-    .filter((group) => group.items.length > 0)
+  const groupedSurveys = (
+    statusFilter === "ALL"
+      ? (["DRAFT", "ACTIVE", "CLOSED"] as const)
+      : [statusFilter]
+  ).map((status) => ({
+    status,
+    items: visibleSurveys.filter((survey) => survey.status === status),
+  }))
 
   return (
     <AppShell
@@ -1458,7 +1548,7 @@ export default function ErdSurveys() {
                       <p className="mt-1 text-sm font-medium text-slate-600">
                         {tr("Chọn chủ đề cần đo lường; câu hỏi chuẩn sẽ được thêm tự động.", "Select topics to measure; standard questions are added automatically.")}
                       </p>
-                      <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                      <div className="mt-2 grid grid-cols-2 gap-2 md:grid-cols-3 lg:grid-cols-4">
                         {categories.map((category) => {
                           const selected = draft.categoryIds.includes(
                             category.id,
@@ -1466,35 +1556,62 @@ export default function ErdSurveys() {
                           return (
                             <label
                               key={category.id}
-                              className={`relative flex min-h-24 cursor-pointer flex-col justify-between gap-3 rounded-xl border p-3 transition-all ${
+                              className={`flex min-h-10 cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 transition-all ${
                                 selected
-                                  ? "border-orange-400 bg-orange-50 shadow-sm ring-1 ring-orange-100"
-                                  : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50"
+                                  ? "border-orange-500 bg-orange-50/50 font-semibold text-orange-950 shadow-sm"
+                                  : "border-slate-200 bg-white text-slate-700 hover:border-slate-300"
                               }`}
                             >
+                              <span className="shrink-0 text-base" aria-hidden="true">
+                                {topicIcon(category.name)}
+                              </span>
+                              <span className="min-w-0 flex-1 text-xs font-medium leading-tight">
+                                {topicLabel(category.name, language)}
+                              </span>
+                              <span className={`shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${selected ? "bg-orange-100 text-orange-800" : "bg-slate-100 text-slate-500"}`}>
+                                {category.defaultQuestions.length} {tr("câu", "items")}
+                              </span>
                               <input
                                 type="checkbox"
                                 checked={selected}
                                 onChange={() => toggleCategory(category.id)}
-                                className="absolute right-3 top-3 size-4 accent-orange-500"
+                                className="size-3.5 shrink-0 rounded-full accent-orange-500"
                               />
-                              <span className="text-2xl" aria-hidden="true">
-                                {topicIcon(category.name)}
-                              </span>
-                              <span className="pr-5">
-                                <strong className="block text-sm font-semibold leading-5 text-slate-900">
-                                  {topicLabel(category.name)}
-                                </strong>
-                                <span className="mt-1 inline-flex rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600">
-                                  {category.defaultQuestions.length} {tr("câu chuẩn", "standard questions")}
-                                </span>
-                              </span>
                             </label>
                           )
                         })}
                       </div>
                     </fieldset>
                     {draft.categoryIds.length > 0 && (
+                      <SurveyQuestionWizard
+                        categories={selectedCategories}
+                        stagedQuestions={stagedQuestions}
+                        customQuestions={customQuestions}
+                        customDraft={customDraft}
+                        onToggleBank={toggleBankQuestion}
+                        onCustomDraft={setCustomDraft}
+                        onAddCustom={addCustomQuestion}
+                        onRemoveCustom={(index) =>
+                          setCustomQuestions((current) =>
+                            current.filter((_, itemIndex) => itemIndex !== index),
+                          )
+                        }
+                        onEditCustom={(index) => {
+                          const question = customQuestions[index]
+                          setCustomDraft({
+                            questionText: question.questionText,
+                            categoryId: question.categoryId,
+                            questionType: question.questionType,
+                            options: isChoiceConfig(question.answerConfig)
+                              ? question.answerConfig.options.map((option) => option.label).join("\n")
+                              : "",
+                            displayOrder: question.displayOrder,
+                          })
+                          setCustomQuestions((current) => current.filter((_, itemIndex) => itemIndex !== index))
+                        }}
+                      />
+                    )}
+                    {false && draft.categoryIds.length > 0 && (
                       <div className="grid gap-3 sm:col-span-2 xl:grid-cols-3">
                         <details className="h-fit rounded-xl border border-slate-200 bg-white p-4">
                           <summary className="cursor-pointer text-[15px] font-semibold text-slate-900 marker:text-orange-500">
@@ -1511,7 +1628,7 @@ export default function ErdSurveys() {
                                   className="rounded-lg bg-slate-50 px-3 py-2"
                                 >
                                   <span className="font-semibold text-orange-700">
-                                    {topicLabel(category.name)}:
+                                    {topicLabel(category.name, language)}:
                                   </span>{" "}
                                   {question.questionText}
                                 </li>
@@ -1530,7 +1647,7 @@ export default function ErdSurveys() {
                             {selectedCategories.map((category) => (
                               <section key={category.id}>
                                 <h4 className="text-sm font-semibold text-slate-800">
-                                  {topicLabel(category.name)}
+                                  {topicLabel(category.name, language)}
                                 </h4>
                                 <div className="mt-2 grid gap-2">
                                   {category.questionBank.map((question) => {
@@ -1582,7 +1699,7 @@ export default function ErdSurveys() {
                               >
                                 <option value={0}>{tr("Chọn chủ đề", "Choose a topic")}</option>
                                 {selectedCategories.map((category) => (
-                                  <option key={category.id} value={category.id}>{topicLabel(category.name)}</option>
+                                  <option key={category.id} value={category.id}>{topicLabel(category.name, language)}</option>
                                 ))}
                               </select>
                             </label>
@@ -1693,7 +1810,7 @@ export default function ErdSurveys() {
         </>
       )}
 
-      {managedSurvey && (
+      {managedSurvey && !previewSurvey && !publishTarget && (
         <SurveyEditorStudio
           survey={managedSurvey}
           categories={categories}
@@ -1725,6 +1842,7 @@ export default function ErdSurveys() {
       {previewSurvey && (
         <SurveyPreviewModal
           survey={previewSurvey}
+          categories={categories}
           totalEmployees={totalEmployees}
           onClose={() => setPreviewSurvey(null)}
           onPublish={previewSurvey.status === "DRAFT" ? () => {
@@ -1771,7 +1889,11 @@ export default function ErdSurveys() {
                     key={value}
                     type="button"
                     aria-pressed={statusFilter === value}
-                    onClick={() => setStatusFilter(value)}
+                    onClick={() => {
+                      setStatusFilter(value)
+                      if (value !== "ALL")
+                        setOpenGroups((current) => ({ ...current, [value]: true }))
+                    }}
                     className={`rounded-full px-3 py-2 text-sm font-semibold transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-500 ${
                       statusFilter === value
                         ? "bg-slate-900 text-white shadow-sm"
@@ -1862,21 +1984,31 @@ export default function ErdSurveys() {
             <div className="space-y-4">
               {isHr ? groupedSurveys.map((group) => {
                 const title = group.status === "DRAFT"
-                  ? tr(`📝 Bản nháp đang soạn (${group.items.length})`, `📝 Draft staging (${group.items.length})`)
+                  ? tr("Bản nháp", "Drafts")
                   : group.status === "ACTIVE"
-                    ? tr(`🟢 Đang diễn ra (${group.items.length} đợt khảo sát)`, `🟢 Active surveys (${group.items.length})`)
-                    : tr(`📁 Đã kết thúc & Lưu trữ (${group.items.length})`, `📁 Closed & archived (${group.items.length})`)
-                if (group.status === "CLOSED")
-                  return (
-                    <details key={`${group.status}-${statusFilter}`} className="rounded-xl border border-slate-200 bg-slate-50/60 p-3" open={statusFilter === "CLOSED" ? true : undefined}>
-                      <summary className="cursor-pointer px-1 py-1 text-sm font-semibold text-slate-700">{title}</summary>
-                      <div className="mt-3 space-y-3">{group.items.map(renderSurveyCard)}</div>
-                    </details>
-                  )
+                    ? tr("Đang diễn ra", "Active surveys")
+                    : tr("Đã kết thúc & Lưu trữ", "Closed & archived")
+                const icon = group.status === "DRAFT" ? "📝" : group.status === "ACTIVE" ? "🟢" : "📁"
+                const badge = group.status === "DRAFT"
+                  ? "bg-amber-100 text-amber-800"
+                  : group.status === "ACTIVE"
+                    ? "bg-emerald-100 text-emerald-800"
+                    : "bg-slate-200 text-slate-700"
+                const opened = openGroups[group.status]
                 return (
-                  <section key={group.status} className="space-y-3">
-                    <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-600">{title}</h3>
-                    {group.items.map(renderSurveyCard)}
+                  <section key={group.status} className="overflow-hidden rounded-xl border border-slate-200 bg-slate-50/50">
+                    <button
+                      type="button"
+                      aria-expanded={opened}
+                      onClick={() => setOpenGroups((current) => ({ ...current, [group.status]: !current[group.status] }))}
+                      className="flex w-full items-center gap-3 px-4 py-3 text-left transition hover:bg-white focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-orange-500"
+                    >
+                      <span aria-hidden="true">{icon}</span>
+                      <span className="flex-1 text-sm font-semibold text-slate-800">{title}</span>
+                      <span className={`rounded-full px-2.5 py-0.5 text-xs font-bold ${badge}`}>{group.items.length}</span>
+                      <ChevronDown size={18} className={`text-slate-400 transition-transform duration-200 ${opened ? "rotate-180" : ""}`} />
+                    </button>
+                    {opened && <div className="space-y-3 border-t border-slate-200 p-3">{group.items.length > 0 ? group.items.map(renderSurveyCard) : <p className="rounded-lg bg-white px-4 py-5 text-center text-sm text-slate-500">{tr("Chưa có khảo sát trong nhóm này.", "No surveys in this section.")}</p>}</div>}
                   </section>
                 )
               }) : visibleSurveys.map((survey) => {
@@ -2021,7 +2153,10 @@ export default function ErdSurveys() {
                         )}
                     </div>
                     {isHr && openResults === survey.id && result && (
-                      <ResultOverview result={result} />
+                      <ResultOverview
+                        result={result}
+                        participants={participantsBySurvey[survey.id] || []}
+                      />
                     )}
                   </Card>
                 )
@@ -2106,6 +2241,258 @@ function SurveyKpiCard({
   )
 }
 
+function CompactOptionInputs({
+  value,
+  onChange,
+}: {
+  value: string
+  onChange: (value: string) => void
+}) {
+  const { language } = useLanguage()
+  const tr = (vi: string, en: string) => (language === "vi" ? vi : en)
+  const options = value.split("\n")
+  const normalized = options.length >= 2 ? options : [...options, ...Array(2 - options.length).fill("")]
+  const update = (index: number, next: string) =>
+    onChange(normalized.map((option, itemIndex) => itemIndex === index ? next : option).join("\n"))
+  const remove = (index: number) => {
+    if (normalized.length <= 2) return
+    onChange(normalized.filter((_, itemIndex) => itemIndex !== index).join("\n"))
+  }
+  const add = () => onChange([...normalized, ""].join("\n"))
+
+  return (
+    <div>
+      <div className="grid gap-2 sm:grid-cols-2">
+        {normalized.map((option, index) => (
+          <div key={index} className="flex items-center gap-1.5">
+            <input
+              value={option}
+              placeholder={tr(`Phương án ${String.fromCharCode(65 + index)}`, `Option ${String.fromCharCode(65 + index)}`)}
+              className="h-10 min-w-0 flex-1 rounded-lg border border-slate-300 bg-white px-3 text-sm outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100"
+              onChange={(event) => update(index, event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") {
+                  event.preventDefault()
+                  add()
+                }
+              }}
+            />
+            <button type="button" aria-label={tr("Xóa phương án", "Remove option")} disabled={normalized.length <= 2} onClick={() => remove(index)} className="grid size-8 shrink-0 place-items-center rounded-md text-slate-400 hover:bg-rose-50 hover:text-rose-600 disabled:opacity-30"><X size={14} /></button>
+          </div>
+        ))}
+      </div>
+      <button type="button" onClick={add} className="mt-2 text-xs font-semibold text-orange-700 hover:underline">+ {tr("Thêm phương án", "Add option")}</button>
+    </div>
+  )
+}
+
+function SurveyQuestionWizard({
+  categories,
+  stagedQuestions,
+  customQuestions,
+  customDraft,
+  onToggleBank,
+  onCustomDraft,
+  onAddCustom,
+  onRemoveCustom,
+  onEditCustom,
+}: {
+  categories: SurveyCategory[]
+  stagedQuestions: SurveyQuestionInput[]
+  customQuestions: SurveyQuestionInput[]
+  customDraft: QuestionDraft
+  onToggleBank: (question: SurveyQuestionInput) => void
+  onCustomDraft: (value: QuestionDraft) => void
+  onAddCustom: () => void
+  onRemoveCustom: (index: number) => void
+  onEditCustom: (index: number) => void
+}) {
+  const { language } = useLanguage()
+  const tr = (vi: string, en: string) => (language === "vi" ? vi : en)
+  const [step, setStep] = useState<0 | 1 | 2>(0)
+  const defaultQuestions = categories.flatMap((category) =>
+    category.defaultQuestions.map((question) => ({ category, question })),
+  )
+  const steps = [
+    tr(`1. Câu hỏi mặc định (${defaultQuestions.length})`, `1. Standard questions (${defaultQuestions.length})`),
+    tr(`2. Ngân hàng bổ sung (${stagedQuestions.length})`, `2. Question bank (${stagedQuestions.length})`),
+    tr(`3. Câu hỏi tự tạo (${customQuestions.length})`, `3. Custom questions (${customQuestions.length})`),
+  ]
+  const choice = customDraft.questionType === "SINGLE_CHOICE" || customDraft.questionType === "MULTIPLE_CHOICE"
+
+  return (
+    <section className="sm:col-span-2 overflow-hidden rounded-xl border border-slate-200 bg-white">
+      <div className="grid border-b border-slate-200 sm:grid-cols-3">
+        {steps.map((label, index) => (
+          <button key={label} type="button" onClick={() => setStep(index as 0 | 1 | 2)} className={`min-h-12 border-b-2 px-3 py-2 text-sm font-semibold transition ${step === index ? "border-orange-500 bg-orange-50 text-orange-800" : "border-transparent text-slate-500 hover:bg-slate-50 hover:text-slate-800"}`}>{label}</button>
+        ))}
+      </div>
+      <div className="min-h-[380px] max-h-[50vh] overflow-y-auto rounded-b-xl border border-t-0 border-slate-200 bg-slate-50/50 p-4">
+        {step === 0 && (
+          <div className="space-y-2">
+            {defaultQuestions.map(({ category, question }, index) => <article key={question.templateCode || question.catalogQuestionId} className="flex gap-3 rounded-lg border border-emerald-100 bg-emerald-50/40 p-3"><span className="grid size-7 shrink-0 place-items-center rounded-full bg-white text-xs font-bold text-emerald-700">{index + 1}</span><div><div className="flex flex-wrap gap-2"><span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold text-emerald-800">{topicLabel(category.name, language)}</span><span className="text-[11px] font-semibold text-slate-400">{tr("Thang điểm 1–5", "Rating 1–5")}</span></div><p className="mt-1.5 text-sm text-slate-700">{question.questionText}</p></div></article>)}
+          </div>
+        )}
+        {step === 1 && (
+          <div className="space-y-3">
+            {categories.map((category) => <details key={category.id} className="rounded-lg border border-slate-200" open><summary className="cursor-pointer px-3 py-2.5 text-sm font-semibold text-slate-800">{topicIcon(category.name)} {topicLabel(category.name, language)} · {category.questionBank.length}</summary><div className="space-y-2 border-t border-slate-100 p-3">{category.questionBank.map((question) => { const selected = stagedQuestions.some((item) => item.categoryId === question.categoryId && item.questionText === question.questionText); return <button key={question.bankCode || question.catalogQuestionId} type="button" aria-pressed={selected} onClick={() => onToggleBank(question)} className={`flex w-full items-start gap-2 rounded-lg border px-3 py-2.5 text-left text-sm ${selected ? "border-blue-400 bg-blue-50 text-blue-900" : "border-slate-200 text-slate-600 hover:bg-slate-50"}`}><span className="font-bold">{selected ? "✓" : "+"}</span><span>{question.questionText}</span></button> })}{category.questionBank.length === 0 && <p className="text-xs text-slate-500">{tr("Chưa có câu hỏi bổ sung.", "No optional questions.")}</p>}</div></details>)}
+          </div>
+        )}
+        {step === 2 && (
+          <div className="grid gap-4 lg:grid-cols-[1fr_.9fr]">
+            <div className="space-y-3">
+              <label className="block text-xs font-semibold text-slate-600">{tr("Chủ đề", "Topic")}<select className={`${control} mt-1`} value={customDraft.categoryId} onChange={(event) => onCustomDraft({ ...customDraft, categoryId: Number(event.target.value) })}><option value={0}>{tr("Chọn chủ đề", "Choose topic")}</option>{categories.map((category) => <option key={category.id} value={category.id}>{topicLabel(category.name, language)}</option>)}</select></label>
+              <label className="block text-xs font-semibold text-slate-600">{tr("Nội dung câu hỏi", "Question text")}<textarea rows={2} className={`${area} mt-1 min-h-16`} value={customDraft.questionText} onChange={(event) => onCustomDraft({ ...customDraft, questionText: event.target.value })} /></label>
+              <label className="block text-xs font-semibold text-slate-600">{tr("Loại trả lời", "Answer type")}<select className={`${control} mt-1`} value={customDraft.questionType} onChange={(event) => onCustomDraft({ ...customDraft, questionType: event.target.value as SurveyQuestionType })}><option value="SINGLE_CHOICE">🔘 {tr("Một lựa chọn", "Single choice")}</option><option value="MULTIPLE_CHOICE">☑️ {tr("Nhiều lựa chọn", "Multiple choice")}</option><option value="RATING">⭐ {tr("Thang điểm 1–5", "Rating 1–5")}</option><option value="TEXT">✍️ {tr("Tự luận", "Free text")}</option></select></label>
+              {choice && <CompactOptionInputs value={customDraft.options} onChange={(options) => onCustomDraft({ ...customDraft, options })} />}
+              <Button type="button" size="sm" onClick={onAddCustom}><Plus size={14} />{tr("Thêm vào khảo sát", "Add to survey")}</Button>
+            </div>
+            <div className="space-y-2 border-t border-slate-100 pt-3 lg:border-l lg:border-t-0 lg:pl-4 lg:pt-0">
+              <h4 className="text-sm font-semibold text-slate-800">{tr("Câu hỏi đã thêm", "Added questions")}</h4>
+              {customQuestions.map((question, index) => <article key={`${question.questionText}-${index}`} className="rounded-lg bg-slate-50 p-3"><p className="text-xs font-semibold text-blue-700">{questionTypeLabels[question.questionType]}</p><p className="mt-1 text-sm text-slate-700">{question.questionText}</p><div className="mt-2 flex gap-2"><button type="button" onClick={() => onEditCustom(index)} className="text-xs font-semibold text-blue-700 hover:underline">{tr("Sửa", "Edit")}</button><button type="button" onClick={() => onRemoveCustom(index)} className="text-xs font-semibold text-rose-600 hover:underline">{tr("Xóa", "Delete")}</button></div></article>)}
+              {customQuestions.length === 0 && <p className="text-xs text-slate-500">{tr("Chưa có câu hỏi tự tạo.", "No custom questions yet.")}</p>}
+            </div>
+          </div>
+        )}
+      </div>
+      <footer className="flex items-center justify-between border-t border-slate-200 bg-slate-50 px-4 py-3"><Button type="button" size="sm" variant="secondary" disabled={step === 0} onClick={() => setStep((step - 1) as 0 | 1 | 2)}>← {tr("Quay lại", "Back")}</Button><span className="text-xs font-medium text-slate-400">{step + 1}/3</span><Button type="button" size="sm" variant="secondary" disabled={step === 2} onClick={() => setStep((step + 1) as 0 | 1 | 2)}>{tr("Tiếp tục", "Continue")} →</Button></footer>
+    </section>
+  )
+}
+
+function SurveyDraftQuestionWizard({
+  questions,
+  categories,
+  newQuestion,
+  onNewQuestion,
+  onAdd,
+  onUpdate,
+  onChangeType,
+  onDelete,
+  onOptionsChange,
+  onQuestionsChange,
+}: {
+  questions: SurveyQuestion[]
+  categories: SurveyCategory[]
+  newQuestion: QuestionDraft
+  onNewQuestion: (value: QuestionDraft) => void
+  onAdd: () => void
+  onUpdate: (id: number, changes: Partial<SurveyQuestion>) => void
+  onChangeType: (question: SurveyQuestion, type: SurveyQuestionType) => void
+  onDelete: (id: number) => void
+  onOptionsChange: (id: number, options: string) => void
+  onQuestionsChange: (questions: SurveyQuestion[]) => void
+}) {
+  const { language } = useLanguage()
+  const tr = (vi: string, en: string) => (language === "vi" ? vi : en)
+  const [step, setStep] = useState<0 | 1 | 2>(0)
+  const bankKey = (categoryId: number, questionText: string) =>
+    `${categoryId}|${questionText.trim().toLocaleLowerCase()}`
+  const bankKeys = new Set(
+    categories.flatMap((category) =>
+      category.questionBank.map((question) => bankKey(category.id, question.questionText)),
+    ),
+  )
+  const standard = questions.filter((question) => question.isSatisfactionCore)
+  const selectedBankQuestions = questions.filter(
+    (question) => !question.isSatisfactionCore && bankKeys.has(bankKey(question.categoryId, question.questionText)),
+  )
+  const customQuestions = questions.filter(
+    (question) => !question.isSatisfactionCore && !bankKeys.has(bankKey(question.categoryId, question.questionText)),
+  )
+  const choiceDraft = newQuestion.questionType === "SINGLE_CHOICE" || newQuestion.questionType === "MULTIPLE_CHOICE"
+  const labelFor = (categoryId: number) => topicLabel(categories.find((category) => category.id === categoryId)?.name || `#${categoryId}`, language)
+  const optionsFor = (question: SurveyQuestion) => isChoiceConfig(question.answerConfig) ? question.answerConfig.options.map((option) => option.label).join("\n") : ""
+  const tabs = [
+    tr(`1. Câu hỏi mặc định (${standard.length})`, `1. Standard (${standard.length})`),
+    tr(`2. Ngân hàng bổ sung (${selectedBankQuestions.length})`, `2. Question bank (${selectedBankQuestions.length})`),
+    tr(`3. Câu hỏi tự tạo (${customQuestions.length})`, `3. Custom (${customQuestions.length})`),
+  ]
+
+  const isBankSelected = (categoryId: number, questionText: string) =>
+    selectedBankQuestions.some(
+      (question) => bankKey(question.categoryId, question.questionText) === bankKey(categoryId, questionText),
+    )
+
+  const addBankQuestion = (categoryId: number, question: SurveyQuestionInput) => {
+    const id = -Date.now()
+    onQuestionsChange([
+      ...questions,
+      {
+        id,
+        categoryId,
+        questionText: question.questionText,
+        questionType: question.questionType,
+        answerConfig: question.answerConfig,
+        displayOrder: questions.length + 1,
+        isRequired: true,
+        isSatisfactionCore: false,
+      },
+    ])
+  }
+
+  const toggleBankQuestion = (categoryId: number, question: SurveyQuestionInput) => {
+    const key = bankKey(categoryId, question.questionText)
+    const selected = selectedBankQuestions.find(
+      (item) => bankKey(item.categoryId, item.questionText) === key,
+    )
+    if (selected) {
+      onQuestionsChange(questions.filter((item) => item.id !== selected.id))
+      return
+    }
+    addBankQuestion(categoryId, question)
+  }
+
+  const selectAllBankQuestions = (category: SurveyCategory) => {
+    const missing = category.questionBank.filter(
+      (question) => !isBankSelected(category.id, question.questionText),
+    )
+    if (missing.length === 0) return
+    const base = Date.now()
+    onQuestionsChange([
+      ...questions,
+      ...missing.map((question, index) => ({
+        id: -(base + question.catalogQuestionId + index),
+        categoryId: category.id,
+        questionText: question.questionText,
+        questionType: question.questionType,
+        answerConfig: question.answerConfig,
+        displayOrder: questions.length + index + 1,
+        isRequired: true,
+        isSatisfactionCore: false,
+      })),
+    ])
+  }
+
+  const clearBankQuestions = (category: SurveyCategory) => {
+    const categoryBankKeys = new Set(
+      category.questionBank.map((question) => bankKey(category.id, question.questionText)),
+    )
+    onQuestionsChange(
+      questions.filter(
+        (question) => !categoryBankKeys.has(bankKey(question.categoryId, question.questionText)),
+      ),
+    )
+  }
+
+  const editableCard = (question: SurveyQuestion, index: number) => {
+    const choice = question.questionType === "SINGLE_CHOICE" || question.questionType === "MULTIPLE_CHOICE"
+    return <article key={question.id} className="rounded-lg border border-slate-200 p-3"><div className="flex items-center justify-between gap-2"><span className="text-xs font-semibold text-slate-400">{tr("Câu", "Question")} {index + 1} · {labelFor(question.categoryId)}</span><button type="button" onClick={() => onDelete(question.id)} className="rounded-md p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600"><Trash2 size={15} /></button></div><div className="mt-2 grid gap-2 sm:grid-cols-[1fr_170px]"><input className="h-10 rounded-lg border border-slate-300 px-3 text-sm outline-none focus:border-orange-400" value={question.questionText} onChange={(event) => onUpdate(question.id, { questionText: event.target.value })} /><select className="h-10 rounded-lg border border-slate-300 px-2 text-sm" value={question.questionType} onChange={(event) => onChangeType(question, event.target.value as SurveyQuestionType)}><option value="SINGLE_CHOICE">{tr("Một lựa chọn", "Single choice")}</option><option value="MULTIPLE_CHOICE">{tr("Nhiều lựa chọn", "Multiple choice")}</option><option value="RATING">{tr("Điểm 1–5", "Rating 1–5")}</option><option value="TEXT">{tr("Tự luận", "Free text")}</option></select></div>{choice && <div className="mt-3"><CompactOptionInputs value={optionsFor(question)} onChange={(options) => onOptionsChange(question.id, options)} /></div>}</article>
+  }
+
+  return (
+    <div className="mt-4 overflow-hidden rounded-xl border border-slate-200">
+      <div className="grid border-b border-slate-200 sm:grid-cols-3">{tabs.map((tab, index) => <button key={tab} type="button" onClick={() => setStep(index as 0 | 1 | 2)} className={`min-h-12 border-b-2 px-3 text-sm font-semibold ${step === index ? "border-orange-500 bg-orange-50 text-orange-800" : "border-transparent text-slate-500 hover:bg-slate-50"}`}>{tab}</button>)}</div>
+      <div className="min-h-[380px] max-h-[50vh] overflow-y-auto rounded-b-xl border border-t-0 border-slate-200 bg-slate-50/50 p-4">
+        {step === 0 && <div className="space-y-3">{categories.map((category, categoryIndex) => { const categoryQuestions = standard.filter((question) => question.categoryId === category.id); if (categoryQuestions.length === 0) return null; return <details key={category.id} open={categoryIndex === 0} className="overflow-hidden rounded-xl border border-slate-200 bg-white"><summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-semibold text-slate-900"><span>{topicIcon(category.name)} {topicLabel(category.name, language)}</span><span className="text-xs font-medium text-slate-500">{categoryQuestions.length} {tr("câu chuẩn", "core")}</span></summary><div className="space-y-2 border-t border-slate-100 p-3">{categoryQuestions.map((question, index) => <article key={question.id} className="flex min-h-11 items-center gap-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 shadow-sm"><span className="grid size-7 shrink-0 place-items-center rounded-md bg-white text-xs font-bold text-slate-500">{String(index + 1).padStart(2, "0")}</span><p className="min-w-0 flex-1 text-sm leading-relaxed text-slate-800">{question.questionText}</p><span title={tr("Câu hỏi chuẩn tính điểm", "Core scoring question")} className="shrink-0 text-slate-400">🔒</span><span className="shrink-0 rounded-full bg-slate-200 px-2 py-0.5 text-[11px] font-semibold text-slate-600">1–5</span></article>)}</div></details> })}</div>}
+        {step === 1 && <div className="space-y-3">{categories.map((category, categoryIndex) => { const selectedCount = category.questionBank.filter((question) => isBankSelected(category.id, question.questionText)).length; return <details key={category.id} open={categoryIndex === 0} className="overflow-hidden rounded-xl border border-slate-200 bg-white"><summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-semibold text-slate-900"><span>{topicIcon(category.name)} {topicLabel(category.name, language)}</span><span className="text-xs font-medium text-slate-500">{selectedCount}/{category.questionBank.length} {tr("đã chọn", "selected")}</span></summary><div className="border-t border-slate-100 p-3"><div className="mb-3 flex flex-wrap items-center justify-between gap-2"><p className="text-xs font-semibold text-slate-600">+ {tr("Thêm/bớt câu hỏi bổ sung từ ngân hàng", "Add/remove bank questions")}</p><div className="flex gap-2"><button type="button" onClick={() => selectAllBankQuestions(category)} className="text-xs font-semibold text-blue-700 hover:underline">{tr("Chọn tất cả", "Select all")}</button><span className="text-slate-300">/</span><button type="button" onClick={() => clearBankQuestions(category)} className="text-xs font-semibold text-slate-600 hover:underline">{tr("Bỏ chọn", "Clear")}</button></div></div><div className="space-y-2">{category.questionBank.map((question) => { const selected = isBankSelected(category.id, question.questionText); return <label key={question.bankCode || question.catalogQuestionId} className={`flex cursor-pointer items-start gap-3 rounded-lg border p-3 text-sm leading-relaxed transition ${selected ? "border-orange-300 bg-orange-50/70 text-slate-900" : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"}`}><input type="checkbox" checked={selected} onChange={() => toggleBankQuestion(category.id, question)} className="mt-0.5 size-4 accent-orange-600" /><span>{question.questionText}</span></label>})}{category.questionBank.length === 0 && <p className="py-4 text-center text-xs text-slate-500">{tr("Chưa có câu hỏi bổ sung trong chủ đề này.", "No bank questions in this topic.")}</p>}</div></div></details> })}</div>}
+        {step === 2 && <div className="grid gap-4 lg:grid-cols-[1.15fr_.85fr]"><div className="space-y-3"><label className="block text-xs font-semibold text-slate-600">{tr("Chủ đề", "Topic")}<select className={`${control} mt-1`} value={newQuestion.categoryId} onChange={(event) => onNewQuestion({ ...newQuestion, categoryId: Number(event.target.value) })}>{categories.map((category) => <option key={category.id} value={category.id}>{topicLabel(category.name, language)}</option>)}</select></label><label className="block text-xs font-semibold text-slate-600">{tr("Nội dung câu hỏi", "Question text")}<textarea rows={2} className={`${area} mt-1 min-h-[70px]`} value={newQuestion.questionText} onChange={(event) => onNewQuestion({ ...newQuestion, questionText: event.target.value })} /></label><label className="block text-xs font-semibold text-slate-600">{tr("Dạng trả lời", "Answer type")}<select className={`${control} mt-1`} value={newQuestion.questionType} onChange={(event) => onNewQuestion({ ...newQuestion, questionType: event.target.value as SurveyQuestionType })}><option value="RATING">⭐ {tr("Thang điểm 1–5 (Đánh giá mức độ hài lòng)", "Rating 1–5")}</option><option value="SINGLE_CHOICE">🔘 {tr("Chọn một đáp án (Single Choice)", "Single choice")}</option><option value="MULTIPLE_CHOICE">☑️ {tr("Chọn nhiều đáp án (Multiple Choice)", "Multiple choice")}</option><option value="TEXT">📝 {tr("Điền văn bản (Text/Tự luận)", "Text response")}</option></select></label>{choiceDraft && <CompactOptionInputs value={newQuestion.options} onChange={(options) => onNewQuestion({ ...newQuestion, options })} />}<Button type="button" size="sm" onClick={onAdd}><Plus size={14} />{tr("Thêm vào danh sách câu hỏi", "Add question")}</Button></div><div className="space-y-2 border-t border-slate-100 pt-3 lg:border-l lg:border-t-0 lg:pl-4 lg:pt-0"><h4 className="text-sm font-semibold text-slate-800">{tr(`Câu hỏi tự tạo (${customQuestions.length})`, `Custom questions (${customQuestions.length})`)}</h4>{customQuestions.map(editableCard)}{customQuestions.length === 0 && <p className="rounded-lg border border-dashed border-slate-300 p-5 text-center text-xs text-slate-500">{tr("Chưa có câu hỏi tự tạo.", "No custom questions.")}</p>}</div></div>}
+      </div>
+      <footer className="flex items-center justify-between border-t border-slate-200 bg-slate-50 px-4 py-3"><Button type="button" size="sm" variant="secondary" disabled={step === 0} onClick={() => setStep((step - 1) as 0 | 1 | 2)}>← {tr("Quay lại", "Back")}</Button><span className="text-xs text-slate-400">{step + 1}/3</span><Button type="button" size="sm" variant="secondary" disabled={step === 2} onClick={() => setStep((step + 1) as 0 | 1 | 2)}>{tr("Tiếp tục", "Continue")} →</Button></footer>
+    </div>
+  )
+}
+
 function SurveyEditorStudio({
   survey,
   categories,
@@ -2134,6 +2521,7 @@ function SurveyEditorStudio({
     ...emptyQuestion(),
     categoryId: metadata.categoryIds[0] || 0,
   })
+  const [studioError, setStudioError] = useState("")
   useDialogBehavior(true, onClose)
 
   const duration = useMemo(() => {
@@ -2188,6 +2576,38 @@ function SurveyEditorStudio({
       isSatisfactionCore: false,
     }])
     setNewQuestion({ ...emptyQuestion(), categoryId: metadata.categoryIds[0] || 0 })
+    setStudioError("")
+  }
+
+  const submitStudio = (publishAfterSave: boolean) => {
+    let merged = questions
+    if (newQuestion.questionText.trim()) {
+      const needsOptions = newQuestion.questionType === "SINGLE_CHOICE" || newQuestion.questionType === "MULTIPLE_CHOICE"
+      const answerConfig = newQuestion.questionType === "RATING"
+        ? { min: 1 as const, max: 5 as const, labels: ratingLabels }
+        : newQuestion.questionType === "TEXT"
+          ? null
+          : optionConfig(newQuestion.options)
+      if (!newQuestion.categoryId || (needsOptions && (!isChoiceConfig(answerConfig) || answerConfig.options.length < 2))) {
+        setStudioError(tr("Câu hỏi đang nhập cần chủ đề và ít nhất 2 phương án.", "The pending question needs a topic and at least two options."))
+        return
+      }
+      merged = [...questions, {
+        id: -(Date.now() + questions.length),
+        surveyId: survey.id,
+        questionText: newQuestion.questionText.trim(),
+        categoryId: newQuestion.categoryId,
+        questionType: newQuestion.questionType,
+        answerConfig,
+        displayOrder: questions.length + 1,
+        isRequired: true,
+        isSatisfactionCore: false,
+      }]
+      setQuestions(merged)
+      setNewQuestion({ ...emptyQuestion(), categoryId: metadata.categoryIds[0] || 0 })
+    }
+    setStudioError("")
+    onSave(merged, publishAfterSave)
   }
 
   return (
@@ -2224,18 +2644,30 @@ function SurveyEditorStudio({
           <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
             <h3 className="font-semibold text-slate-950">2. {tr("Chủ đề khảo sát", "Survey topics")}</h3>
             <p className="mt-1 text-xs text-amber-700">{tr("Chủ đề đã được khóa theo công thức chấm điểm của bản nháp. Backend hiện chưa hỗ trợ đổi chủ đề sau khi tạo.", "Topics are locked by the draft scoring setup. The backend does not support changing topics after creation.")}</p>
-            <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="mt-2 grid grid-cols-2 gap-2 md:grid-cols-3 lg:grid-cols-4">
               {categories.map((category) => {
                 const selected = selectedIds.has(category.id)
                 const count = questions.filter((question) => question.categoryId === category.id).length
-                return <div key={category.id} className={`flex items-center gap-3 rounded-xl border p-3 ${selected ? "border-orange-300 bg-orange-50" : "border-slate-200 bg-slate-50 opacity-55"}`}><span className="text-xl">{topicIcon(category.name)}</span><span className="min-w-0 flex-1"><strong className="block truncate text-sm text-slate-900">{topicLabel(category.name)}</strong><span className="text-xs text-slate-500">{selected ? tr(`${count} câu hỏi`, `${count} questions`) : tr("Chưa chọn", "Not selected")}</span></span>{selected && <CheckCircle2 size={17} className="text-orange-600" />}</div>
+                return <div key={category.id} className={`flex min-h-10 items-center gap-2 rounded-lg border px-3 py-2 ${selected ? "border-orange-500 bg-orange-50/50 text-orange-950 shadow-sm" : "border-slate-200 bg-white text-slate-500 opacity-60"}`}><span className="shrink-0 text-base">{topicIcon(category.name)}</span><strong className="min-w-0 flex-1 text-xs font-medium leading-tight">{topicLabel(category.name, language)}</strong><span className={`shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${selected ? "bg-orange-100 text-orange-800" : "bg-slate-100 text-slate-500"}`}>{selected ? `${count} ${tr("câu", "items")}` : "—"}</span>{selected && <CheckCircle2 size={14} className="shrink-0 text-orange-600" />}</div>
               })}
             </div>
           </section>
 
           <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
             <h3 className="font-semibold text-slate-950">3. {tr("Quản lý câu hỏi", "Question management")}</h3>
-            <div className="mt-4 space-y-3">
+            <SurveyDraftQuestionWizard
+              questions={questions}
+              categories={categories.filter((category) => selectedIds.has(category.id))}
+              newQuestion={newQuestion}
+              onNewQuestion={setNewQuestion}
+              onAdd={addQuestion}
+              onUpdate={updateQuestion}
+              onChangeType={changeType}
+              onDelete={(id) => setQuestions((current) => current.filter((question) => question.id !== id))}
+              onOptionsChange={(id, options) => updateQuestion(id, { answerConfig: optionConfig(options) })}
+              onQuestionsChange={setQuestions}
+            />
+            <div className="hidden mt-4 space-y-3">
               {questions.map((question, index) => {
                 const locked = question.isSatisfactionCore
                 const choice = question.questionType === "SINGLE_CHOICE" || question.questionType === "MULTIPLE_CHOICE"
@@ -2251,11 +2683,11 @@ function SurveyEditorStudio({
               })}
             </div>
 
-            <div className="mt-5 rounded-xl border border-dashed border-orange-300 bg-orange-50/30 p-4">
+            <div className="hidden mt-5 rounded-xl border border-dashed border-orange-300 bg-orange-50/30 p-4">
               <h4 className="font-semibold text-slate-900">+ {tr("Thêm câu hỏi tùy chỉnh", "Add custom question")}</h4>
               <div className="mt-3 grid gap-3 sm:grid-cols-2">
                 <label className="text-xs font-semibold text-slate-600 sm:col-span-2">{tr("Nội dung câu hỏi", "Question text")}<textarea rows={2} className={`${area} mt-1 min-h-16`} value={newQuestion.questionText} onChange={(event) => setNewQuestion((current) => ({ ...current, questionText: event.target.value }))} /></label>
-                <label className="text-xs font-semibold text-slate-600">{tr("Chủ đề", "Topic")}<select className={`${control} mt-1`} value={newQuestion.categoryId} onChange={(event) => setNewQuestion((current) => ({ ...current, categoryId: Number(event.target.value) }))}>{categories.filter((category) => selectedIds.has(category.id)).map((category) => <option key={category.id} value={category.id}>{topicLabel(category.name)}</option>)}</select></label>
+                <label className="text-xs font-semibold text-slate-600">{tr("Chủ đề", "Topic")}<select className={`${control} mt-1`} value={newQuestion.categoryId} onChange={(event) => setNewQuestion((current) => ({ ...current, categoryId: Number(event.target.value) }))}>{categories.filter((category) => selectedIds.has(category.id)).map((category) => <option key={category.id} value={category.id}>{topicLabel(category.name, language)}</option>)}</select></label>
                 <label className="text-xs font-semibold text-slate-600">{tr("Loại trả lời", "Answer type")}<select className={`${control} mt-1`} value={newQuestion.questionType} onChange={(event) => setNewQuestion((current) => ({ ...current, questionType: event.target.value as SurveyQuestionType }))}><option value="SINGLE_CHOICE">🔘 {tr("Một lựa chọn", "Single choice")}</option><option value="MULTIPLE_CHOICE">☑️ {tr("Nhiều lựa chọn", "Multiple choice")}</option><option value="RATING">⭐ {tr("Thang điểm 1–5", "Rating 1–5")}</option><option value="TEXT">✍️ {tr("Tự luận", "Free text")}</option></select></label>
                 {(newQuestion.questionType === "SINGLE_CHOICE" || newQuestion.questionType === "MULTIPLE_CHOICE") && <label className="text-xs font-semibold text-slate-600 sm:col-span-2">{tr("Các lựa chọn · mỗi dòng một đáp án", "Options · one per line")}<textarea rows={3} className={`${area} mt-1 min-h-20`} value={newQuestion.options} onChange={(event) => setNewQuestion((current) => ({ ...current, options: event.target.value }))} /></label>}
               </div>
@@ -2265,8 +2697,8 @@ function SurveyEditorStudio({
         </div>
 
         <footer className="flex flex-col gap-3 border-t border-slate-200 bg-white px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
-          <p className="text-sm font-medium text-slate-600">{tr(`Đang có: ${metadata.categoryIds.length} chủ đề · ${questions.length} câu hỏi · Tiếp cận ${totalEmployees} nhân sự`, `${metadata.categoryIds.length} topics · ${questions.length} questions · ${totalEmployees} recipients`)}</p>
-          <div className="flex flex-wrap justify-end gap-2"><Button type="button" variant="secondary" onClick={onClose}>{tr("Hủy / Đóng", "Cancel / Close")}</Button><Button type="button" variant="secondary" disabled={pending || !metadata.title.trim() || !duration} onClick={() => onSave(questions, false)}>💾 {tr("Lưu thay đổi bản nháp", "Save draft changes")}</Button><Button type="button" disabled={pending || !metadata.title.trim() || !duration} onClick={() => onSave(questions, true)}>🚀 {tr("Lưu & Xuất bản ngay", "Save & publish")}</Button></div>
+          <div><p className="text-sm font-medium text-slate-600">{tr(`Đang có: ${metadata.categoryIds.length} chủ đề · ${questions.length} câu hỏi · Tiếp cận ${totalEmployees} nhân sự`, `${metadata.categoryIds.length} topics · ${questions.length} questions · ${totalEmployees} recipients`)}</p>{studioError && <p className="mt-1 text-xs font-medium text-rose-600">{studioError}</p>}</div>
+          <div className="flex flex-wrap justify-end gap-2"><Button type="button" variant="secondary" onClick={onClose}>{tr("Hủy / Đóng", "Cancel / Close")}</Button><Button type="button" variant="secondary" disabled={pending || !metadata.title.trim() || !duration} onClick={() => submitStudio(false)}>💾 {tr("Lưu thay đổi bản nháp", "Save draft changes")}</Button><Button type="button" disabled={pending || !metadata.title.trim() || !duration} onClick={() => submitStudio(true)}>🚀 {tr("Lưu & Xuất bản ngay", "Save & publish")}</Button></div>
         </footer>
       </section>
     </div>
@@ -2275,17 +2707,38 @@ function SurveyEditorStudio({
 
 function SurveyPreviewModal({
   survey,
+  categories,
   totalEmployees,
   onClose,
   onPublish,
 }: {
   survey: SurveySummary & { questions: SurveyQuestion[] }
+  categories: SurveyCategory[]
   totalEmployees: number
   onClose: () => void
   onPublish?: () => void
 }) {
   const { language } = useLanguage()
   const tr = (vi: string, en: string) => (language === "vi" ? vi : en)
+  const groupedQuestions = useMemo(() => {
+    const groups = new Map<number, SurveyQuestion[]>()
+    survey.questions.forEach((question) =>
+      groups.set(question.categoryId, [...(groups.get(question.categoryId) || []), question]),
+    )
+    return [...groups.entries()].map(([categoryId, questions]) => ({
+      categoryId,
+      rawName: categories.find((category) => category.id === categoryId)?.name || `Chủ đề #${categoryId}`,
+      name: topicLabel(categories.find((category) => category.id === categoryId)?.name || `Chủ đề #${categoryId}`, language),
+      questions,
+    }))
+  }, [categories, language, survey.questions])
+  const estimatedMinutesMin = Math.max(1, Math.ceil(survey.questions.length * 0.35))
+  const estimatedMinutesMax = Math.max(estimatedMinutesMin, Math.ceil(survey.questions.length * 0.5))
+  const renderQuestionText = (text: string, required: boolean) => {
+    const words = text.trim().split(/\s+/)
+    const lastWord = words.pop() || ""
+    return <>{words.length > 0 ? `${words.join(" ")} ` : ""}<span className="whitespace-nowrap">{lastWord}{required && <span className="font-bold text-rose-500"> *</span>}</span></>
+  }
   useDialogBehavior(true, onClose)
 
   return (
@@ -2300,18 +2753,30 @@ function SurveyPreviewModal({
           </div>
           <button type="button" aria-label={tr("Đóng", "Close")} className="grid size-9 shrink-0 place-items-center rounded-lg text-slate-500 hover:bg-slate-100" onClick={onClose}><X size={19} /></button>
         </header>
-        <div className="space-y-4 overflow-y-auto bg-slate-50/70 p-5 sm:p-6">
-          {survey.questions.map((question, index) => (
+        {survey.questions.length > 16 && (
+          <nav className="flex shrink-0 gap-2 overflow-x-auto border-b border-slate-200 bg-white px-5 py-3 sm:px-6" aria-label={tr("Mục lục chủ đề", "Topic navigation")}>
+            {groupedQuestions.map((group) => (
+              <button key={group.categoryId} type="button" onClick={() => document.getElementById(`preview-topic-${group.categoryId}`)?.scrollIntoView({ behavior: "smooth", block: "start" })} className="shrink-0 rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:border-orange-300 hover:bg-orange-50 hover:text-orange-800">
+                {group.name} ({group.questions.length})
+              </button>
+            ))}
+          </nav>
+        )}
+        <div className="overflow-y-auto scroll-smooth bg-slate-50/70 p-5 sm:p-6">
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200/60 bg-slate-100/80 px-4 py-2.5 text-xs text-slate-600"><div className="flex flex-wrap items-center gap-2"><span className="inline-flex items-center gap-1 rounded-md bg-orange-100/80 px-2 py-0.5 font-semibold text-orange-600">👁 {tr("CHẾ ĐỘ XEM TRƯỚC", "PREVIEW MODE")}</span><span>{tr("Mô phỏng giao diện khảo sát thực tế của nhân viên", "Simulation of the employee survey experience")}</span></div><div className="font-medium text-slate-700">{survey.questions.length} {tr("câu hỏi", "questions")} · {tr("Ước tính", "Estimated")} ~{estimatedMinutesMin}{estimatedMinutesMax > estimatedMinutesMin ? `–${estimatedMinutesMax}` : ""} {tr("phút hoàn thành", "min to complete")}</div></div>
+          <div className="space-y-6">
+          {groupedQuestions.map((group) => (
+            <section key={group.categoryId} id={`preview-topic-${group.categoryId}`} className="scroll-mt-4">
+              <h3 className="mb-3 flex items-center gap-2 pb-2 pt-4 text-xs font-bold uppercase tracking-wider text-slate-500"><span>{topicIcon(group.rawName)}</span><span>{group.name}</span><span className="rounded-full bg-slate-200 px-2 py-0.5 text-[11px] font-semibold text-slate-600">{group.questions.length} {tr("câu", "items")}</span><span className="ml-2 h-px flex-1 bg-slate-200" /></h3>
+              <div className="space-y-3">
+              {group.questions.map((question, index) => (
             <article key={question.id} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
               <div className="flex gap-3">
                 <span className="grid size-7 shrink-0 place-items-center rounded-full bg-orange-50 text-xs font-bold text-orange-700">{index + 1}</span>
                 <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <p className="font-medium leading-6 text-slate-900">{question.questionText}</p>
-                    {question.isRequired && <span className="text-rose-500">*</span>}
-                  </div>
+                  <p className="font-medium leading-6 text-slate-900">{renderQuestionText(question.questionText, question.isRequired)}</p>
                   {question.questionType === "RATING" && (
-                    <div className="mt-3 grid grid-cols-5 gap-2">{[1, 2, 3, 4, 5].map((value) => <span key={value} className="grid h-9 place-items-center rounded-lg border border-slate-200 bg-slate-50 text-sm font-semibold text-slate-500">{value}</span>)}</div>
+                    <div className="mt-4 max-w-sm"><div className="flex items-center gap-2">{[1, 2, 3, 4, 5].map((value) => <button key={value} type="button" className="flex size-11 items-center justify-center rounded-xl border border-slate-200 bg-white font-semibold text-slate-700 shadow-sm transition-all hover:border-orange-400 hover:bg-orange-50/40 hover:text-orange-600 sm:size-12">{value}</button>)}</div><div className="mt-1.5 flex justify-between gap-4 text-[11px] leading-tight text-slate-400"><span className="max-w-24">{tr("Hoàn toàn không đồng ý", "Strongly disagree")}</span><span className="max-w-24 text-right">{tr("Hoàn toàn đồng ý", "Strongly agree")}</span></div></div>
                   )}
                   {isChoiceConfig(question.answerConfig) && (
                     <div className="mt-3 grid gap-2 sm:grid-cols-2">{question.answerConfig.options.map((option) => <span key={option.code} className="flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-600"><span className={`size-3 border border-slate-300 ${question.questionType === "SINGLE_CHOICE" ? "rounded-full" : "rounded"}`} />{option.label}</span>)}</div>
@@ -2320,7 +2785,11 @@ function SurveyPreviewModal({
                 </div>
               </div>
             </article>
+              ))}
+              </div>
+            </section>
           ))}
+          </div>
         </div>
         <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 bg-white px-5 py-4 sm:px-6">
           <p className="text-xs font-medium text-slate-500">{survey.questions.length} {tr("câu hỏi · Đây là bản xem trước, không ghi nhận câu trả lời.", "questions · Preview only; responses are not recorded.")}</p>
@@ -2953,7 +3422,13 @@ function EmployeeSurveyForm({
   )
 }
 
-function ResultOverview({ result }: { result: SurveyResults }) {
+function ResultOverview({
+  result,
+  participants,
+}: {
+  result: SurveyResults
+  participants: SurveyParticipant[]
+}) {
   const { language } = useLanguage()
   const tr = (vi: string, en: string) => (language === "vi" ? vi : en)
   const invitedCount = result.invitedCount
@@ -2965,34 +3440,37 @@ function ResultOverview({ result }: { result: SurveyResults }) {
       ? Math.round((submittedCount / invitedCount) * 1_000) / 10
       : 0)
   const tone = progressTone(completionRate)
+  const departmentProgress = useMemo(() => {
+    const groups = new Map<string, { invited: number; submitted: number }>()
+    participants.forEach((participant) => {
+      const name = participant.departmentName || tr("Chưa xác định", "Unassigned")
+      const current = groups.get(name) || { invited: 0, submitted: 0 }
+      current.invited += 1
+      if (participant.status === "SUBMITTED") current.submitted += 1
+      groups.set(name, current)
+    })
+    return [...groups.entries()]
+      .map(([name, counts]) => ({
+        name,
+        ...counts,
+        rate: counts.invited > 0 ? (counts.submitted / counts.invited) * 100 : 0,
+      }))
+      .sort((left, right) => left.rate - right.rate)
+  }, [participants, language])
 
   return (
     <div className="border-t border-slate-200 bg-slate-50/70 p-5 sm:p-6">
-      <div className="flex flex-col gap-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm lg:flex-row lg:items-center lg:justify-between">
+      <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">
             {tr("Tiến độ tham gia", "Participation progress")}
           </p>
-          <div className="mt-2 flex flex-wrap items-baseline gap-x-3 gap-y-1">
-            <strong className="text-3xl font-bold tracking-tight text-slate-950">
-              {submittedCount} / {invitedCount}
-            </strong>
-            <span className="text-sm font-medium text-slate-500">
-              {tr("nhân sự đã phản hồi", "employees responded")}
-            </span>
-          </div>
-          <p className={`mt-2 text-sm font-semibold ${tone.text}`}>
-            {language === "vi" ? tone.hintVi : tone.hintEn}
-          </p>
+          <strong className={`mt-1 block text-3xl font-bold tracking-tight ${tone.text}`}>{completionRate.toFixed(1)}%</strong>
         </div>
         <div className="min-w-0 flex-1 lg:max-w-xl">
           <div className="flex items-center justify-between gap-3 text-sm">
-            <span className="font-medium text-slate-500">
-              {pendingCount} {tr("nhân sự chưa phản hồi", "responses pending")}
-            </span>
-            <strong className={`text-lg tabular-nums ${tone.text}`}>
-              {completionRate.toFixed(1)}%
-            </strong>
+            <span className={`font-semibold ${tone.text}`}>{language === "vi" ? tone.hintVi : tone.hintEn}</span>
           </div>
           <div
             className="mt-2 h-2.5 overflow-hidden rounded-full bg-slate-100"
@@ -3007,32 +3485,37 @@ function ResultOverview({ result }: { result: SurveyResults }) {
             />
           </div>
         </div>
+        </div>
+        <div className="mt-4 flex flex-wrap gap-x-6 gap-y-2 border-t border-slate-100 pt-4 text-sm">
+          <span className="text-slate-500">{tr("Tổng mời", "Invited")}: <strong className="text-slate-900">{invitedCount}</strong></span>
+          <span className="text-slate-500">{tr("Đã nộp", "Submitted")}: <strong className="text-emerald-700">{submittedCount}</strong></span>
+          <span className="text-slate-500">{tr("Chưa nộp", "Pending")}: <strong className="text-amber-700">{pendingCount}</strong></span>
+        </div>
       </div>
-      <div className="mt-4 grid gap-3 sm:grid-cols-3">
-        {[
-          [tr("Được mời", "Invited"), invitedCount, "text-slate-950"],
-          [tr("Đã phản hồi", "Submitted"), submittedCount, "text-emerald-600"],
-          [tr("Đang chờ", "Pending"), pendingCount, "text-amber-600"],
-        ].map(([label, value, color]) => (
-          <div key={String(label)} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-            <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">{label}</p>
-            <strong className={`mt-1 block text-2xl ${color}`}>{value}</strong>
+      {departmentProgress.length > 0 && (
+        <section className="mt-5">
+          <h4 className="font-semibold text-slate-950">{tr("Tiến độ theo phòng ban", "Department progress")}</h4>
+          <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+            {departmentProgress.map((department) => {
+              const departmentTone = progressTone(department.rate)
+              return <div key={department.name} className="rounded-lg border border-slate-200 bg-white px-3 py-2.5"><div className="flex items-center justify-between gap-3 text-xs"><span className="truncate font-semibold text-slate-700">{department.name}</span><span className={`font-bold tabular-nums ${departmentTone.text}`}>{department.submitted}/{department.invited} · {department.rate.toFixed(0)}%</span></div><div className="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-100"><span className={`block h-full rounded-full bg-gradient-to-r ${departmentTone.fill}`} style={{ width: `${department.rate}%` }} /></div></div>
+            })}
           </div>
-        ))}
-      </div>
+        </section>
+      )}
       <h4 className="mt-5 font-semibold text-slate-950">
         {tr("Điểm gắn kết theo chủ đề", "Engagement score by topic")}
       </h4>
-      <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+      <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
         {result.categoryScores.map((category) => (
           <div
             key={category.categoryId}
-            className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm"
+            className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm"
           >
             <div className="flex items-start justify-between gap-3">
               <div>
                 <p className="font-semibold text-slate-900">
-                  {topicLabel(category.name)}
+                  {topicLabel(category.name, language)}
                 </p>
                 <p className="mt-1 text-xs text-slate-500">
                   {category.responseCount} {tr("phản hồi hợp lệ", "valid responses")}

@@ -267,6 +267,7 @@ export interface SurveyParticipant {
   surveyId?: number;
   surveyTitle?: string;
   answerCount?: number;
+  departmentName?: string | null;
 }
 
 export interface SurveyParticipantResponse extends SurveyParticipant {
