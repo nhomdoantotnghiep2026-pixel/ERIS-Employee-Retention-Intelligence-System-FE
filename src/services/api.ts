@@ -1091,6 +1091,7 @@ export function searchPlaces(query: string, signal?: AbortSignal) {
 export interface EmployeeImportResult {
   row: number;
   status: 'CREATED' | 'FAILED';
+  warnings?: string[];
   statusCode?: number;
   message?: string;
   data?: EmployeeProfile;
@@ -1112,12 +1113,24 @@ export interface EmployeeImportIssue {
   message: string;
 }
 
+export interface ImportInstitutionChoice { row: number; educationIndex: number; institutionRefId: string }
+export interface ImportInstitutionReview {
+  educationIndex: number; originalName: string;
+  status: 'MATCHED' | 'NEEDS_SELECTION' | 'NOT_FOUND' | 'UNAVAILABLE';
+  selectedId: string | null; candidates: EducationInstitution[]; warning?: string | null;
+}
+export interface EmployeeImportPreviewRow {
+  row: number; status: 'VALID' | 'FAILED' | 'NEEDS_REVIEW';
+  email?: string; message?: string; issue?: EmployeeImportIssue; institutions?: ImportInstitutionReview[];
+  employee?: Record<string, unknown>;
+}
 export interface EmployeeImportPreview {
   total: number;
   valid: number;
   failed: number;
   fileIssues?: EmployeeImportIssue[];
-  results: Array<{ row: number; status: 'VALID' | 'FAILED'; email?: string; message?: string; issue?: EmployeeImportIssue }>;
+  pending?: number;
+  results: EmployeeImportPreviewRow[];
 }
 
 export function previewEmployeeImport(file: File) {
@@ -1126,9 +1139,10 @@ export function previewEmployeeImport(file: File) {
   return request<EmployeeImportPreview>('/employees/import/preview', { method: 'POST', body });
 }
 
-export function importEmployees(file: File) {
+export function importEmployees(file: File, choices: ImportInstitutionChoice[] = []) {
   const body = new FormData();
   body.append('file', file);
+  body.append('institutionChoices', JSON.stringify(choices));
   return request<EmployeeImportResponse>('/employees/import', {
     method: 'POST',
     body,
