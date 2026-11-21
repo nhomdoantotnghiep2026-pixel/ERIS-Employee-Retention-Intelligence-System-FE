@@ -508,6 +508,8 @@ export interface ApiUser {
   roleName?: string;
   roleId?: number;
   status: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface ApiEmployee {
@@ -904,7 +906,16 @@ export function resetPassword(email: string, otp: string, newPassword: string) {
   });
 }
 
-export type EmployeeAccountCandidate = { id: number; employeeCode: string; fullName: string; email: string };
+export type EmployeeAccountCandidate = {
+  id: number;
+  employeeCode: string;
+  fullName: string;
+  email: string;
+  departmentId?: number | null;
+  departmentName?: string | null;
+  positionName?: string | null;
+  createdAt?: string | null;
+};
 
 export async function listEmployeeAccountCandidates(signal?: AbortSignal) {
   const result = await request<{ data: EmployeeAccountCandidate[] }>('/employees/account-candidates', { cache: 'no-store', signal });
