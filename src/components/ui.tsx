@@ -145,10 +145,10 @@ export function Tabs({ tabs, active, onChange }: { tabs: string[]; active: strin
 export function EmptyState({ icon, title, description }: { icon?: ReactNode; title: string; description?: string }) {
   const { t } = useLanguage();
   return (
-    <div className="flex flex-col items-center justify-center py-12 text-center">
-      {icon && <div className="mb-3 text-gray-300">{icon}</div>}
-      <div className="text-sm font-medium text-gray-600 mb-1">{t(title)}</div>
-      {description && <div className="text-[13px] text-gray-400 max-w-xs">{t(description)}</div>}
+    <div role="status" className="flex flex-col items-center justify-center py-12 text-center">
+      {icon && <div className="mb-3 text-slate-500" aria-hidden="true">{icon}</div>}
+      <div className="mb-1 text-sm font-semibold text-slate-800">{t(title)}</div>
+      {description && <div className="max-w-xs text-[13px] leading-5 text-slate-600">{t(description)}</div>}
     </div>
   );
 }

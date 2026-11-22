@@ -104,7 +104,12 @@ test('all routed feature pages use VI/EN consistently and preserve navigation an
   for(const page of pages.filter(page=>['RiskWorkspace','RiskAnalysis','Predictions','WorkforceSnapshot','ModelLifecycle','EmployeeOutcomes','ErdEmployeeDetails','EmployeeRecord','WorkflowActivity','ErdSurveys'].includes(page[2])))checkPage(page,'populated ');
   // Inspect copy in later form steps and closed dialogs as well as initially rendered screens.
   const app = readFileSync('src/App.tsx', 'utf8');
-  const sources = [...new Set([...app.matchAll(/from '\.\/screens\/([^']+)'/g)].map(match=>'src/screens/'+match[1]+'.tsx'))].filter(file=>!['Landing','Login','PublicDetail'].some(name=>file.endsWith('/'+name+'.tsx')));
+  const lazyScreens = readFileSync('src/routes/lazyScreens.ts', 'utf8');
+  const screenNames = [
+    ...[...app.matchAll(/from '\.\/screens\/([^']+)'/g)].map(match=>match[1]),
+    ...[...lazyScreens.matchAll(/import\("\.\.\/screens\/([^"']+)"\)/g)].map(match=>match[1]),
+  ];
+  const sources = [...new Set(screenNames.map(name=>'src/screens/'+name+'.tsx'))].filter(file=>!['Landing','Login','PublicDetail'].some(name=>file.endsWith('/'+name+'.tsx')));
   sources.push('src/screens/RBACMatrix.tsx','src/components/EmployeePrediction.tsx','src/components/EmployeeRetentionSummary.tsx','src/components/ErdEmployeeRelations.tsx','src/components/ui.tsx');
   const copy = new Set<string>();
   for(const file of sources){

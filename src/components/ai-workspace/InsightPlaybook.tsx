@@ -66,7 +66,7 @@ export function InsightPlaybook({
   ]
   return <div ref={root} className="space-y-6">
     <section className="rounded-xl border border-slate-200 bg-gradient-to-br from-slate-50 via-white to-orange-50/30 p-4 shadow-sm">
-      <div className="flex items-start gap-3"><span className="grid size-9 shrink-0 place-items-center rounded-lg bg-slate-900 text-white"><BarChart3 className="size-4" /></span><div><p className="metadata-label">Câu chuyện chính trong 3 giây</p><h3 className="mt-1 font-semibold tracking-tight text-slate-900">Top 3 tín hiệu theo mức tác động Explainable SHAP</h3><p className="mt-1 text-sm leading-6 text-slate-600">Cam biểu thị yếu tố làm tăng nguy cơ; xanh ngọc biểu thị điểm tựa giúp giữ chân. Độ dài thanh thể hiện mức tác động tương đối.</p></div></div>
+      <div className="flex items-start gap-3"><span className="grid size-9 shrink-0 place-items-center rounded-lg bg-slate-900 text-white"><BarChart3 className="size-4" /></span><div><p className="metadata-label">Câu chuyện chính trong 3 giây</p><h3 className="mt-1 font-semibold tracking-tight text-slate-900">Top 3 tín hiệu theo mức tác động</h3><p className="mt-1 text-sm leading-6 text-slate-600">Cam biểu thị yếu tố làm tăng nguy cơ; xanh ngọc biểu thị điểm tựa giúp giữ chân. Độ dài thanh thể hiện mức tác động tương đối.</p></div></div>
       <div className="mt-4 grid gap-2 sm:grid-cols-3">{topThree.map((signal, index) => <div key={signal.feature} className="rounded-lg border border-slate-200 bg-white p-3"><div className="flex items-center justify-between gap-2"><span className="text-xs font-semibold text-slate-500">#{index + 1}</span><ImpactBadge signal={signal} /></div><p className="mt-2 text-sm font-semibold text-slate-900">{featureLabel(signal.feature)}</p><ImpactBar signal={signal} max={maxImpact} compact /></div>)}</div>
     </section>
     {groups.filter(group => group.items.length).map(group => <section key={group.title} className={`rounded-xl border p-4 ${group.risk ? "border-amber-200/80 bg-amber-50/20" : "border-emerald-200/80 bg-emerald-50/20"}`}>
@@ -75,7 +75,7 @@ export function InsightPlaybook({
         <div className="flex flex-wrap items-start justify-between gap-3"><div><h4 className="text-sm font-semibold text-slate-900">{featureLabel(signal.feature)}</h4><p className="mt-1 text-xs font-medium text-slate-500">Thực tế: {actualValue(signal.feature, features)}</p></div><ImpactBadge signal={signal} /></div>
         <ImpactBar signal={signal} max={maxImpact} />
         <p className="mt-3 text-sm leading-relaxed text-slate-700">{signal.insight}</p>
-        <Button variant="link" className="mt-2 h-auto whitespace-normal p-0 text-left text-orange-700" onClick={() => onPolicy(signal.feature)}>Xem chính sách tương ứng <ArrowRight className="size-4" /></Button>
+        <Button variant="link" className="mt-2 h-auto whitespace-normal p-0 text-left text-orange-700" onClick={() => onPolicy(signal.feature)}>Xem giải pháp tương ứng [Tab 3] <ArrowRight className="size-4" /></Button>
       </article>)}</div>
     </section>)}
   </div>

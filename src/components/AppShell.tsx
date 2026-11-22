@@ -41,7 +41,7 @@ const NAV_BY_ROLE: Record<UserRole, NavGroup[]> = {
     {
       group: 'Retention',
       items: [
-        { label: 'Đánh giá gắn kết', icon: BrainCircuit, to: '/ai-analysis' },
+        { label: 'Engagement assessment', icon: BrainCircuit, to: '/ai-analysis' },
       ],
     },
     {
