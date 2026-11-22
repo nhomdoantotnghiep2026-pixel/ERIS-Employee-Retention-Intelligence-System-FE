@@ -59,3 +59,19 @@ test("the profile save toggle runs prediction directly without a broken confirma
   assert.match(source, /type="button"[\s\S]*role="switch"/)
   assert.doesNotMatch(source, /className="peer sr-only"/)
 })
+
+test("individual assessment loads the live profile without exposing snapshot selection", async () => {
+  const source = await readFile(new URL("../src/components/ai-workspace/IndividualAnalysis.tsx", import.meta.url), "utf8")
+  const dashboard = await readFile(new URL("../src/components/ai-workspace/EmployeePredictionDashboard.tsx", import.meta.url), "utf8")
+
+  assert.match(source, /\.preview\(employeeId, \{\}\)/)
+  assert.match(source, /Tìm nhân viên theo tên hoặc mã/)
+  assert.match(source, /Dữ liệu hợp lệ · Sẵn sàng đánh giá/)
+  assert.match(source, /Hồ sơ chưa đủ điều kiện đánh giá/)
+  assert.match(source, /Bấm vào đây để cập nhật hồ sơ/)
+  assert.doesNotMatch(source, /Chọn nhân viên và bản dữ liệu/)
+  assert.doesNotMatch(source, /Tạo bản dữ liệu/)
+  assert.doesNotMatch(source, /Tùy chọn kiểm tra và bổ sung dữ liệu/)
+  assert.doesNotMatch(source, /const latest = ordered\[0\]/)
+  assert.match(dashboard, /Dữ liệu hồ sơ của \$\{employee\.fullName\} đã được nạp đầy đủ/)
+})

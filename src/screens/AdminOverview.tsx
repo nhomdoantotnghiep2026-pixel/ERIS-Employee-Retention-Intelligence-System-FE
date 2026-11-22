@@ -1,52 +1,654 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { Activity, ArrowRight, Clock3, FileUp, MoreHorizontal, Pencil, Plus, RefreshCw, Search, Settings, ShieldAlert, UserRound, Users, X } from 'lucide-react';
-import { AppShell } from '../components/AppShell';
-import { Card, SectionHeader } from '../components/ui';
-import { Button } from '../components/ui/button';
-import { useLanguage } from '../context/LanguageContext';
-import { listAuditLogs, listUsers, type ApiUser, type AuditLogEntry } from '../services/api';
-import { auditDateMatches } from '../utils/auditDateFilter';
-import { employeeDate } from '../utils/employeeDates';
+import { useEffect, useMemo, useState } from "react"
+import { Link } from "react-router-dom"
+import {
+  Activity,
+  ArrowRight,
+  Clock3,
+  FileUp,
+  MoreHorizontal,
+  Pencil,
+  Plus,
+  RefreshCw,
+  Search,
+  Settings,
+  ShieldAlert,
+  UserRound,
+  Users,
+  X,
+} from "lucide-react"
+import { AppShell } from "../components/AppShell"
+import { Card, SectionHeader } from "../components/ui"
+import { Button } from "../components/ui/button"
+import { useLanguage } from "../context/LanguageContext"
+import {
+  listAuditLogs,
+  listUsers,
+  type ApiUser,
+  type AuditLogEntry,
+} from "../services/api"
+import { auditDateMatches } from "../utils/auditDateFilter"
+import { employeeDate } from "../utils/employeeDates"
 
-type Directory = { users: ApiUser[]; total: number; active: number; inactive: number; pending: number };
-type UserFilter = 'ALL' | 'ACTIVE' | 'IN_PROCESS';
-const Skeleton = ({ className = '' }: { className?: string }) => <div className={`animate-pulse rounded-md bg-slate-200/80 motion-reduce:animate-none ${className}`} />;
-const role = (u: ApiUser) => (typeof u.role === 'string' ? u.role : u.role?.name || u.roleName || '').toUpperCase();
-const initials = (s: string) => { const p = s.trim().split(/\s+/); return `${p[0]?.[0] || 'E'}${p.length > 1 ? p.at(-1)?.[0] : p[0]?.[1] || 'R'}`.toUpperCase(); };
+type Directory = {
+  users: ApiUser[]
+  total: number
+  active: number
+  inactive: number
+  pending: number
+}
+type UserFilter = "ALL" | "ACTIVE" | "IN_PROCESS"
+const Skeleton = ({ className = "" }: { className?: string }) => (
+  <div
+    className={`animate-pulse rounded-md bg-slate-200/80 motion-reduce:animate-none ${className}`}
+  />
+)
+const role = (u: ApiUser) =>
+  (typeof u.role === "string"
+    ? u.role
+    : u.role?.name || u.roleName || ""
+  ).toUpperCase()
+const initials = (s: string) => {
+  const p = s.trim().split(/\s+/)
+  return `${p[0]?.[0] || "E"}${
+    p.length > 1 ? p.at(-1)?.[0] : p[0]?.[1] || "R"
+  }`.toUpperCase()
+}
 
 export default function AdminOverview() {
-  const { t, language } = useLanguage(); const tr = (vi: string, en: string) => language === 'vi' ? vi : en;
-  const [data, setData] = useState<Directory | null>(null); const [logs, setLogs] = useState<AuditLogEntry[] | null>(null);
-  const [loading, setLoading] = useState(true); const [failed, setFailed] = useState({ users: false, logs: false }); const [revision, setRevision] = useState(0);
-  const [query, setQuery] = useState(''); const [search, setSearch] = useState(''); const [filter, setFilter] = useState<UserFilter>('ALL'); const [logFilter, setLogFilter] = useState('ALL'); const [modal, setModal] = useState(false);
-  useEffect(() => { const timer = setTimeout(() => setSearch(query.trim().toLowerCase()), 250); return () => clearTimeout(timer); }, [query]);
-  useEffect(() => { const c = new AbortController(); let dead = false; setLoading(true); setFailed({ users: false, logs: false });
-    const users = Promise.all([listUsers({ limit: 100 }, c.signal), listUsers({ limit: 1, status: 'ACTIVE' }, c.signal), listUsers({ limit: 1, status: 'INACTIVE' }, c.signal), listUsers({ limit: 1, status: 'IN_PROCESS' }, c.signal)]).then(([p,a,i,w]) => !dead && setData({ users:p.data,total:p.pagination.total,active:a.pagination.total,inactive:i.pagination.total,pending:w.pagination.total })).catch(() => !dead && setFailed(v => ({...v,users:true})));
-    const audit = listAuditLogs(c.signal).then(r => !dead && setLogs(r.data)).catch(() => !dead && setFailed(v => ({...v,logs:true})));
-    void Promise.allSettled([users,audit]).finally(() => !dead && setLoading(false)); return () => { dead=true;c.abort(); }; }, [revision]);
-  useEffect(() => { if (!modal) return; const close=(e:KeyboardEvent)=>e.key==='Escape'&&setModal(false); document.addEventListener('keydown',close); return()=>document.removeEventListener('keydown',close); },[modal]);
-  const today=employeeDate(new Date().toISOString())||''; const todayLogs=(logs||[]).filter(x=>auditDateMatches(x.createdAt,today,today)); const rate=data?.total?data.active/data.total*100:0;
-  const users=useMemo(()=>(data?.users||[]).filter(u=>(filter==='ALL'||u.status===filter)&&(!search||`${u.fullName} ${u.email} ${u.employeeId||''}`.toLowerCase().includes(search))),[data,filter,search]);
-  const recent=useMemo(()=>[...(logs||[])].filter(x=>{const e=(x.entityType||'').toLowerCase();return logFilter==='ALL'||(logFilter==='ACCOUNT'&&/user|role/.test(e))||(logFilter==='HR'&&/employee|department|position|survey/.test(e))||(logFilter==='TIME'&&/attendance|leave|schedule/.test(e));}).sort((a,b)=>Date.parse(b.createdAt)-Date.parse(a.createdAt)),[logs,logFilter]);
-  const tabs:Array<[UserFilter,string,number]>=[['ALL',tr('Tất cả','All'),data?.total||0],['ACTIVE',tr('Đang hoạt động','Active'),data?.active||0],['IN_PROCESS',tr('Chờ kích hoạt','Pending'),data?.pending||0]];
-  const modules=[[tr('Quản lý người dùng','Users management'),tr(`${data?.total||0} tài khoản`,`${data?.total||0} accounts`),'/users',Users,'bg-orange-100 text-orange-700'],[tr('Cấu hình hệ thống','System configuration'),tr('100% Sẵn sàng','100% Ready'),'/system',Settings,'bg-purple-100 text-purple-700'],[tr('Nhật ký hoạt động','Activity logs'),tr(`${todayLogs.length} bản ghi hôm nay`,`${todayLogs.length} records today`),'/activity',Activity,'bg-emerald-100 text-emerald-700']] as const;
-  return <AppShell breadcrumb={['Admin Overview']}><SectionHeader title={t('Admin Overview')} description={tr('Theo dõi sức khỏe tài khoản và vận hành hệ thống ERIS tại một nơi.','Monitor account health and ERIS operations in one place.')}><Button variant="outline" className="h-10 gap-2" disabled={loading} onClick={()=>setRevision(v=>v+1)}><RefreshCw className={`size-4 ${loading?'animate-spin':''}`}/>{t('Refresh')}</Button></SectionHeader>
-    <div className="mb-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{loading&&!data?Array.from({length:4},(_,i)=><Card key={i} className="p-5"><Skeleton className="h-4 w-28"/><Skeleton className="mt-5 h-9 w-20"/></Card>):<>
-      <Metric label={tr('Tổng người dùng','Total users')} value={data?.total||0} detail={<><Dot c="bg-emerald-500"/>{data?.active||0} {tr('hoạt động','active')} · <Dot c="bg-amber-400"/>{data?.pending||0} {tr('chờ','pending')} · <Dot c="bg-slate-300"/>{data?.inactive||0} {tr('tạm khóa','inactive')}</>}/>
-      <Metric label={tr('Tỷ lệ hoạt động','Active rate')} value={`${rate.toFixed(1)}%`} detail={<>{data?.active||0}/{data?.total||0} {tr('tài khoản','accounts')}<div className="mt-3 flex h-2 overflow-hidden rounded-full bg-slate-100"><i className="bg-emerald-500" style={{width:`${rate}%`}}/><i className="bg-amber-400" style={{width:`${data?.total?data.pending/data.total*100:0}%`}}/></div></>}/>
-      <Card className="border-amber-200 bg-amber-50/60 p-5"><p className="text-sm font-medium text-slate-700">{tr('Chờ hoàn tất kích hoạt','Pending activation')}</p><p className="mt-3 font-mono text-3xl font-bold text-amber-600">{data?.pending||0}</p><Button className="mt-4 h-8 w-full bg-amber-600 text-white hover:bg-amber-700" disabled={!data?.pending} onClick={()=>setModal(true)}>{tr('Gửi nhắc kích hoạt','Send reminder')}</Button></Card>
-      <Metric label={tr('Số thao tác hôm nay','Actions today')} value={todayLogs.length} detail={<><span className="text-emerald-700">● {tr('Đang ghi nhận trực tiếp','Live')}</span><br/><Clock3 className="mr-1 inline size-3"/>{tr('Hôm nay','Today')} · {new Date().toLocaleDateString(language==='vi'?'vi-VN':'en-US',{timeZone:'Asia/Ho_Chi_Minh'})}</>}/></>}</div>
-    <div className="mb-5 grid gap-4 lg:grid-cols-3">{modules.map(([label,count,to,Icon,color])=><Link key={to} to={to} className="group flex items-center gap-4 rounded-[20px] border border-white bg-white p-5 shadow-sm transition-all hover:-translate-y-0.5 hover:border-orange-400 hover:shadow-md"><span className={`flex size-11 items-center justify-center rounded-xl ${color}`}><Icon className="size-5"/></span><div className="min-w-0 flex-1"><h2 className="font-semibold text-slate-900">{label}</h2><span className="mt-2 inline-block rounded-full bg-slate-100 px-2 py-1 text-xs text-slate-700">{count}</span></div><ArrowRight className="size-4 text-slate-400 group-hover:text-orange-600"/></Link>)}</div>
-    <div className="grid gap-5 2xl:grid-cols-2"><Card className="overflow-hidden"><Header title={tr('Người dùng hệ thống','System users')} link="/users" linkText={tr('Xem tất cả','View all')} badge={`${data?.total||0} ${tr('tài khoản','accounts')}`}><label className="relative block"><Search className="absolute left-3 top-3 size-4 text-slate-400"/><input className="h-10 w-full rounded-md border border-slate-300 pl-9 pr-9 text-sm outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-100" value={query} onChange={e=>setQuery(e.target.value)} placeholder={tr('Tìm theo tên, email, mã nhân viên…','Search name, email, employee ID…')}/>{query&&<button onClick={()=>setQuery('')} className="absolute right-2 top-2 p-1"><X className="size-4"/></button>}</label><Pills items={tabs.map(([k,l,n])=>[k,`${l} (${n})`])} active={filter} set={x=>setFilter(x as UserFilter)}/></Header><div className="max-h-[380px] overflow-y-auto px-5">{loading&&!data?<p className="py-6 text-sm text-slate-600">{tr('Đang tải…','Loading…')}</p>:failed.users?<Error text={tr('Chưa tải được dữ liệu.','Data could not be loaded.')} retry={tr('Thử lại','Retry')} onClick={()=>setRevision(v=>v+1)}/>:users.length?<ul className="divide-y divide-slate-100">{users.map(u=><li key={u.id} className="flex items-center gap-3 py-3"><span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-orange-100 text-xs font-bold text-orange-700">{initials(u.fullName||u.email)}</span><div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold text-slate-800">{u.fullName||u.email}</p><p className="truncate font-mono text-[11px] text-slate-600">{u.email}</p></div><span className={`hidden rounded-md border px-2 py-1 text-[11px] md:block ${role(u)==='ADMIN'?'border-purple-200 bg-purple-50 text-purple-700':role(u)==='HR'?'border-orange-200 bg-orange-50 text-orange-700':'border-slate-200 bg-slate-100 text-slate-700'}`}>{role(u)||'ESS'}</span><span className={u.status==='ACTIVE'?'text-xs text-emerald-700':'text-xs text-amber-700'}>● {u.status==='ACTIVE'?tr('Hoạt động','Active'):tr('Chờ kích hoạt','Pending')}</span><MoreHorizontal className="size-4 text-slate-500"/></li>)}</ul>:<Empty title={tr('Không tìm thấy tài khoản phù hợp với từ khóa','No account matches your search')} label={tr('Đặt lại bộ lọc','Reset filters')} reset={()=>{setQuery('');setFilter('ALL')}}/>}</div></Card>
-      <Card className="overflow-hidden"><Header title={tr('Nhật ký hoạt động gần đây','Recent activity')} link="/activity" linkText={tr('Xem toàn bộ nhật ký','View all logs')}><Pills items={[["ALL",tr('Tất cả','All')],["ACCOUNT",tr('Tài khoản','Accounts')],["HR",tr('Nhân sự','Workforce')],["TIME",tr('Chấm công','Attendance')]]} active={logFilter} set={setLogFilter}/></Header><div className="max-h-[380px] overflow-y-auto px-5">{loading&&!logs?<p className="py-6 text-sm text-slate-600">{tr('Đang tải…','Loading…')}</p>:failed.logs?<Error text={tr('Chưa tải được dữ liệu.','Data could not be loaded.')} retry={tr('Thử lại','Retry')} onClick={()=>setRevision(v=>v+1)}/>:<ol className="divide-y divide-slate-100">{recent.map(x=><Log key={x.id} x={x} vi={language==='vi'}/>)}</ol>}</div></Card></div>
-    {modal&&<div className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/45 px-4" role="dialog" aria-modal="true" onMouseDown={e=>e.target===e.currentTarget&&setModal(false)}><div className="max-w-md rounded-xl bg-white p-5 shadow-2xl"><h2 className="font-semibold text-slate-900">{tr('Nhắc hoàn tất kích hoạt','Activation reminder')}</h2><p className="mt-2 text-sm leading-6 text-slate-600">{tr(`Có ${data?.pending||0} tài khoản đang chờ. Backend hiện chưa hỗ trợ gửi lại email hàng loạt; hãy mở danh sách để xử lý từng tài khoản.`,`There are ${data?.pending||0} pending accounts. Bulk resend is not available from the backend; open the directory to manage them.`)}</p><div className="mt-5 flex justify-end gap-2"><Button variant="outline" onClick={()=>setModal(false)}>{tr('Đóng','Close')}</Button><Button asChild className="bg-orange-600 text-white"><Link to="/users">{tr('Mở quản lý người dùng','Open user management')}</Link></Button></div></div></div>}
-  </AppShell>;
+  const { t, language } = useLanguage()
+  const tr = (vi: string, en: string) => (language === "vi" ? vi : en)
+  const [data, setData] = useState<Directory | null>(null)
+  const [logs, setLogs] = useState<AuditLogEntry[] | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [failed, setFailed] = useState({ users: false, logs: false })
+  const [revision, setRevision] = useState(0)
+  const [query, setQuery] = useState("")
+  const [search, setSearch] = useState("")
+  const [filter, setFilter] = useState<UserFilter>("ALL")
+  const [logFilter, setLogFilter] = useState("ALL")
+  const [modal, setModal] = useState(false)
+  useEffect(() => {
+    const timer = setTimeout(() => setSearch(query.trim().toLowerCase()), 250)
+    return () => clearTimeout(timer)
+  }, [query])
+  useEffect(() => {
+    const c = new AbortController()
+    let dead = false
+    setLoading(true)
+    setFailed({ users: false, logs: false })
+    const users = Promise.all([
+      listUsers({ limit: 100 }, c.signal),
+      listUsers({ limit: 1, status: "ACTIVE" }, c.signal),
+      listUsers({ limit: 1, status: "INACTIVE" }, c.signal),
+      listUsers({ limit: 1, status: "IN_PROCESS" }, c.signal),
+    ])
+      .then(
+        ([p, a, i, w]) =>
+          !dead &&
+          setData({
+            users: p.data,
+            total: p.pagination.total,
+            active: a.pagination.total,
+            inactive: i.pagination.total,
+            pending: w.pagination.total,
+          }),
+      )
+      .catch(() => !dead && setFailed((v) => ({ ...v, users: true })))
+    const audit = listAuditLogs(c.signal)
+      .then((r) => !dead && setLogs(r.data))
+      .catch(() => !dead && setFailed((v) => ({ ...v, logs: true })))
+    void Promise.allSettled([users, audit]).finally(
+      () => !dead && setLoading(false),
+    )
+    return () => {
+      dead = true
+      c.abort()
+    }
+  }, [revision])
+  useEffect(() => {
+    if (!modal) return
+    const close = (e: KeyboardEvent) => e.key === "Escape" && setModal(false)
+    document.addEventListener("keydown", close)
+    return () => document.removeEventListener("keydown", close)
+  }, [modal])
+  const today = employeeDate(new Date().toISOString()) || ""
+  const todayLogs = (logs || []).filter((x) =>
+    auditDateMatches(x.createdAt, today, today),
+  )
+  const rate = data?.total ? (data.active / data.total) * 100 : 0
+  const users = useMemo(
+    () =>
+      (data?.users || []).filter(
+        (u) =>
+          (filter === "ALL" || u.status === filter) &&
+          (!search ||
+            `${u.fullName} ${u.email} ${u.employeeId || ""}`
+              .toLowerCase()
+              .includes(search)),
+      ),
+    [data, filter, search],
+  )
+  const recent = useMemo(
+    () =>
+      [...(logs || [])]
+        .filter((x) => {
+          const e = (x.entityType || "").toLowerCase()
+          return (
+            logFilter === "ALL" ||
+            (logFilter === "ACCOUNT" && /user|role/.test(e)) ||
+            (logFilter === "HR" &&
+              /employee|department|position|survey/.test(e)) ||
+            (logFilter === "TIME" && /attendance|leave|schedule/.test(e))
+          )
+        })
+        .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt)),
+    [logs, logFilter],
+  )
+  const tabs: Array<[UserFilter, string, number]> = [
+    ["ALL", tr("Tất cả", "All"), data?.total || 0],
+    ["ACTIVE", tr("Đang hoạt động", "Active"), data?.active || 0],
+    ["IN_PROCESS", tr("Chờ kích hoạt", "Pending"), data?.pending || 0],
+  ]
+  const modules = [
+    [
+      tr("Quản lý người dùng", "Users management"),
+      tr(`${data?.total || 0} tài khoản`, `${data?.total || 0} accounts`),
+      "/users",
+      Users,
+      "bg-orange-100 text-orange-700",
+    ],
+    [
+      tr("Cấu hình hệ thống", "System configuration"),
+      tr("100% Sẵn sàng", "100% Ready"),
+      "/system",
+      Settings,
+      "bg-purple-100 text-purple-700",
+    ],
+    [
+      tr("Nhật ký hoạt động", "Activity logs"),
+      tr(
+        `${todayLogs.length} bản ghi hôm nay`,
+        `${todayLogs.length} records today`,
+      ),
+      "/activity",
+      Activity,
+      "bg-emerald-100 text-emerald-700",
+    ],
+  ] as const
+  return (
+    <AppShell breadcrumb={["Admin Overview"]}>
+      <SectionHeader
+        title={t("Admin Overview")}
+        description={tr(
+          "Theo dõi sức khỏe tài khoản và vận hành hệ thống ERIS tại một nơi.",
+          "Monitor account health and ERIS operations in one place.",
+        )}
+      >
+        <Button
+          variant="outline"
+          className="h-10 gap-2"
+          disabled={loading}
+          onClick={() => setRevision((v) => v + 1)}
+        >
+          <RefreshCw className={`size-4 ${loading ? "animate-spin" : ""}`} />
+          {t("Refresh")}
+        </Button>
+      </SectionHeader>
+      <div className="mb-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        {loading && !data ? (
+          Array.from({ length: 4 }, (_, i) => (
+            <Card key={i} className="p-5">
+              <Skeleton className="h-4 w-28" />
+              <Skeleton className="mt-5 h-9 w-20" />
+            </Card>
+          ))
+        ) : (
+          <>
+            <Metric
+              label={tr("Tổng người dùng", "Total users")}
+              value={data?.total || 0}
+              detail={
+                <>
+                  <Dot c="bg-emerald-500" />
+                  {data?.active || 0} {tr("hoạt động", "active")} ·{" "}
+                  <Dot c="bg-amber-400" />
+                  {data?.pending || 0} {tr("chờ", "pending")} ·{" "}
+                  <Dot c="bg-slate-300" />
+                  {data?.inactive || 0} {tr("tạm khóa", "inactive")}
+                </>
+              }
+            />
+            <Metric
+              label={tr("Tỷ lệ hoạt động", "Active rate")}
+              value={`${rate.toFixed(1)}%`}
+              detail={
+                <>
+                  {data?.active || 0}/{data?.total || 0}{" "}
+                  {tr("tài khoản", "accounts")}
+                  <div className="mt-3 flex h-2 overflow-hidden rounded-full bg-slate-100">
+                    <i
+                      className="bg-emerald-500"
+                      style={{ width: `${rate}%` }}
+                    />
+                    <i
+                      className="bg-amber-400"
+                      style={{
+                        width: `${
+                          data?.total ? (data.pending / data.total) * 100 : 0
+                        }%`,
+                      }}
+                    />
+                  </div>
+                </>
+              }
+            />
+            <Card className="border-amber-200 bg-amber-50/60 p-5">
+              <p className="text-sm font-medium text-slate-700">
+                {tr("Chờ hoàn tất kích hoạt", "Pending activation")}
+              </p>
+              <p className="mt-3 font-mono text-3xl font-bold text-amber-600">
+                {data?.pending || 0}
+              </p>
+              <Button
+                className="mt-4 h-8 w-full bg-amber-600 text-white hover:bg-amber-700"
+                disabled={!data?.pending}
+                onClick={() => setModal(true)}
+              >
+                {tr("Gửi nhắc kích hoạt", "Send reminder")}
+              </Button>
+            </Card>
+            <Metric
+              label={tr("Số thao tác hôm nay", "Actions today")}
+              value={todayLogs.length}
+              detail={
+                <>
+                  <span className="text-emerald-700">
+                    ● {tr("Đang ghi nhận trực tiếp", "Live")}
+                  </span>
+                  <br />
+                  <Clock3 className="mr-1 inline size-3" />
+                  {tr("Hôm nay", "Today")} ·{" "}
+                  {new Date().toLocaleDateString(
+                    language === "vi" ? "vi-VN" : "en-US",
+                    { timeZone: "Asia/Ho_Chi_Minh" },
+                  )}
+                </>
+              }
+            />
+          </>
+        )}
+      </div>
+      <div className="mb-5 grid gap-4 lg:grid-cols-3">
+        {modules.map(([label, count, to, Icon, color]) => (
+          <Link
+            key={to}
+            to={to}
+            className="group flex items-center gap-4 rounded-[20px] border border-white bg-white p-5 shadow-sm transition-all hover:-translate-y-0.5 hover:border-orange-400 hover:shadow-md"
+          >
+            <span
+              className={`flex size-11 items-center justify-center rounded-xl ${color}`}
+            >
+              <Icon className="size-5" />
+            </span>
+            <div className="min-w-0 flex-1">
+              <h2 className="font-semibold text-slate-900">{label}</h2>
+              <span className="mt-2 inline-block rounded-full bg-slate-100 px-2 py-1 text-xs text-slate-700">
+                {count}
+              </span>
+            </div>
+            <ArrowRight className="size-4 text-slate-400 group-hover:text-orange-600" />
+          </Link>
+        ))}
+      </div>
+      <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-12">
+        <Card className="flex h-[480px] flex-col overflow-hidden lg:col-span-7">
+          <Header
+            title={tr("Người dùng hệ thống", "System users")}
+            link="/users"
+            linkText={tr("Xem tất cả", "View all")}
+            badge={`${data?.total || 0} ${tr("tài khoản", "accounts")}`}
+          >
+            <label className="relative block">
+              <Search className="absolute left-3 top-3 size-4 text-slate-400" />
+              <input
+                className="h-10 w-full rounded-md border border-slate-300 pl-9 pr-9 text-sm outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-100"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder={tr(
+                  "Tìm theo tên, email, mã nhân viên…",
+                  "Search name, email, employee ID…",
+                )}
+              />
+              {query && (
+                <button
+                  onClick={() => setQuery("")}
+                  className="absolute right-2 top-2 p-1"
+                >
+                  <X className="size-4" />
+                </button>
+              )}
+            </label>
+            <Pills
+              items={tabs.map(([k, l, n]) => [k, `${l} (${n})`])}
+              active={filter}
+              set={(x) => setFilter(x as UserFilter)}
+            />
+          </Header>
+          <div className="max-h-[380px] overflow-y-auto px-5">
+            {loading && !data ? (
+              <p className="py-6 text-sm text-slate-600">
+                {tr("Đang tải…", "Loading…")}
+              </p>
+            ) : failed.users ? (
+              <Error
+                text={tr("Chưa tải được dữ liệu.", "Data could not be loaded.")}
+                retry={tr("Thử lại", "Retry")}
+                onClick={() => setRevision((v) => v + 1)}
+              />
+            ) : users.length ? (
+              <ul className="divide-y divide-slate-100">
+                {users.map((u) => (
+                  <li key={u.id} className="flex items-center gap-3 py-3">
+                    <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-orange-100 text-xs font-bold text-orange-700">
+                      {initials(u.fullName || u.email)}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-semibold text-slate-800">
+                        {u.fullName || u.email}
+                      </p>
+                      <p className="truncate font-mono text-[11px] text-slate-600">
+                        {u.email}
+                      </p>
+                    </div>
+                    <span
+                      className={`hidden rounded-md border px-2 py-1 text-[11px] md:block ${
+                        role(u) === "ADMIN"
+                          ? "border-purple-200 bg-purple-50 text-purple-700"
+                          : role(u) === "HR"
+                            ? "border-orange-200 bg-orange-50 text-orange-700"
+                            : "border-slate-200 bg-slate-100 text-slate-700"
+                      }`}
+                    >
+                      {role(u) || "ESS"}
+                    </span>
+                    <span
+                      className={
+                        u.status === "ACTIVE"
+                          ? "text-xs text-emerald-700"
+                          : "text-xs text-amber-700"
+                      }
+                    >
+                      ●{" "}
+                      {u.status === "ACTIVE"
+                        ? tr("Hoạt động", "Active")
+                        : tr("Chờ kích hoạt", "Pending")}
+                    </span>
+                    <MoreHorizontal className="size-4 text-slate-500" />
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <Empty
+                title={tr(
+                  "Không tìm thấy tài khoản phù hợp với từ khóa",
+                  "No account matches your search",
+                )}
+                label={tr("Đặt lại bộ lọc", "Reset filters")}
+                reset={() => {
+                  setQuery("")
+                  setFilter("ALL")
+                }}
+              />
+            )}
+          </div>
+        </Card>
+        <Card className="flex h-[480px] flex-col overflow-hidden lg:col-span-5">
+          <Header
+            title={tr("Nhật ký hoạt động gần đây", "Recent activity")}
+            link="/activity"
+            linkText={tr("Xem toàn bộ nhật ký", "View all logs")}
+          >
+            <Pills
+              items={[
+                ["ALL", tr("Tất cả", "All")],
+                ["ACCOUNT", tr("Tài khoản", "Accounts")],
+                ["HR", tr("Nhân sự", "Workforce")],
+                ["TIME", tr("Chấm công", "Attendance")],
+              ]}
+              active={logFilter}
+              set={setLogFilter}
+            />
+          </Header>
+          <div className="max-h-[380px] overflow-y-auto px-5">
+            {loading && !logs ? (
+              <p className="py-6 text-sm text-slate-600">
+                {tr("Đang tải…", "Loading…")}
+              </p>
+            ) : failed.logs ? (
+              <Error
+                text={tr("Chưa tải được dữ liệu.", "Data could not be loaded.")}
+                retry={tr("Thử lại", "Retry")}
+                onClick={() => setRevision((v) => v + 1)}
+              />
+            ) : (
+              <ol className="divide-y divide-slate-100">
+                {recent.map((x) => (
+                  <Log key={x.id} x={x} vi={language === "vi"} />
+                ))}
+              </ol>
+            )}
+          </div>
+        </Card>
+      </div>
+      {modal && (
+        <div
+          className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/45 px-4"
+          role="dialog"
+          aria-modal="true"
+          onMouseDown={(e) => e.target === e.currentTarget && setModal(false)}
+        >
+          <div className="max-w-md rounded-xl bg-white p-5 shadow-2xl">
+            <h2 className="font-semibold text-slate-900">
+              {tr("Nhắc hoàn tất kích hoạt", "Activation reminder")}
+            </h2>
+            <p className="mt-2 text-sm leading-6 text-slate-600">
+              {tr(
+                `Có ${data?.pending || 0} tài khoản đang chờ. Backend hiện chưa hỗ trợ gửi lại email hàng loạt; hãy mở danh sách để xử lý từng tài khoản.`,
+                `There are ${data?.pending || 0} pending accounts. Bulk resend is not available from the backend; open the directory to manage them.`,
+              )}
+            </p>
+            <div className="mt-5 flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setModal(false)}>
+                {tr("Đóng", "Close")}
+              </Button>
+              <Button asChild className="bg-orange-600 text-white">
+                <Link to="/users">
+                  {tr("Mở quản lý người dùng", "Open user management")}
+                </Link>
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+    </AppShell>
+  )
 }
-function Dot({c}:{c:string}){return <i className={`mr-1 inline-block size-2 rounded-full ${c}`}/>}
-function Metric({label,value,detail}:{label:string;value:string|number;detail:React.ReactNode}){return <Card className="p-5"><p className="text-sm font-medium text-slate-600">{label}</p><p className="mt-3 font-mono text-3xl font-bold tracking-tight text-slate-900">{value}</p><div className="mt-3 text-xs leading-5 text-slate-600">{detail}</div></Card>}
-function Header({title,link,linkText,badge,children}:{title:string;link:string;linkText:string;badge?:string;children:React.ReactNode}){return <div className="border-b border-slate-100 p-5"><div className="flex justify-between gap-3"><h2 className="font-semibold text-slate-900">{title} {badge&&<span className="ml-1 rounded-full bg-orange-50 px-2 py-1 text-xs text-orange-700">{badge}</span>}</h2><Link className="shrink-0 text-sm font-semibold text-orange-700 hover:underline" to={link}>{linkText} →</Link></div><div className="mt-4 space-y-3">{children}</div></div>}
-function Pills({items,active,set}:{items:string[][];active:string;set:(x:string)=>void}){return <div className="flex gap-2 overflow-x-auto">{items.map(([k,l])=><button key={k} onClick={()=>set(k)} className={`h-8 shrink-0 rounded-full border px-3 text-xs font-semibold ${active===k?'border-orange-200 bg-orange-50 text-orange-700':'border-slate-200 text-slate-600'}`}>{l}</button>)}</div>}
-function Empty({reset,title,label}:{reset:()=>void;title:string;label:string}){return <div className="flex min-h-52 flex-col items-center justify-center text-center"><UserRound className="size-9 text-slate-300"/><p className="mt-3 text-sm font-semibold">{title}</p><button onClick={reset} className="mt-3 text-sm font-semibold text-orange-700">{label}</button></div>}
-function Error({onClick,text,retry}:{onClick:()=>void;text:string;retry:string}){return <div className="flex min-h-52 flex-col items-center justify-center"><ShieldAlert className="size-9 text-rose-400"/><p className="mt-3 text-sm">{text}</p><button onClick={onClick} className="mt-2 text-sm font-semibold text-orange-700">{retry}</button></div>}
-function Log({x,vi}:{x:AuditLogEntry;vi:boolean}){const a=(x.action||'').toUpperCase();const C=/IMPORT/.test(a)?FileUp:a==='CREATE'?Plus:/DELETE|LOCK/.test(a)?ShieldAlert:Pencil;const color=/IMPORT/.test(a)?'bg-blue-100 text-blue-600':a==='CREATE'?'bg-emerald-100 text-emerald-600':/DELETE|LOCK/.test(a)?'bg-rose-100 text-rose-600':'bg-amber-100 text-amber-600';const actor=x.actor?.fullName||x.actor?.email||(vi?'Hệ thống':'System');return <li className="flex gap-3 py-4"><span className={`flex size-8 shrink-0 items-center justify-center rounded-full ${color}`}><C className="size-4"/></span><div><p className="text-sm text-slate-700"><b className="text-slate-900">{actor}</b> {vi?'đã thực hiện':'performed'} <b>{x.action||'UPDATE'}</b> · {x.entityType||'system'}{x.entityId?` #${x.entityId}`:''}.</p><time title={new Date(x.createdAt).toLocaleString(vi?'vi-VN':'en-US',{timeZone:'Asia/Ho_Chi_Minh'})} className="mt-1 block text-xs text-slate-600">{new Date(x.createdAt).toLocaleString(vi?'vi-VN':'en-US',{timeZone:'Asia/Ho_Chi_Minh',hour:'2-digit',minute:'2-digit',day:'2-digit',month:'2-digit'})}</time></div></li>}
+function Dot({ c }: { c: string }) {
+  return <i className={`mr-1 inline-block size-2 rounded-full ${c}`} />
+}
+function Metric({
+  label,
+  value,
+  detail,
+}: {
+  label: string
+  value: string | number
+  detail: React.ReactNode
+}) {
+  return (
+    <Card className="relative overflow-hidden border-orange-200/70 bg-gradient-to-br from-white via-orange-50/40 to-orange-100/50 p-5 transition-all duration-300 hover:shadow-md">
+      <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-orange-400 to-amber-500" />
+      <p className="text-sm font-medium text-slate-600">{label}</p>
+      <p className="mt-3 font-mono text-3xl font-extrabold tracking-tight text-slate-900">
+        {value}
+      </p>
+      <div className="mt-3 text-xs leading-5 text-slate-600">{detail}</div>
+    </Card>
+  )
+}
+function Header({
+  title,
+  link,
+  linkText,
+  badge,
+  children,
+}: {
+  title: string
+  link: string
+  linkText: string
+  badge?: string
+  children: React.ReactNode
+}) {
+  return (
+    <div className="border-b border-slate-100 p-5">
+      <div className="flex justify-between gap-3">
+        <h2 className="font-semibold text-slate-900">
+          {title}{" "}
+          {badge && (
+            <span className="ml-1 rounded-full bg-orange-50 px-2 py-1 text-xs text-orange-700">
+              {badge}
+            </span>
+          )}
+        </h2>
+        <Link
+          className="shrink-0 text-sm font-semibold text-orange-700 hover:underline"
+          to={link}
+        >
+          {linkText} →
+        </Link>
+      </div>
+      <div className="mt-4 space-y-3">{children}</div>
+    </div>
+  )
+}
+function Pills({
+  items,
+  active,
+  set,
+}: {
+  items: string[][]
+  active: string
+  set: (x: string) => void
+}) {
+  return (
+    <div className="flex gap-2 overflow-x-auto">
+      {items.map(([k, l]) => (
+        <button
+          key={k}
+          onClick={() => set(k)}
+          className={`h-8 shrink-0 rounded-full border px-3 text-xs font-semibold ${
+            active === k
+              ? "border-orange-200 bg-orange-50 text-orange-700"
+              : "border-slate-200 text-slate-600"
+          }`}
+        >
+          {l}
+        </button>
+      ))}
+    </div>
+  )
+}
+function Empty({
+  reset,
+  title,
+  label,
+}: {
+  reset: () => void
+  title: string
+  label: string
+}) {
+  return (
+    <div className="flex min-h-52 flex-col items-center justify-center text-center">
+      <UserRound className="size-9 text-slate-300" />
+      <p className="mt-3 text-sm font-semibold">{title}</p>
+      <button
+        onClick={reset}
+        className="mt-3 text-sm font-semibold text-orange-700"
+      >
+        {label}
+      </button>
+    </div>
+  )
+}
+function Error({
+  onClick,
+  text,
+  retry,
+}: {
+  onClick: () => void
+  text: string
+  retry: string
+}) {
+  return (
+    <div className="flex min-h-52 flex-col items-center justify-center">
+      <ShieldAlert className="size-9 text-rose-400" />
+      <p className="mt-3 text-sm">{text}</p>
+      <button
+        onClick={onClick}
+        className="mt-2 text-sm font-semibold text-orange-700"
+      >
+        {retry}
+      </button>
+    </div>
+  )
+}
+function Log({ x, vi }: { x: AuditLogEntry; vi: boolean }) {
+  const a = (x.action || "").toUpperCase()
+  const C = /IMPORT/.test(a)
+    ? FileUp
+    : a === "CREATE"
+      ? Plus
+      : /DELETE|LOCK/.test(a)
+        ? ShieldAlert
+        : Pencil
+  const color = /IMPORT/.test(a)
+    ? "bg-blue-100 text-blue-600"
+    : a === "CREATE"
+      ? "bg-emerald-100 text-emerald-600"
+      : /DELETE|LOCK/.test(a)
+        ? "bg-rose-100 text-rose-600"
+        : "bg-amber-100 text-amber-600"
+  const actor =
+    x.actor?.fullName || x.actor?.email || (vi ? "Hệ thống" : "System")
+  return (
+    <li className="flex gap-3 py-4">
+      <span
+        className={`flex size-8 shrink-0 items-center justify-center rounded-full ${color}`}
+      >
+        <C className="size-4" />
+      </span>
+      <div>
+        <p className="text-sm text-slate-700">
+          <b className="text-slate-900">{actor}</b>{" "}
+          {vi ? "đã thực hiện" : "performed"} <b>{x.action || "UPDATE"}</b> ·{" "}
+          {x.entityType || "system"}
+          {x.entityId ? ` #${x.entityId}` : ""}.
+        </p>
+        <time
+          title={new Date(x.createdAt).toLocaleString(vi ? "vi-VN" : "en-US", {
+            timeZone: "Asia/Ho_Chi_Minh",
+          })}
+          className="mt-1 block text-xs text-slate-600"
+        >
+          {new Date(x.createdAt).toLocaleString(vi ? "vi-VN" : "en-US", {
+            timeZone: "Asia/Ho_Chi_Minh",
+            hour: "2-digit",
+            minute: "2-digit",
+            day: "2-digit",
+            month: "2-digit",
+          })}
+        </time>
+      </div>
+    </li>
+  )
+}

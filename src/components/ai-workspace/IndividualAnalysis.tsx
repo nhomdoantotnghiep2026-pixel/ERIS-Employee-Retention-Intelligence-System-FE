@@ -1,42 +1,33 @@
 import { useAutoDismissState } from '../../hooks/useAutoDismissState';
 import { useEffect, useRef, useState, type ReactNode } from "react"
+import { Link } from "react-router-dom"
 import {
   Activity,
   Banknote,
-  AlertTriangle,
-  BriefcaseBusiness,
   BrainCircuit,
   CheckCircle2,
   Loader2,
-  UserRound,
+  Search,
 } from "lucide-react"
 import {
   getAiResult,
   listAiEmployeeResults,
-  getAiSnapshot,
   getApiErrorMessage,
-  listAiSnapshots,
   predictAiEmployee,
   previewAiEmployee,
   type AiEmployee,
   type AiPrediction,
   type AiSnapshot,
 } from "../../services/api"
-import {
-  FEATURE_CHOICES,
-  FEATURE_UNITS,
-  featureLabel,
-  formatDateTime,
-} from "./analysis"
+import { featureLabel, formatDateTime } from "./analysis"
 import {
   EmployeePredictionDashboard,
   type PredictionDashboardState,
 } from "./EmployeePredictionDashboard"
-import { Empty, Loading, Notice } from "./States"
+import { Empty, Loading } from "./States"
 
 type Sel = {
   employeeId?: number | undefined
-  snapshotId?: number | undefined
   resultId?: number | undefined
 }
 type Props = {
@@ -44,8 +35,6 @@ type Props = {
   initial: Sel
   onSelectionChange: (s: Sel) => void
   adapter?: {
-    listSnapshots: typeof listAiSnapshots
-    getSnapshot: typeof getAiSnapshot
     preview: typeof previewAiEmployee
     predict: typeof predictAiEmployee
     getResult: typeof getAiResult
@@ -56,29 +45,6 @@ type Props = {
 type Busy = "" | "preview" | "predict" | "save" | "result"
 type FailedAction = { type: "predict" } | { type: "result"; id: number } | null
 
-const FEATURE_GROUPS = [
-  {
-    icon: UserRound,
-    title: "Nhân thân",
-    keys: ["Department", "Gender", "Age", "Education_Level"],
-  },
-  {
-    icon: BriefcaseBusiness,
-    title: "Chế độ đãi ngộ & Thâm niên",
-    keys: ["Hire_Date", "Years_At_Company", "Monthly_Salary", "Promotions"],
-  },
-  {
-    icon: Activity,
-    title: "Nhịp độ công việc & Mức độ thỏa mãn",
-    keys: [
-      "Work_Hours_Per_Week",
-      "Overtime_Hours",
-      "Sick_Days",
-      "Employee_Satisfaction_Score",
-    ],
-  },
-]
-
 export function IndividualAnalysis({
   employees,
   initial,
@@ -88,8 +54,6 @@ export function IndividualAnalysis({
 }: Props) {
   const apiRef = useRef(
     adapter ?? {
-      listSnapshots: listAiSnapshots,
-      getSnapshot: getAiSnapshot,
       preview: previewAiEmployee,
       predict: predictAiEmployee,
       getResult: getAiResult,
@@ -99,13 +63,10 @@ export function IndividualAnalysis({
   const [employeeId, setEmployeeId] = useState<number | undefined>(
     initial.employeeId,
   )
-  const [snapshots, setSnapshots] = useState<AiSnapshot[] | null>(null)
-  const [snapshotId, setSnapshotId] = useState<number | undefined>(
-    initial.snapshotId,
-  )
   const [snapshot, setSnapshot] = useState<AiSnapshot | null>(null)
   const [snapshotLoading, setSnapshotLoading] = useState(false)
-  const [supplement, setSupplement] = useState<Record<string, string>>({})
+  const [employeeQuery, setEmployeeQuery] = useState("")
+  const [selectorOpen, setSelectorOpen] = useState(false)
   const [save, setSave] = useState(false)
   const predictionLock = useRef(false)
   const selectionVersion = useRef(0)
@@ -125,8 +86,7 @@ export function IndividualAnalysis({
   const [resultError, setResultError] = useState("")
   const [failedAction, setFailedAction] = useState<FailedAction>(null)
   const [mobileTab, setMobileTab] = useState<"data" | "result">("data")
-  const seq = useRef(0)
-  const snapSeq = useRef(0)
+  const profileSeq = useRef(0)
   const historySeq = useRef(0)
   const headingRef = useRef<HTMLHeadingElement>(null)
   const openedInitialResult = useRef(false)
@@ -148,18 +108,6 @@ export function IndividualAnalysis({
         const loaded = details.flatMap(item => item.status === "fulfilled" ? [item.value.data] : [])
         const ordered = loaded.sort((a, b) => (Date.parse(b.createdAt || "") || 0) - (Date.parse(a.createdAt || "") || 0))
         setSavedResults(ordered)
-        const latest = ordered[0]
-        if (latest && !resultRef.current && !predictionLock.current) {
-          resultRef.current = latest
-          setResult(latest)
-          setSnapshot(latest.preview)
-          setSnapshotId(latest.snapshotId ?? latest.preview.snapshotId ?? undefined)
-          onSelectionChange({
-            employeeId,
-            snapshotId: latest.snapshotId ?? latest.preview.snapshotId ?? undefined,
-            resultId: latest.predictionId,
-          })
-        }
         if (loaded.length !== response.data.length) setHistoryError("Một số lần đánh giá cũ chưa thể tải chi tiết.")
       })
       .catch(error => {
@@ -172,42 +120,28 @@ export function IndividualAnalysis({
 
   useEffect(() => {
     const api = apiRef.current
-    const my = ++seq.current
-    setSnapshots(null)
+    const my = ++profileSeq.current
     setDataError("")
     setSnapshot(null)
-    setSupplement({})
-    if (!employeeId) return
-    api
-      .listSnapshots(employeeId)
-      .then((response) => my === seq.current && setSnapshots(response.data))
-      .catch(
-        (error) =>
-          my === seq.current &&
-          setDataError(
-            getApiErrorMessage(error, "Không tải được danh sách bản dữ liệu."),
-          ),
-      )
-  }, [employeeId])
-
-  useEffect(() => {
-    const api = apiRef.current
-    const my = ++snapSeq.current
     setSnapshotLoading(false)
-    if (!employeeId || !snapshotId) return
+    if (!employeeId) return
     setSnapshotLoading(true)
     api
-      .getSnapshot(employeeId, snapshotId)
-      .then((response) => my === snapSeq.current && setSnapshot(response.data))
+      .preview(employeeId, {})
+      .then((response) => {
+        if (my !== profileSeq.current) return
+        setSnapshot(response.data)
+        onSelectionChange({ employeeId })
+      })
       .catch(
         (error) =>
-          my === snapSeq.current &&
+          my === profileSeq.current &&
           setDataError(
-            getApiErrorMessage(error, "Không tải được bản dữ liệu."),
+            normalizeProfileError(getApiErrorMessage(error, "Không tải được hồ sơ hiện tại.")),
           ),
       )
-      .finally(() => my === snapSeq.current && setSnapshotLoading(false))
-  }, [employeeId, snapshotId])
+      .finally(() => my === profileSeq.current && setSnapshotLoading(false))
+  }, [employeeId, employees])
 
   useEffect(() => {
     if (openedInitialResult.current || !initial.resultId) return
@@ -232,93 +166,16 @@ export function IndividualAnalysis({
 
   function chooseEmployee(id?: number) {
     selectionVersion.current++
-    snapSeq.current++
+    profileSeq.current++
     setSave(false)
     setEmployeeId(id)
-    setSnapshotId(undefined)
     setResult(null)
     resultRef.current = null
     setResultError("")
     setFailedAction(null)
     setMobileTab("data")
+    if (!id) setEmployeeQuery("")
     onSelectionChange({ employeeId: id })
-  }
-
-  function chooseSnapshot(id?: number) {
-    selectionVersion.current++
-    snapSeq.current++
-    setSave(false)
-    setSnapshotId(id)
-    setSnapshot(null)
-    setResult(null)
-    resultRef.current = null
-    setResultError("")
-    setFailedAction(null)
-    setMobileTab("data")
-    onSelectionChange({ employeeId, snapshotId: id })
-  }
-
-  async function prepare() {
-    if (!employeeId || busy) return
-    const version = selectionVersion.current
-    if (snapshotId) {
-      setBusy("preview")
-      setDataError("")
-      try {
-        const response = await apiRef.current.getSnapshot(
-          employeeId,
-          snapshotId,
-        )
-        if (version === selectionVersion.current) setSnapshot(response.data)
-      } catch (error) {
-        if (version === selectionVersion.current)
-          setDataError(
-            getApiErrorMessage(
-              error,
-              "Không thể kiểm tra bản dữ liệu. Vui lòng thử lại.",
-            ),
-          )
-      } finally {
-        setBusy("")
-      }
-      return
-    }
-    const extras: Record<string, string | number> = {}
-    for (const [key, value] of Object.entries(supplement))
-      if (value.trim())
-        extras[key] =
-          FEATURE_CHOICES[key] || key === "Hire_Date" ? value : Number(value)
-    if (
-      Object.values(extras).some(
-        (value) => typeof value === "number" && !Number.isFinite(value),
-      )
-    ) {
-      setDataError("Vui lòng kiểm tra các giá trị số.")
-      return
-    }
-    setBusy("preview")
-    setDataError("")
-    setResult(null)
-    setResultError("")
-    try {
-      const response = await apiRef.current.preview(employeeId, {
-        ...(Object.keys(extras).length ? { supplementalFeatures: extras } : {}),
-      })
-      setSnapshot(response.data)
-      if (response.data.snapshotId) {
-        setSupplement({})
-        setSnapshotId(response.data.snapshotId)
-        onSelectionChange({ employeeId, snapshotId: response.data.snapshotId })
-        apiRef.current
-          .listSnapshots(employeeId)
-          .then((next) => setSnapshots(next.data))
-          .catch(() => undefined)
-      }
-    } catch (error) {
-      setDataError(getApiErrorMessage(error, "Không kiểm tra được dữ liệu."))
-    } finally {
-      setBusy("")
-    }
   }
 
   async function runPrediction(
@@ -360,7 +217,6 @@ export function IndividualAnalysis({
       if (response.data.saved && response.data.predictionId)
         onSelectionChange({
           employeeId,
-          snapshotId: snapshot.snapshotId,
           resultId: response.data.predictionId,
         })
     } catch (error) {
@@ -391,13 +247,8 @@ export function IndividualAnalysis({
       setResult(response.data)
       setSnapshot(nextSnapshot)
       setEmployeeId(nextSnapshot.employee.id)
-      setSnapshotId(
-        response.data.snapshotId ?? nextSnapshot.snapshotId ?? undefined,
-      )
       onSelectionChange({
         employeeId: nextSnapshot.employee.id,
-        snapshotId:
-          response.data.snapshotId ?? nextSnapshot.snapshotId ?? undefined,
         resultId: id,
       })
     } catch (error) {
@@ -409,6 +260,10 @@ export function IndividualAnalysis({
   }
 
   const employee = employees.find((item) => item.id === employeeId)
+  const employeeMatches = employees.filter(item => {
+    const query = employeeQuery.trim().toLocaleLowerCase("vi-VN")
+    return !query || `${item.employeeCode} ${item.fullName}`.toLocaleLowerCase("vi-VN").includes(query)
+  }).slice(0, 12)
   const snapshotStatus = !snapshot
     ? null
     : snapshot.invalidFeatures?.length
@@ -416,6 +271,15 @@ export function IndividualAnalysis({
       : !snapshot.ready || snapshot.missingFeatures.length
         ? "missing"
         : "ready"
+  const profileProblems = snapshot ? [
+    ...snapshot.missingFeatures.map(key => `Thiếu ${featureLabel(key)}`),
+    ...(snapshot.invalidFeatures ?? []).map(key => `Không hợp lệ: ${featureLabel(key)}`),
+    ...snapshot.issues.filter(issue => !isInternalProfileMessage(issue)),
+  ] : []
+  const profileWarning = profileProblems.join(". ") || dataError
+  const eligibilityMessage = employee && /Thiếu (Ngày vào làm|Hire Date)/i.test(profileWarning)
+    ? `Thiếu Ngày vào làm của nhân viên ${employee.employeeCode}.`
+    : profileWarning
   const dashboardState: PredictionDashboardState =
     busy === "predict" || busy === "save" || busy === "result"
       ? "loading"
@@ -437,142 +301,31 @@ export function IndividualAnalysis({
 
   return (
     <div className="space-y-5">
-      <section
-        className={`panel p-4 ${
-          mobileTab === "result" ? "hidden min-[1200px]:block" : ""
-        }`}
-        aria-labelledby="prediction-selector-heading"
-      >
-        <h2
-          id="prediction-selector-heading"
-          className="text-base font-semibold"
-        >
-          Chọn nhân viên và bản dữ liệu
-        </h2>
-        <div className="mt-3 grid items-end gap-3 min-[768px]:grid-cols-2 min-[1200px]:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto_auto]">
-          <label className="text-xs font-medium text-slate-500">
-            Nhân viên
-            <select
-              aria-label="Nhân viên"
-              disabled={!!busy}
-              className="field mt-1.5 text-slate-900"
-              value={employeeId ?? ""}
-              onChange={(event) =>
-                chooseEmployee(
-                  event.target.value ? Number(event.target.value) : undefined,
-                )
-              }
-            >
-              <option value="">Chọn nhân viên</option>
-              {employees.map((item) => (
-                <option key={item.id} value={item.id}>
-                  {item.employeeCode} · {item.fullName}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="text-xs font-medium text-slate-500">
-            Bản dữ liệu
-            <select
-              aria-label="Bản dữ liệu"
-              className="field mt-1.5 text-slate-900"
-              value={snapshotId ?? ""}
-              disabled={!employeeId || !snapshots || !!busy}
-              onChange={(event) =>
-                chooseSnapshot(
-                  event.target.value ? Number(event.target.value) : undefined,
-                )
-              }
-            >
-              <option value="">
-                {!employeeId
-                  ? "Chọn nhân viên trước"
-                  : !snapshots
-                    ? "Đang tải…"
-                    : snapshots.length
-                      ? "Chọn bản dữ liệu"
-                      : "Chưa có bản dữ liệu"}
-              </option>
-              {snapshots?.map(
-                (item) =>
-                  item.snapshotId && (
-                    <option key={item.snapshotId} value={item.snapshotId}>
-                      Bản {item.snapshotId} ·{" "}
-                      {formatDateTime(item.snapshotDate || item.capturedAt)} ·{" "}
-                      {item.ready ? "Sẵn sàng" : "Thiếu dữ liệu"}
-                    </option>
-                  ),
-              )}
-            </select>
-          </label>
-          <div>
-            <span className="mb-1.5 block text-xs font-medium text-slate-500">
-              Trạng thái
-            </span>
-            <SnapshotStatus status={snapshotStatus} />
-          </div>
-          <button
-            type="button"
-            className="btn btn-secondary whitespace-nowrap"
-            disabled={!employeeId || !!busy}
-            onClick={() => void prepare()}
-          >
-            {busy === "preview"
-              ? "Đang kiểm tra…"
-              : snapshotId
-                ? "Kiểm tra dữ liệu"
-                : "Tạo bản dữ liệu"}
-          </button>
+      <section className={`panel flex min-h-16 flex-wrap items-center justify-between gap-3 px-4 py-3 ${mobileTab === "result" ? "hidden min-[1200px]:flex" : ""}`} aria-labelledby="prediction-selector-heading">
+        <div className="relative min-w-0 flex-1" onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setSelectorOpen(false) }}>
+          <h2 id="prediction-selector-heading" className="sr-only">Chọn nhân viên</h2>
+          <Search className="pointer-events-none absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-slate-400" aria-hidden />
+          <input
+            aria-label="Tìm và chọn nhân viên"
+            disabled={!!busy}
+            className="field h-11 pl-10"
+            value={employeeQuery}
+            placeholder="Tìm nhân viên theo tên hoặc mã (VD: EMP005 - Hoàng Gia Hưng)..."
+            onFocus={() => setSelectorOpen(true)}
+            onChange={(event) => { setEmployeeQuery(event.target.value); setSelectorOpen(true) }}
+          />
+          {selectorOpen && <div className="absolute left-0 right-0 top-12 z-40 max-h-72 overflow-y-auto rounded-xl border border-slate-200 bg-white p-1.5 shadow-xl">
+            {employeeMatches.length ? employeeMatches.map(item => <button key={item.id} type="button" className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left hover:bg-slate-50" onMouseDown={event => event.preventDefault()} onClick={() => { chooseEmployee(item.id); setEmployeeQuery(`${item.employeeCode} · ${item.fullName}`); setSelectorOpen(false) }}>
+              <span className="grid size-9 shrink-0 place-items-center rounded-full bg-orange-50 text-xs font-bold text-orange-700">{getInitials(item.fullName)}</span>
+              <span className="min-w-0"><strong className="block truncate text-sm text-slate-900">{item.fullName}</strong><span className="block truncate text-xs text-slate-500">{item.employeeCode}{snapshot?.employee.id === item.id && snapshot.features.Department ? ` · ${snapshot.features.Department}` : ""}</span></span>
+            </button>) : <p className="px-3 py-5 text-center text-sm text-slate-500">Không tìm thấy nhân viên phù hợp.</p>}
+          </div>}
         </div>
-        {employeeId && (
-          <details
-            className="mt-3 border-t pt-3 text-sm"
-            open={!!snapshot && !snapshot.ready}
-          >
-            <summary className="cursor-pointer text-xs font-medium text-slate-500">
-              Tùy chọn kiểm tra và bổ sung dữ liệu
-            </summary>
-            <div className="mt-3 grid gap-3 md:grid-cols-2 lg:grid-cols-3">
-              {snapshot?.missingFeatures.map((key) => (
-                <label key={key} className="text-xs font-medium">
-                  {featureLabel(key)}
-                  {FEATURE_UNITS[key] ? ` (${FEATURE_UNITS[key]})` : ""}
-                  {FEATURE_CHOICES[key] ? (
-                    <select
-                      className="field mt-1.5"
-                      value={supplement[key] || ""}
-                      onChange={(event) =>
-                        setSupplement((current) => ({
-                          ...current,
-                          [key]: event.target.value,
-                        }))
-                      }
-                    >
-                      <option value="">Chọn giá trị</option>
-                      {FEATURE_CHOICES[key].map((choice) => (
-                        <option key={choice} value={choice}>
-                          {choice}
-                        </option>
-                      ))}
-                    </select>
-                  ) : (
-                    <input
-                      className="field tabular mt-1.5"
-                      type={key === "Hire_Date" ? "date" : "number"}
-                      value={supplement[key] || ""}
-                      onChange={(event) =>
-                        setSupplement((current) => ({
-                          ...current,
-                          [key]: event.target.value,
-                        }))
-                      }
-                    />
-                  )}
-                </label>
-              ))}
-            </div>
-          </details>
-        )}
+        {employee && <div className="flex flex-wrap items-center gap-2">
+          {snapshot?.features.Department && <span className="rounded-full bg-sky-50 px-3 py-1.5 text-xs font-semibold text-sky-700">Phòng {snapshot.features.Department}</span>}
+          {snapshot && <span className="rounded-full bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-700">Thâm niên: {formatTenure(snapshot.features.Years_At_Company)}</span>}
+          <span className="rounded-full bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700">Đang làm việc</span>
+        </div>}
       </section>
 
       <div
@@ -606,64 +359,34 @@ export function IndividualAnalysis({
           >
             <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-200 px-5 py-4">
               <div className="flex min-w-0 items-center gap-3">
-                <span className={`grid h-11 w-11 shrink-0 place-items-center rounded-full bg-slate-100 text-sm font-semibold text-slate-700 ${snapshot ? 'ring-2 ring-emerald-400 ring-offset-2' : ''}`}>
-                  {getInitials(snapshot?.employee.fullName)}
+                <span className={`grid h-12 w-12 shrink-0 place-items-center rounded-full bg-slate-100 text-sm font-semibold text-slate-700 ${snapshot ? 'ring-2 ring-emerald-400 ring-offset-2' : ''}`}>
+                  {getInitials(employee?.fullName)}
                 </span>
                 <div className="min-w-0">
                   <p className="metadata-label">Hồ sơ nhân viên</p>
                   <h2 id="prediction-input-heading" className="mt-1 truncate font-semibold text-slate-900">
-                    {snapshot?.employee.fullName || "Chưa chọn nhân viên"}
+                    {employee?.fullName || "Chưa chọn nhân viên"}
                   </h2>
-                  {snapshot?.employee.employeeCode && <span className="mt-1 inline-flex rounded-md bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">{snapshot.employee.employeeCode}</span>}
-                  {snapshot && <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-slate-600">
-                    <span>{snapshot.features.Age} tuổi</span><span aria-hidden>•</span>
-                    <span>{formatDisplayValue(snapshot, 'Gender')}</span><span aria-hidden>•</span>
-                    <span>{educationTag(snapshot.features.Education_Level)}</span><span aria-hidden>•</span>
-                    <span>{snapshot.features.Department}</span>
-                  </div>}
+                  {employee && <p className="mt-1 text-xs font-medium text-slate-600">{employee.employeeCode} · {String(snapshot?.features.Position ?? snapshot?.features.Department ?? "Chưa cập nhật chức danh")}</p>}
                 </div>
               </div>
-              <div className="flex flex-col items-end gap-1.5">
-                <SnapshotStatus status={snapshotStatus} />
-                {snapshot?.snapshotId && <span className="text-xs font-medium text-slate-500">Bản ghi #{snapshot.snapshotId}</span>}
-              </div>
+              <ProfileStatus status={snapshotStatus} loading={snapshotLoading} />
             </div>
-            {dataError && (
-              <div className="px-5 pt-4">
-                <Notice tone="error">{dataError}</Notice>
-              </div>
-            )}
             <div className="min-h-72 flex-1 overflow-y-auto px-5 py-4">
               {snapshotLoading ? (
-                <Loading label="Đang tải bản dữ liệu…" />
-              ) : !snapshot ? (
+                <Loading label="Đang nạp hồ sơ hiện tại…" />
+              ) : !employee ? (
                 <Empty>
-                  Chọn nhân viên và bản dữ liệu, hoặc tạo bản dữ liệu mới từ hồ
-                  sơ hiện tại.
+                  Vui lòng chọn nhân viên ở thanh tìm kiếm phía trên để nạp hồ sơ.
                 </Empty>
+              ) : !snapshot ? (
+                <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900"><p className="font-semibold">Hồ sơ chưa đủ điều kiện đánh giá</p><p className="mt-1 leading-6">{eligibilityMessage || `Chưa thể nạp đủ dữ liệu của nhân viên ${employee.employeeCode}.`}</p><Link className="mt-3 inline-flex font-semibold text-amber-950 underline underline-offset-2" to={`/employees/${employee.id}/edit`}>Bấm vào đây để cập nhật hồ sơ</Link></div>
               ) : (
                 <>
                   {snapshotStatus !== "ready" && (
-                    <Notice
-                      tone="warning"
-                      title={
-                        snapshotStatus === "invalid"
-                          ? "Dữ liệu không hợp lệ"
-                          : "Dữ liệu còn thiếu"
-                      }
-                    >
-                      {[
-                        ...snapshot.missingFeatures.map(
-                          (key) => `Thiếu ${featureLabel(key)}`,
-                        ),
-                        ...(snapshot.invalidFeatures ?? []).map(
-                          (key) => `Không hợp lệ: ${featureLabel(key)}`,
-                        ),
-                        ...snapshot.issues,
-                      ].join(". ")}
-                    </Notice>
+                    <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900"><p className="font-semibold">Hồ sơ chưa đủ điều kiện đánh giá</p><p className="mt-1 leading-6">{eligibilityMessage || `Hồ sơ nhân viên ${employee.employeeCode} còn thiếu thông tin bắt buộc.`}</p><Link className="mt-3 inline-flex font-semibold text-amber-950 underline underline-offset-2" to={`/employees/${employee.id}/edit`}>Bấm vào đây để cập nhật hồ sơ</Link></div>
                   )}
-                  <div className="mt-3 space-y-3">
+                  <div className={`${snapshotStatus === "ready" ? "" : "mt-3"} space-y-3`}>
                     <FeatureGroups snapshot={snapshot} />
                   </div>
                 </>
@@ -686,15 +409,9 @@ export function IndividualAnalysis({
                 </span>
                 <span>Lưu vào hồ sơ theo dõi định kỳ</span>
               </button>
-              <button
-                type="button"
-                className="btn btn-primary"
-                disabled={!snapshot?.ready || !!busy}
-                onClick={() => void runPrediction(save, "predict")}
-              >
-                {busy === "predict" ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <BrainCircuit className="h-4 w-4" aria-hidden />}
-                {busy === "predict" ? "Đang đánh giá…" : "Đánh giá mức độ gắn kết"}
-              </button>
+              <span title={!snapshot?.ready ? profileWarning || "Hồ sơ chưa đủ dữ liệu bắt buộc để đánh giá." : undefined}>
+                <button type="button" className="btn btn-primary" disabled={!snapshot?.ready || !!busy} onClick={() => void runPrediction(save, "predict")}>{busy === "predict" ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <BrainCircuit className="h-4 w-4" aria-hidden />}{busy === "predict" ? "Đang đánh giá…" : "Đánh giá mức độ gắn kết"}</button>
+              </span>
             </div>
           </section>
         </div>
@@ -732,67 +449,41 @@ export function IndividualAnalysis({
   )
 }
 
-function SnapshotStatus({
+function ProfileStatus({
   status,
+  loading,
 }: {
   status: "ready" | "missing" | "invalid" | null
+  loading: boolean
 }) {
-  if (!status)
-    return (
-      <span className="flex h-10 items-center text-sm text-slate-500">
-        Chưa chọn
-      </span>
-    )
-  const config =
-    status === "ready"
-      ? {
-          label: "Sẵn sàng",
-          className: "bg-orange-50 text-emerald-700",
-          Icon: CheckCircle2,
-        }
-      : {
-          label: status === "invalid" ? "Không hợp lệ" : "Thiếu dữ liệu",
-          className:
-            status === "invalid"
-              ? "bg-red-50 text-red-700"
-              : "bg-amber-50 text-amber-800",
-          Icon: AlertTriangle,
-        }
-  return (
-    <span
-      className={`inline-flex h-10 items-center gap-1.5 whitespace-nowrap rounded-full px-3 text-xs font-medium ${config.className}`}
-    >
-      <config.Icon className="h-3.5 w-3.5" aria-hidden />
-      {config.label}
-    </span>
-  )
+  if (loading) return <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-3 py-2 text-xs font-medium text-slate-600"><Loader2 className="size-3.5 animate-spin" />Đang nạp hồ sơ</span>
+  if (status === "ready") return <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700"><CheckCircle2 className="size-3.5" />Dữ liệu hợp lệ · Sẵn sàng đánh giá</span>
+  if (status) return <span className="inline-flex rounded-full bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800">Hồ sơ cần bổ sung</span>
+  return null
 }
 
 function FeatureGroups({ snapshot }: { snapshot: AiSnapshot }) {
   const f = snapshot.features
   const satisfaction = Number(f.Employee_Satisfaction_Score)
-  return <div className="grid gap-3">
-    <section className="rounded-lg bg-slate-50 p-3.5">
-      <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-900"><BriefcaseBusiness className="size-4 text-slate-500" />Đãi ngộ & Thâm niên</div>
-      <div className="grid gap-2 sm:grid-cols-2">
-        <Metric label="Ngày vào làm" value={formatDisplayValue(snapshot, 'Hire_Date')} note={`Thâm niên ${f.Years_At_Company} năm`} />
-        <Metric label="Lương cơ bản" value={formatDisplayValue(snapshot, 'Monthly_Salary')} icon={<Banknote className="size-4 text-slate-500" />} />
-        <Metric label="Đã thăng chức" value={`${f.Promotions} lần`} />
-      </div>
-    </section>
-    <section>
-      <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-slate-900"><Activity className="size-4 text-slate-500" />Vận hành & Cảm xúc</div>
-      <div className="grid grid-cols-2 gap-2">
-        <Metric label="Giờ làm / tuần" value={`${formatNumber(f.Work_Hours_Per_Week)}h`} />
-        <Metric label="Tăng ca YTD" value={`${formatNumber(f.Overtime_Hours)}h`} />
-        <Metric label="Vắng mặt YTD" value={`${formatNumber(f.Sick_Days)} ngày`} />
-        <div className="rounded-lg border border-slate-200 bg-white p-3">
-          <p className="text-xs font-medium text-slate-500">Điểm hài lòng</p>
-          <p className="mt-1 text-base font-semibold tabular-nums text-slate-900">{Number.isFinite(satisfaction) ? satisfaction.toFixed(2) : '—'} <span className="text-xs font-medium text-slate-500">/ 5.0</span></p>
-          <SatisfactionBar value={satisfaction} />
-        </div>
-      </div>
-    </section>
+  const years = Number(f.Years_At_Company)
+  const lastRaise = Number(f.Months_Since_Last_Raise ?? f.Last_Salary_Increase_Months)
+  const onTime = Number(f.On_Time_Rate ?? f.Attendance_Rate)
+  return <div>
+    <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-900"><Activity className="size-4 text-slate-500" />Dữ liệu làm việc hiện tại</div>
+    <div className="grid grid-cols-2 gap-2">
+      <Metric label="Thời gian làm thêm" value={`${formatNumber(f.Overtime_Hours)} giờ`} />
+      <Metric label="Nghỉ phép / Nghỉ ốm" value={`${formatNumber(f.Sick_Days)} ngày`} />
+      <div className="rounded-lg border border-slate-200 bg-white p-3"><p className="text-xs font-medium text-slate-500">Hài lòng gần nhất</p><p className="mt-1 text-base font-semibold tabular-nums text-slate-900">{Number.isFinite(satisfaction) ? satisfaction.toFixed(2) : '—'} <span className="text-xs font-medium text-slate-500">/ 5.0</span></p><SatisfactionBar value={satisfaction} /></div>
+      <Metric label="Thâm niên công tác" value={Number.isFinite(years) ? `${Math.round(years * 12)} tháng` : "—"} />
+      <Metric label="Tăng lương gần nhất" value={Number.isFinite(lastRaise) ? `${lastRaise} tháng trước` : "Chưa có dữ liệu"} />
+      <Metric label="Tỷ lệ đúng giờ" value={Number.isFinite(onTime) ? `${onTime.toFixed(1)}%` : "Chưa có dữ liệu"} />
+    </div>
+    <div className="mt-3 grid gap-2 sm:grid-cols-2">
+      <Metric label="Ngày vào làm" value={formatDisplayValue(snapshot, 'Hire_Date')} />
+      <Metric label="Lương cơ bản" value={formatDisplayValue(snapshot, 'Monthly_Salary')} icon={<Banknote className="size-4 text-slate-500" />} />
+      <Metric label="Giờ làm / tuần" value={`${formatNumber(f.Work_Hours_Per_Week)} giờ`} />
+      <Metric label="Đã thăng chức" value={`${formatNumber(f.Promotions)} lần`} />
+    </div>
   </div>
 }
 
@@ -807,8 +498,17 @@ function formatNumber(value: unknown) {
   const number = Number(value)
   return Number.isFinite(number) ? number.toLocaleString('vi-VN', {maximumFractionDigits: 2}) : '—'
 }
-function educationTag(value: unknown) {
-  return ({Bachelor: 'Cử nhân (Đại học)', Master: 'Thạc sĩ', PhD: 'Tiến sĩ', 'High School': 'Trung học phổ thông'} as Record<string,string>)[String(value)] ?? String(value ?? '—')
+function formatTenure(value: unknown) {
+  const years = Number(value)
+  if (!Number.isFinite(years)) return "Chưa cập nhật"
+  return `${years.toLocaleString("vi-VN", { maximumFractionDigits: 1 })} năm`
+}
+function isInternalProfileMessage(message: string) {
+  return /Chọn ngày bắt đầu hợp lệ|ngày hiện tại tại Việt Nam làm ngày chốt/i.test(message)
+}
+function normalizeProfileError(message: string) {
+  if (isInternalProfileMessage(message)) return "Thiếu Ngày vào làm trong hồ sơ nhân viên."
+  return message
 }
 
 function getInitials(name?: string) {

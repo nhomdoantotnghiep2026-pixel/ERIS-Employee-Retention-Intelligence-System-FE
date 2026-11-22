@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react"
+import { FileDown, RefreshCw } from "lucide-react"
 
 import { AppShell } from "../components/AppShell"
 
@@ -62,13 +63,12 @@ export default function AiAnalysis() {
       <SectionHeader
         title={t("Hồ sơ sức khỏe nhân sự & Kế hoạch giữ chân")}
         description={t(
-          "Kiểm tra dữ liệu và xem kết quả hỗ trợ cho từng nhân viên.",
+          "Đánh giá rủi ro thôi việc và đề xuất lộ trình giữ chân dựa trên dữ liệu làm việc thực tế.",
         )}
-      />
-      <div className="mb-5 flex flex-wrap gap-2">
-        <Button variant="secondary" onClick={() => window.print()}>{t("Tải bản tóm tắt nhân sự (PDF)")}</Button>
-        <Button variant="secondary" onClick={() => setReload(v => v + 1)}>{t("Cập nhật dữ liệu từ HRIS")}</Button>
-      </div>
+      >
+        <Button variant="secondary" onClick={() => setReload(v => v + 1)}><RefreshCw size={16} />{t("Cập nhật dữ liệu từ HRIS")}</Button>
+        <Button variant="secondary" onClick={() => window.print()}><FileDown size={16} />{t("Tải tóm tắt nhân sự (PDF)")}</Button>
+      </SectionHeader>
       <div className="ai-workspace text-slate-900">
         {error && (
           <div

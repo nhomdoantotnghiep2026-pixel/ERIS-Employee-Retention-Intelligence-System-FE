@@ -89,11 +89,11 @@ export function buildInsights(contributions: Record<string, number> | undefined,
     return [{feature, value, direction: value > 0 ? 'positive' as const : 'negative' as const,
       strength: Math.abs(value) >= limits[1] ? 'Strong' as const : 'Moderate' as const}]
   }).sort((a,b) => Math.abs(b.value) - Math.abs(a.value) || a.feature.localeCompare(b.feature))
-  // Age and Gender remain profile data and must not consume the 3 risk / 2
+  // Age and Gender remain profile data and must not consume the 3 risk / 3
   // retention explanation slots shown to HR.
   const explainable = eligible.filter(candidate => candidate.feature !== 'Age' && candidate.feature !== 'Gender')
   const positiveCandidates = explainable.filter(candidate => candidate.direction === 'positive').slice(0, 3)
-  const negativeCandidates = explainable.filter(candidate => candidate.direction === 'negative').slice(0, 2)
+  const negativeCandidates = explainable.filter(candidate => candidate.direction === 'negative').slice(0, 3)
   const candidates = [...positiveCandidates, ...negativeCandidates]
   const render = (candidate: typeof candidates[number]): Omit<Signal, 'rank'> => {
     const { feature, direction, strength } = candidate

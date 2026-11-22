@@ -4,9 +4,9 @@ import { InsightPlaybook } from "./InsightPlaybook";
 import {
   AlertTriangle,
   ArrowRightLeft,
+  BarChart3,
   CheckCircle2,
   Clock3,
-  Database,
   History,
   Loader2,
   Minus,
@@ -83,6 +83,7 @@ export const EmployeePredictionDashboard = forwardRef<
     state,
     result,
     snapshot,
+    employee,
     error,
     loadingLabel,
     illustrative = false,
@@ -173,7 +174,7 @@ export const EmployeePredictionDashboard = forwardRef<
         </div>
 
         <div hidden={activeTab !== 0}>
-          {state === "idle" && <EmptyResult />}
+          {state === "idle" && <EmptyResult employee={employee} ready={Boolean(snapshot?.ready)} />}
           {state === "loading" && (
             <div
               role="status"
@@ -750,17 +751,21 @@ function formatHistoryOption(value?: string) {
   const p = dateTimeParts(value);
   return p ? `${p.day}/${p.month} ${p.hour}:${p.minute}` : "Chưa có thời gian";
 }
-function EmptyResult() {
+function EmptyResult({ employee, ready }: { employee?: AiEmployee | null; ready: boolean }) {
   return (
     <div className="flex min-h-80 flex-col items-center justify-center px-4 text-center">
       <span className="grid h-14 w-14 place-items-center rounded-full bg-slate-100 text-slate-500">
-        <Database className="h-6 w-6" aria-hidden />
+        <BarChart3 className="h-6 w-6" aria-hidden />
       </span>
       <h3 className="mt-4 font-semibold text-slate-900">
         Chưa có kết quả đánh giá
       </h3>
-      <p className="mt-2 max-w-64 text-sm leading-6 text-slate-600">
-        Kiểm tra dữ liệu bên trái và chọn Đánh giá mức độ gắn kết để bắt đầu.
+      <p className="mt-2 max-w-md text-sm leading-6 text-slate-600">
+        {employee
+          ? ready
+            ? `Dữ liệu hồ sơ của ${employee.fullName} đã được nạp đầy đủ. Bấm nút “Đánh giá mức độ gắn kết” ở cột bên trái để chạy phân tích.`
+            : `Hồ sơ của ${employee.fullName} cần được bổ sung trước khi đánh giá.`
+          : "Vui lòng chọn nhân viên ở thanh tìm kiếm để nạp hồ sơ và bắt đầu đánh giá."}
       </p>
     </div>
   );
