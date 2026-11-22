@@ -3,10 +3,14 @@ import assert from "node:assert/strict"
 import { readFile } from "node:fs/promises"
 
 test("HR survey management uses KPI cards, quick filters, progress, and non-destructive close styling", async () => {
-  const source = await readFile(
-    new URL("../src/screens/ErdSurveys.tsx", import.meta.url),
-    "utf8",
-  )
+  const source = (
+    await Promise.all([
+      "../src/screens/ErdSurveys.tsx",
+      "../src/features/surveys/surveyUtils.ts",
+      "../src/features/surveys/CompactOptionInputs.tsx",
+      "../src/features/surveys/SurveyKpiCard.tsx",
+    ].map((path) => readFile(new URL(path, import.meta.url), "utf8")))
+  ).join("\n")
 
   assert.match(source, /label=\{tr\("Đang mở", "Active surveys"\)\}/)
   assert.match(source, /label=\{tr\("Lượt phản hồi", "Total responses"\)\}/)

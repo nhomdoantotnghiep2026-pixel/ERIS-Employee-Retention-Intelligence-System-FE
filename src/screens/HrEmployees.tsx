@@ -321,6 +321,7 @@ export default function HrEmployees() {
   const appliedPosition = positions.find(item => String(item.id) === positionId)?.name;
   const pendingFilterChanges = query.trim() !== search || draftDepartmentId !== departmentId || draftPositionId !== positionId || draftStatus !== status;
   const hasFilterValues = Boolean(query.trim() || search || draftDepartmentId || departmentId || draftPositionId || positionId || draftStatus !== 'ACTIVE' || status !== 'ACTIVE');
+  const pageError = error || catalogError;
   useEffect(() => {
     const query = form.address.trim();
     if (!showAddressSuggestions || form.addressRefId || query.length < 3 || (showingRecord && !editing)) {
@@ -355,8 +356,10 @@ export default function HrEmployees() {
         {(creating || showingRecord) && <Button variant="secondary" onClick={() => navigate('/employees')}>{text('Về danh sách', 'Back to list')}</Button>}</div>
     </div></Card>
     {message && <p role="status" className="mb-5 rounded-xl bg-emerald-50 p-4 text-emerald-800">{t(message)}</p>}
-    {catalogError && <p role="alert" className="mb-5 rounded-xl bg-red-50 p-4">{t(catalogError)}<Button variant="secondary" onClick={() => setRevision(v => v + 1)}>{text('Thử lại', 'Retry')}</Button></p>}
-    {error && <p role="alert" className="mb-5 rounded-xl bg-red-50 p-4 text-red-800">{t(error)}<Button variant="secondary" onClick={() => setRevision(v => v + 1)}>{text('Thử lại', 'Retry')}</Button></p>}
+    {pageError && <div role="alert" className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-red-100 bg-red-50 p-4 text-red-800">
+      <p>{t(pageError)}</p>
+      <Button variant="secondary" onClick={() => setRevision(v => v + 1)}>{text('Thử lại', 'Retry')}</Button>
+    </div>}
     {loading ? <Card className="p-6"><p role="status">{text('Đang tải nhân viên...', 'Loading employees...')}</p></Card>
       : creating ? <MotionConfig reducedMotion="user"><motion.form noValidate onChange={() => setCreateValidationError('')} onSubmit={save} initial="hidden" animate="visible" variants={createContainerMotion} className="grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_300px]">
         <fieldset disabled={pending} className="min-w-0 space-y-5 border-0 p-0">

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react"
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react"
 
 import {
   BarChart3,
@@ -45,6 +45,37 @@ import { useRole } from "../context/RoleContext"
 
 import { useAutoDismissFeedback } from "../hooks/useAutoDismissState"
 
+import { CompactOptionInputs } from "../features/surveys/CompactOptionInputs"
+
+import { SurveyKpiCard } from "../features/surveys/SurveyKpiCard"
+
+import {
+  createEmptySurveyDraft as emptyDraft,
+  createEmptySurveyQuestion as emptyQuestion,
+  type SurveyAnswerDraft as AnswerDraft,
+  type SurveyDraft as Draft,
+  type SurveyQuestionDraft as QuestionDraft,
+} from "../features/surveys/surveyTypes"
+
+import {
+  dateWithZone,
+  isChoiceConfig,
+  isRatingConfig,
+  progressTone,
+  questionTypeLabels,
+  ratingLabels,
+  remainingLabel,
+  statusLabel,
+  surveyAverageScore,
+  surveyInvitedCount,
+  surveyResponseCount,
+  surveyResponseRate,
+  topicIcon,
+  topicLabel,
+} from "../features/surveys/surveyUtils"
+
+import { useDialogBehavior } from "../features/surveys/useDialogBehavior"
+
 import { rememberCompletedSurvey } from "../utils/completedSurveys"
 
 import { employeeDate } from "../utils/employeeDates"
@@ -86,232 +117,6 @@ const control =
 
 const area =
   "mt-2 min-h-24 w-full rounded-xl border border-slate-300 bg-white p-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-orange-400 focus:ring-4 focus:ring-orange-100"
-
-const dateWithZone = (date: string, endOfDay = false) =>
-  `${date}T${endOfDay ? "23:59:59" : "00:00:00"}+07:00`
-
-const ratingLabels = [
-  "Rất không hài lòng",
-  "Không hài lòng",
-  "Không hài lòng cũng không bất mãn",
-  "Hài lòng",
-  "Rất hài lòng",
-]
-
-const questionTypeLabels: Record<SurveyQuestionType, string> = {
-  RATING: "Thang điểm 1–5",
-  TEXT: "Câu trả lời văn bản",
-  SINGLE_CHOICE: "Chọn một",
-  MULTIPLE_CHOICE: "Chọn nhiều",
-}
-
-const topicLabelsVi: Record<string, string> = {
-  "compensation benefits": "Thu nhập & Phúc lợi",
-  "working time": "Thời gian làm việc",
-  "work environment": "Môi trường làm việc",
-  "career development": "Phát triển sự nghiệp",
-  management: "Năng lực quản lý",
-  "employee engagement": "Mức độ gắn kết",
-  "work life balance": "Cân bằng công việc & Cuộc sống",
-  "communication culture": "Văn hóa giao tiếp",
-  "job fit": "Mức độ phù hợp công việc",
-  other: "Chủ đề khác",
-}
-
-const normalizedTopicName = (name: string) =>
-  name.trim().replace(/[_-]+/g, " ").replace(/\s+/g, " ").toLocaleLowerCase()
-
-const topicLabel = (name: string, language = "vi") => {
-  const normalized = normalizedTopicName(name)
-  if (language === "vi" && topicLabelsVi[normalized]) return topicLabelsVi[normalized]
-  return normalized
-    .split(" ")
-    .map((word) => word.charAt(0).toLocaleUpperCase() + word.slice(1))
-    .join(" ")
-}
-
-const isChoiceConfig = (config: SurveyAnswerConfig): config is {
-  options: Array<{ code: string; label: string }>
-} => Boolean(config && "options" in config)
-
-const isRatingConfig = (config: SurveyAnswerConfig): config is {
-  min: 1
-  max: 5
-  labels: string[]
-  templateCode?: string
-} => Boolean(config && "labels" in config)
-
-type Draft = {
-  title: string
-  description: string
-  startDate: string
-  endDate: string
-  categoryIds: number[]
-}
-
-type AnswerDraft = { value?: SurveyAnswerValue; comment: string }
-
-type QuestionDraft = {
-  questionId?: number
-  questionText: string
-  categoryId: number
-  questionType: SurveyQuestionType
-  options: string
-  displayOrder: number
-}
-
-const emptyDraft = (): Draft => ({
-  title: "",
-  description: "",
-  startDate: "",
-  endDate: "",
-  categoryIds: [],
-})
-
-const emptyQuestion = (): QuestionDraft => ({
-  questionText: "",
-  categoryId: 0,
-  questionType: "RATING",
-  options: "",
-  displayOrder: 100,
-})
-
-function useDialogBehavior(open: boolean, onClose: () => void) {
-  useEffect(() => {
-    if (!open) return
-
-    const previousOverflow = document.body.style.overflow
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose()
-    }
-
-    document.body.style.overflow = "hidden"
-    document.addEventListener("keydown", closeOnEscape)
-
-    return () => {
-      document.body.style.overflow = previousOverflow
-      document.removeEventListener("keydown", closeOnEscape)
-    }
-  }, [onClose, open])
-}
-
-const surveyResponseCount = (survey: SurveySummary, result?: SurveyResults) =>
-  result?.responseCount ?? survey.responseCount ?? 0
-
-const surveyInvitedCount = (
-  survey: SurveySummary,
-  result?: SurveyResults,
-  totalEmployees = 0,
-) => {
-  const explicitCount =
-    survey.targetAudienceCount ??
-    result?.invitedCount ??
-    survey.invitedCount ??
-    survey.participantCount
-  return explicitCount != null && explicitCount > 0
-    ? explicitCount
-    : totalEmployees
-}
-
-const surveyResponseRate = (
-  survey: SurveySummary,
-  result?: SurveyResults,
-  totalEmployees = 0,
-) => {
-  if (result?.completionRate != null) return result.completionRate
-  const invited = surveyInvitedCount(survey, result, totalEmployees)
-  return invited > 0
-    ? Math.round((surveyResponseCount(survey, result) / invited) * 100)
-    : 0
-}
-
-const progressTone = (rate: number) =>
-  rate < 25
-    ? {
-        fill: "from-rose-500 to-amber-500",
-        text: "text-rose-600",
-        hintVi: "Cần gửi nhắc nhở",
-        hintEn: "Reminder recommended",
-      }
-    : rate < 60
-      ? {
-          fill: "from-amber-400 to-amber-500",
-          text: "text-amber-600",
-          hintVi: "Đang thu thập phản hồi",
-          hintEn: "Collecting responses",
-        }
-      : rate < 85
-        ? {
-            fill: "from-blue-500 to-teal-400",
-            text: "text-teal-600",
-            hintVi: "Tiến độ tốt",
-            hintEn: "Good progress",
-          }
-        : {
-            fill: "from-teal-400 to-emerald-500",
-            text: "text-emerald-600",
-            hintVi: "Đủ tin cậy thống kê",
-            hintEn: "Statistically reliable",
-          }
-
-const topicIcon = (name: string) => {
-  const value = name.toLocaleLowerCase()
-  if (/salary|compensation|lương|benefit/.test(value)) return "💰"
-  if (/hour|time|giờ|balance/.test(value)) return "⏰"
-  if (/environment|workplace|môi trường/.test(value)) return "🏢"
-  if (/career|promotion|growth|thăng|phát triển/.test(value)) return "🚀"
-  if (/manager|leadership|quản lý/.test(value)) return "👥"
-  if (/engagement|gắn kết/.test(value)) return "🤝"
-  if (/communication|giao tiếp/.test(value)) return "💬"
-  if (/job|fit|công việc/.test(value)) return "🎯"
-  return "📝"
-}
-
-const surveyAverageScore = (result?: SurveyResults) => {
-  if (!result) return null
-  const scored = result.categoryScores.filter(
-    (item) => item.satisfactionScore != null,
-  )
-  if (!scored.length) return null
-  const weight = scored.reduce(
-    (sum, item) => sum + Math.max(1, item.responseCount),
-    0,
-  )
-  return scored.reduce(
-    (sum, item) =>
-      sum + Number(item.satisfactionScore) * Math.max(1, item.responseCount),
-    0,
-  ) / weight
-}
-
-function remainingLabel(survey: SurveySummary, language: string) {
-  if (survey.status !== "ACTIVE" || !survey.endDate) return null
-  const end = new Date(survey.endDate)
-  if (Number.isNaN(end.getTime())) return null
-  const days = Math.max(0, Math.ceil((end.getTime() - Date.now()) / 86_400_000))
-  if (days <= 2)
-    return {
-      label:
-        language === "vi"
-          ? days === 0
-            ? "Kết thúc hôm nay"
-            : `Sắp kết thúc · còn ${days} ngày`
-          : days === 0
-            ? "Ends today"
-            : `Ending soon · ${days} days left`,
-      className: "border-amber-200 bg-amber-50 text-amber-800",
-    }
-  return {
-    label: language === "vi" ? `Còn ${days} ngày` : `${days} days left`,
-    className: "border-sky-200 bg-sky-50 text-sky-700",
-  }
-}
-
-const statusLabel: Record<SurveySummary["status"], { vi: string; en: string }> = {
-  ACTIVE: { vi: "Đang mở", en: "Active" },
-  DRAFT: { vi: "Bản nháp", en: "Draft" },
-  CLOSED: { vi: "Đã đóng", en: "Closed" },
-}
 
 export default function ErdSurveys() {
   const { t, language } = useLanguage()
@@ -2192,97 +1997,6 @@ export default function ErdSurveys() {
         }}
       />
     </AppShell>
-  )
-}
-
-function SurveyKpiCard({
-  label,
-  value,
-  note,
-  icon,
-  tone,
-  pulse = false,
-  progress,
-}: {
-  label: string
-  value: string
-  note: string
-  icon: ReactNode
-  tone: "emerald" | "blue" | "orange" | "violet"
-  pulse?: boolean
-  progress?: number
-}) {
-  const progressStyle = progress == null ? null : progressTone(progress)
-  const styles = {
-    emerald: "bg-emerald-50 text-emerald-700 ring-emerald-100",
-    blue: "bg-sky-50 text-sky-700 ring-sky-100",
-    orange: "bg-orange-50 text-orange-700 ring-orange-100",
-    violet: "bg-violet-50 text-violet-700 ring-violet-100",
-  }
-  return (
-    <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">{label}</p>
-          <p className="mt-2 text-2xl font-bold tracking-tight text-slate-950">{value}</p>
-        </div>
-        <span className={`relative grid size-10 shrink-0 place-items-center rounded-xl ring-4 ${styles[tone]}`}>
-          {icon}
-          {pulse && <span className="absolute right-0 top-0 size-2.5 rounded-full bg-emerald-500 ring-2 ring-white before:absolute before:inset-0 before:animate-ping before:rounded-full before:bg-emerald-400" />}
-        </span>
-      </div>
-      {progress != null && (
-        <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-100">
-          <span className={`block h-full rounded-full bg-gradient-to-r transition-all duration-500 ease-out ${progressStyle?.fill || ""}`} style={{ width: `${Math.min(100, Math.max(0, progress))}%` }} />
-        </div>
-      )}
-      <p className="mt-2 text-xs font-medium text-slate-500">{note}</p>
-    </article>
-  )
-}
-
-function CompactOptionInputs({
-  value,
-  onChange,
-}: {
-  value: string
-  onChange: (value: string) => void
-}) {
-  const { language } = useLanguage()
-  const tr = (vi: string, en: string) => (language === "vi" ? vi : en)
-  const options = value.split("\n")
-  const normalized = options.length >= 2 ? options : [...options, ...Array(2 - options.length).fill("")]
-  const update = (index: number, next: string) =>
-    onChange(normalized.map((option, itemIndex) => itemIndex === index ? next : option).join("\n"))
-  const remove = (index: number) => {
-    if (normalized.length <= 2) return
-    onChange(normalized.filter((_, itemIndex) => itemIndex !== index).join("\n"))
-  }
-  const add = () => onChange([...normalized, ""].join("\n"))
-
-  return (
-    <div>
-      <div className="grid gap-2 sm:grid-cols-2">
-        {normalized.map((option, index) => (
-          <div key={index} className="flex items-center gap-1.5">
-            <input
-              value={option}
-              placeholder={tr(`Phương án ${String.fromCharCode(65 + index)}`, `Option ${String.fromCharCode(65 + index)}`)}
-              className="h-10 min-w-0 flex-1 rounded-lg border border-slate-300 bg-white px-3 text-sm outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100"
-              onChange={(event) => update(index, event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === "Enter") {
-                  event.preventDefault()
-                  add()
-                }
-              }}
-            />
-            <button type="button" aria-label={tr("Xóa phương án", "Remove option")} disabled={normalized.length <= 2} onClick={() => remove(index)} className="grid size-8 shrink-0 place-items-center rounded-md text-slate-400 hover:bg-rose-50 hover:text-rose-600 disabled:opacity-30"><X size={14} /></button>
-          </div>
-        ))}
-      </div>
-      <button type="button" onClick={add} className="mt-2 text-xs font-semibold text-orange-700 hover:underline">+ {tr("Thêm phương án", "Add option")}</button>
-    </div>
   )
 }
 
