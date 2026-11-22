@@ -9,6 +9,9 @@ test("HR survey management uses KPI cards, quick filters, progress, and non-dest
       "../src/features/surveys/surveyUtils.ts",
       "../src/features/surveys/CompactOptionInputs.tsx",
       "../src/features/surveys/SurveyKpiCard.tsx",
+      "../src/features/surveys/SurveyDraftEditor.tsx",
+      "../src/features/surveys/SurveyQuestionWizards.tsx",
+      "../src/features/surveys/SurveyPreviewModal.tsx",
     ].map((path) => readFile(new URL(path, import.meta.url), "utf8")))
   ).join("\n")
 
@@ -45,13 +48,22 @@ test("HR survey management uses KPI cards, quick filters, progress, and non-dest
   assert.match(source, /function SurveyPreviewModal/)
   assert.match(source, /Xem trước & xuất bản/)
   assert.match(source, /exportSurveyCsv/)
-  assert.match(source, /function SurveyEditorStudio/)
+  assert.match(source, /function SurveyDraftEditor/)
   assert.match(source, /Chỉnh sửa bản nháp/)
   assert.match(source, /Lưu thay đổi bản nháp/)
   assert.match(source, /Lưu & Xuất bản ngay/)
   assert.match(source, /function SurveyQuestionWizard/)
   assert.match(source, /function SurveyDraftQuestionWizard/)
   assert.match(source, /function CompactOptionInputs/)
+  assert.match(source, /role="tablist"/)
+  assert.match(source, /role="tabpanel"/)
+  assert.match(source, /aria-selected=\{selected\}/)
+  assert.match(source, /aria-controls=\{`survey-create-panel-/)
+  assert.match(source, /aria-controls=\{`survey-edit-panel-/)
+  assert.match(source, /onMouseDown=\{\(event\) => \{/)
+  assert.match(source, /if \(event\.target === event\.currentTarget\) onClose\(\)/)
+  assert.match(source, /animate-in[^"]*fade-in[^"]*duration-200/)
+  assert.match(source, /useDialogBehavior\(true, onClose\)/)
   assert.match(source, /topicLabelsVi/)
   assert.match(source, /"compensation benefits": "Thu nhập & Phúc lợi"/)
   assert.match(source, /"work life balance": "Cân bằng công việc & Cuộc sống"/)
@@ -69,13 +81,30 @@ test("HR survey management uses KPI cards, quick filters, progress, and non-dest
   assert.doesNotMatch(source, /block h-full w-1\/3 rounded-full/)
   assert.doesNotMatch(source, /tr\("Xem trước", "Preview"\)<\/Button>/)
   assert.match(source, /openGroups/)
-  assert.match(source, /Default satisfaction questions cannot be edited|Câu hỏi chuẩn được backend bảo vệ/)
+  assert.match(source, /Core scoring question|Câu hỏi chuẩn tính điểm/)
   assert.match(source, /Xem phản hồi/)
   assert.match(source, /Xóa bộ lọc/)
   assert.doesNotMatch(
     source,
     /variant="danger"[\s\S]{0,180}Đóng khảo sát/,
   )
+})
+
+test("survey screen delegates large authoring dialogs to focused feature components", async () => {
+  const source = await readFile(
+    new URL("../src/screens/ErdSurveys.tsx", import.meta.url),
+    "utf8",
+  )
+
+  assert.match(source, /import \{ SurveyDraftEditor \}/)
+  assert.match(source, /import \{ SurveyPreviewModal \}/)
+  assert.match(source, /import \{ SurveyQuestionWizard \}/)
+  assert.match(source, /<SurveyDraftEditor/)
+  assert.match(source, /<SurveyPreviewModal/)
+  assert.match(source, /<SurveyQuestionWizard/)
+  assert.doesNotMatch(source, /function SurveyEditorStudio/)
+  assert.doesNotMatch(source, /function SurveyPreviewModal/)
+  assert.doesNotMatch(source, /function SurveyQuestionWizard/)
 })
 
 test("survey result drawer keeps large participant directories searchable and paginated", async () => {
