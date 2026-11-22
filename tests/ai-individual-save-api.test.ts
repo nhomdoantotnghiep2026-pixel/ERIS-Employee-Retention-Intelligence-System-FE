@@ -39,6 +39,22 @@ test("individual prediction sends an explicit save choice in one request; histor
     assert.equal(calls[0].url, "/api/ai/employees/4/results")
     assert.notEqual(calls[0].init?.method, "POST")
     assert.equal(calls[0].init?.cache, "no-store")
+    calls.length = 0
+    await api.analyzeAiEmployee(4, {
+      snapshotId: 9,
+      save: true,
+      confirmExternalData: true,
+      evidencePeriod: { from: "2026-01-01", to: "2026-11-22" },
+    })
+    assert.equal(calls.length, 1)
+    assert.equal(calls[0].url, "/api/ai/employees/4/analyze")
+    assert.equal(calls[0].init?.method, "POST")
+    assert.deepEqual(JSON.parse(String(calls[0].init?.body)), {
+      snapshotId: 9,
+      save: true,
+      confirmExternalData: true,
+      evidencePeriod: { from: "2026-01-01", to: "2026-11-22" },
+    })
   } finally {
     globalThis.fetch = originalFetch
     if (storage) Object.defineProperty(globalThis, "sessionStorage", storage)
@@ -47,31 +63,48 @@ test("individual prediction sends an explicit save choice in one request; histor
   }
 })
 
-test("the profile save toggle runs prediction directly without a broken confirmation dialog", async () => {
-  const source = await readFile(new URL("../src/components/ai-workspace/IndividualAnalysis.tsx", import.meta.url), "utf8")
-  assert.match(source, /onClick=\{\(\) => void runPrediction\(save, "predict"\)\}/)
-  assert.match(source, /if \(response\.data\.saved\) setSaveNotice/)
-  assert.doesNotMatch(source, /setConfirmation|<Dialog open=\{confirmation\}/)
-  assert.match(source, /grid items-stretch gap-5/)
-  assert.match(source, /panel flex min-h-\[680px\] w-full flex-col/)
-  assert.doesNotMatch(source, /mobileTab === "data" \? "block h-full"/)
-  assert.match(source, /role="switch"/)
-  assert.match(source, /type="button"[\s\S]*role="switch"/)
-  assert.doesNotMatch(source, /className="peer sr-only"/)
+test("unified request validates evidence dates before analysis", async () => {
+  const {validEvidencePeriod} = await import("../src/components/ai-workspace/unifiedContract.ts")
+  assert.equal(validEvidencePeriod("2024-01-01","2024-12-31","2026-11-22"),true)
+  assert.equal(validEvidencePeriod("2024-01-01","2025-01-01","2026-11-22"),false)
+  assert.equal(validEvidencePeriod("2026-11-23","2026-11-23","2026-11-22"),false)
+  assert.equal(validEvidencePeriod("2026-11-22","2026-11-21","2026-11-22"),false)
+  assert.equal(validEvidencePeriod("2026-02-30","2026-03-01","2026-11-22"),false)
 })
 
-test("individual assessment loads the live profile without exposing snapshot selection", async () => {
-  const source = await readFile(new URL("../src/components/ai-workspace/IndividualAnalysis.tsx", import.meta.url), "utf8")
-  const dashboard = await readFile(new URL("../src/components/ai-workspace/EmployeePredictionDashboard.tsx", import.meta.url), "utf8")
+test("analysis route does not connect the legacy prediction pipelines", async () => {
+ const source=await readFile(new URL("../src/components/ai-workspace/IndividualAnalysis.tsx",import.meta.url),"utf8")
+ const workspace=await readFile(new URL("../src/components/ai-workspace/UnifiedWorkspace.tsx",import.meta.url),"utf8")
+ assert.doesNotMatch(source+workspace,/predictAiEmployee|policy-recommendations|policy-agent\//)
+ assert.match(workspace,/analyzeAiEmployee/)
+})
 
-  assert.match(source, /\.preview\(employeeId, \{\}\)/)
-  assert.match(source, /Tìm nhân viên theo tên hoặc mã/)
-  assert.match(source, /Dữ liệu hợp lệ · Sẵn sàng đánh giá/)
-  assert.match(source, /Hồ sơ chưa đủ điều kiện đánh giá/)
-  assert.match(source, /Bấm vào đây để cập nhật hồ sơ/)
-  assert.doesNotMatch(source, /Chọn nhân viên và bản dữ liệu/)
-  assert.doesNotMatch(source, /Tạo bản dữ liệu/)
-  assert.doesNotMatch(source, /Tùy chọn kiểm tra và bổ sung dữ liệu/)
-  assert.doesNotMatch(source, /const latest = ordered\[0\]/)
-  assert.match(dashboard, /Dữ liệu hồ sơ của \$\{employee\.fullName\} đã được nạp đầy đủ/)
+test("employee assessment resolves a ready profile in the background without exposing data-version controls", async () => {
+  const workspace = await readFile(new URL("../src/components/ai-workspace/UnifiedWorkspace.tsx", import.meta.url), "utf8")
+  assert.match(workspace, /listAiSnapshots\(employee\.id\)/)
+  assert.match(workspace, /find\(item => item\.ready && item\.snapshotId\)/)
+  assert.match(workspace, /previewAiEmployee\(employee\.id/)
+  assert.doesNotMatch(workspace, />Snapshot</)
+  assert.doesNotMatch(workspace, /Tạo snapshot/)
+  assert.doesNotMatch(workspace, /TreeSHAP|E5 & Qwen|Ollama|Điểm nền|Ngưỡng:/)
+})
+
+test("saved and preview assessments compare with the immediately previous saved session", async () => {
+  const workspace = await readFile(new URL("../src/components/ai-workspace/UnifiedWorkspace.tsx", import.meta.url), "utf8")
+  assert.match(workspace, /items\[index \+ 1\] : items\[0\]/)
+  assert.match(workspace, /getAiResult\(candidate\.predictionId\)/)
+  assert.match(workspace, /So với lần đánh giá trước/)
+  assert.match(workspace, /Phiên đánh giá đầu tiên/)
+})
+
+test("assessment UI gates the detailed signals and action dossier behind stage two", async () => {
+  const workspace = await readFile(new URL("../src/components/ai-workspace/UnifiedWorkspace.tsx", import.meta.url), "utf8")
+  const dossier = await readFile(new URL("../src/components/ai-workspace/ActionDossier.tsx", import.meta.url), "utf8")
+  assert.match(workspace, /Tính điểm rủi ro gắn kết/)
+  assert.match(workspace, /detailsUnlocked/)
+  assert.match(workspace, /Bóc tách nguyên nhân & Đề xuất kế hoạch hành động/)
+  assert.match(workspace, /TrendSparkline/)
+  assert.match(workspace, /Xem chi tiết phiên/)
+  assert.match(dossier, /Nhân sự cần xác minh/)
+  assert.doesNotMatch(workspace + dossier, />TreeSHAP<|>Ollama<|>Base value<|>Điểm nền</)
 })
