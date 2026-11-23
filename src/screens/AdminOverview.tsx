@@ -361,7 +361,7 @@ export default function AdminOverview() {
                       </p>
                     </div>
                     <span
-                      className={`hidden rounded-md border px-2 py-1 text-[11px] md:block ${
+                      className={`hidden w-24 shrink-0 rounded-md border px-2 py-1 text-center text-[11px] md:block ${
                         role(u) === "ADMIN"
                           ? "border-purple-200 bg-purple-50 text-purple-700"
                           : role(u) === "HR"
@@ -372,18 +372,18 @@ export default function AdminOverview() {
                       {role(u) || "ESS"}
                     </span>
                     <span
-                      className={
+                      className={`flex w-28 shrink-0 items-center gap-1.5 whitespace-nowrap text-xs ${
                         u.status === "ACTIVE"
-                          ? "text-xs text-emerald-700"
-                          : "text-xs text-amber-700"
-                      }
+                          ? "text-emerald-700"
+                          : "text-amber-700"
+                      }`}
                     >
-                      ●{" "}
+                      <span aria-hidden="true" className="size-1.5 shrink-0 rounded-full bg-current" />
                       {u.status === "ACTIVE"
                         ? tr("Hoạt động", "Active")
                         : tr("Chờ kích hoạt", "Pending")}
                     </span>
-                    <MoreHorizontal className="size-4 text-slate-500" />
+                    <MoreHorizontal className="size-4 shrink-0 text-slate-500" />
                   </li>
                 ))}
               </ul>

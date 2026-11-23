@@ -1393,7 +1393,9 @@ export default function LeaveRecords({ own = false }: { own?: boolean }) {
                         {tr("Lý do", "Reason")}
                       </th>
                       <th className="p-3 text-xs font-bold uppercase tracking-wide text-slate-600">
-                        {tr("Trạng thái", "Status")}
+                        <span className="inline-block lg:translate-x-8 xl:translate-x-12">
+                          {tr("Trạng thái", "Status")}
+                        </span>
                       </th>
                       <th className="w-44 p-3 text-right text-xs font-bold uppercase tracking-wide text-slate-600">
                         {tr("Thao tác", "Actions")}
@@ -1425,7 +1427,7 @@ export default function LeaveRecords({ own = false }: { own?: boolean }) {
                         </td>
                         <td className="p-3">
                           <span
-                            className={`inline-flex h-6 items-center rounded-md border px-2 text-xs font-semibold ${
+                            className={`inline-flex h-6 items-center rounded-md border px-2 text-xs font-semibold lg:translate-x-8 xl:translate-x-12 ${
                               r.record_status === "ACTIVE"
                                 ? "border-emerald-300 bg-emerald-50 text-emerald-800"
                                 : "border-slate-300 bg-slate-100 text-slate-700"
