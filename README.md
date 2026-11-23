@@ -25,6 +25,19 @@ npm run build
 
 Tests bao gồm phân quyền theo role, nhập CSV/XLSX, dữ liệu demo theo hợp đồng ERD, khảo sát, chuẩn bị dữ liệu, mô hình/dự đoán mẫu và Employee gửi yêu cầu → HR duyệt → Employee xem kết quả.
 
+## Công cụ hỗ trợ thiết kế UI/UX (không bắt buộc)
+
+Nhóm có thể cài [UI UX Pro Max](https://github.com/nextlevelbuilder/ui-ux-pro-max-skill) để hỗ trợ đánh giá và triển khai giao diện nhất quán. Skill được cài riêng trên từng máy và không được commit vào repository.
+
+Tại thư mục gốc của dự án, chạy:
+
+```powershell
+New-Item -ItemType Directory -Force .agents\skills | Out-Null
+git clone https://github.com/nextlevelbuilder/ui-ux-pro-max-skill.git .agents\skills\ui-ux-pro-max
+```
+
+Sau khi cài, file hướng dẫn của skill nằm tại `.agents/skills/ui-ux-pro-max/SKILL.md`. Thư mục này đã được thêm vào `.gitignore`, nên không xuất hiện trong danh sách file cần commit.
+
 ## Phạm vi frontend
 
 - Đăng nhập sử dụng tài khoản do backend cấp. HR có các luồng nhân viên, phòng ban và chức danh gọi API; một số dashboard/luồng phân tích vẫn dùng dữ liệu demo trong trình duyệt.
