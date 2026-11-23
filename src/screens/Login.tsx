@@ -11,15 +11,15 @@ import {
   UserRound,
   UsersRound,
 } from 'lucide-react';
-import { useRole, type UserRole } from '../context/RoleContext';
+import { useRole } from '../context/RoleContext';
+import type { ActiveUserRole } from '../domain/roleContract.ts';
 import { useLanguage } from '../context/LanguageContext';
 import { changePassword, getApiErrorMessage, getCurrentUser, login, logout } from '../services/api';
 import { isManualPasswordEdit } from '../utils/manualPassword';
 import { mapApiRole, portalAllowsRole, workspaceRoleForPortal, type LoginPortal } from '../utils/loginPortal';
 
-const ROLE_HOME: Record<UserRole, string> = {
+const ROLE_HOME: Record<ActiveUserRole, string> = {
   HR: '/dashboard',
-  'Data / AI Analyst': '/data-overview',
   'System Administrator': '/admin-overview',
   'Employee / ESS': '/employee-dashboard',
 };
@@ -94,7 +94,7 @@ export default function Login() {
   }, []);
 
   useEffect(() => {
-    if (isAuthenticated) navigate(ROLE_HOME[user.role], { replace: true });
+    if (isAuthenticated && user.lifecycle === 'active') navigate(ROLE_HOME[user.role as ActiveUserRole], { replace: true });
   }, [isAuthenticated, navigate, user.role]);
 
   useEffect(() => {
@@ -145,6 +145,7 @@ export default function Login() {
         role: workspaceRole,
         accountRole: resolvedRole,
         workspace: loginPortal,
+        lifecycle: 'active' as const,
         initials: (apiUser.fullName || apiUser.email)
           .split(/\s+/)
           .map((part) => part[0])
