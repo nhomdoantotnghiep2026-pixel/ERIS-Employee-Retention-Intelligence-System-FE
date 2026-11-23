@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { hasRoutePermission } from '../src/utils/rbacAccess.ts';
+import { hasPermission, hasRoutePermission } from '../src/utils/rbacAccess.ts';
 const storage = new Map<string, string>();
 test('positions require HR, matching the team BE', () => {
   assert.equal(hasRoutePermission('HR', '/positions'), true);
@@ -38,6 +38,23 @@ test('employee import API is available to HR only', () => {
   for (const role of ['System Administrator', 'Data / AI Analyst', 'Employee / ESS'] as const) {
     assert.equal(hasRoutePermission(role, '/employees/import'), false);
   }
+});
+test('reports center is HR-only and separates viewing from generation permission', () => {
+  storage.clear();
+  assert.equal(hasRoutePermission('HR', '/reports'), true);
+  assert.equal(hasRoutePermission('HR', '/reports/1'), true);
+  assert.equal(hasPermission('HR', 'Generate & Export Reports'), true);
+  for (const role of ['System Administrator', 'Data / AI Analyst', 'Employee / ESS'] as const) {
+    assert.equal(hasRoutePermission(role, '/reports'), false);
+    assert.equal(hasRoutePermission(role, '/reports/1'), false);
+  }
+  storage.set('eris-rbac-matrix-v3', JSON.stringify([{ items: [
+    { label: 'View Executive Reports', access: { HR: true } },
+    { label: 'Generate & Export Reports', access: { HR: false } },
+  ] }]));
+  assert.equal(hasRoutePermission('HR', '/reports'), true);
+  assert.equal(hasPermission('HR', 'Generate & Export Reports'), false);
+  storage.clear();
 });
 Object.defineProperty(globalThis, 'localStorage', { configurable: true, value: { getItem: (key: string) => storage.get(key) ?? null } });
 test('stored permission grants cannot expand an actor beyond diagram route boundaries', () => {

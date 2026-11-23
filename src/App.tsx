@@ -52,6 +52,8 @@ import {
   Positions,
   Predictions,
   PublicDetail,
+  ReportDetail,
+  Reports,
   RetentionInterventions,
   RiskAnalysis,
   RiskWorkspace,
@@ -110,6 +112,8 @@ export default function App() {
           <Route path="/login" element={<Login />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/notifications" element={<RoleGuard><WorkInbox /></RoleGuard>} />
+          <Route path="/reports" element={<RoleGuard><Reports /></RoleGuard>} />
+          <Route path="/reports/:reportId" element={<RoleGuard><ReportDetail /></RoleGuard>} />
 
           {/* HR */}
           <Route path="/dashboard" element={<RoleGuard><Dashboard /></RoleGuard>} />

@@ -1,15 +1,17 @@
 import { useLanguage } from '../context/LanguageContext';
 import { AppShell } from '../components/AppShell';
 import { Card, Button, RiskBadge, Avatar, AIAdvisoryBanner } from '../components/ui';
-import { departments } from '../data/mockData';
-import { ArrowLeft, Download, Printer, FileDown } from 'lucide-react';
-import { demoPdfContent, downloadTextFile, slugify, toCsv } from '../utils/demoActions';
+import { ArrowLeft, Printer, FileDown } from 'lucide-react';
+import { downloadTextFile, slugify, toCsv } from '../utils/demoActions';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useEmployees } from '../context/EmployeeContext';
 import { loadReports } from '../utils/reportStore';
+import { useRole } from '../context/RoleContext';
+import { hasPermission } from '../utils/rbacAccess';
 
 export default function ReportDetail() {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
+  const { user } = useRole();
   const { reportId } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
@@ -21,7 +23,20 @@ export default function ReportDetail() {
     return <AppShell breadcrumb={['Reports', 'Not found']}><Card className="mx-auto max-w-xl p-8 text-center"><h1 className="text-xl font-bold text-slate-900">{t("Report not found")}</h1><p className="mt-2 text-sm text-slate-500">{t("This report does not exist or is no longer available in the current session.")}</p><Button className="mt-6" onClick={() => navigate('/reports')}>{t("Back to reports")}</Button></Card></AppShell>;
   }
 
-  const highRisk = employees.filter(e => e.riskLevel === 'High');
+  const tr = (vi: string, en: string) => language === 'vi' ? vi : en;
+  const canGenerate = hasPermission(user.role, 'Generate & Export Reports');
+  const activeEmployees = employees.filter(employee => employee.status === 'Active');
+  const evaluatedEmployees = activeEmployees.filter(employee => employee.lastAnalysis !== 'Not analyzed');
+  const highRisk = evaluatedEmployees.filter(employee => employee.riskLevel === 'High');
+  const mediumRisk = evaluatedEmployees.filter(employee => employee.riskLevel === 'Medium');
+  const lowRisk = evaluatedEmployees.filter(employee => employee.riskLevel === 'Low');
+  const percent = (count: number) => evaluatedEmployees.length ? `${(count / evaluatedEmployees.length * 100).toFixed(1)}%` : '0.0%';
+  const departmentRows = [...new Set(activeEmployees.map(employee => employee.department))].sort().map(name => {
+    const departmentEmployees = activeEmployees.filter(employee => employee.department === name);
+    const evaluated = departmentEmployees.filter(employee => employee.lastAnalysis !== 'Not analyzed');
+    const high = evaluated.filter(employee => employee.riskLevel === 'High').length;
+    return { name, employees: departmentEmployees.length, highRisk: high, avgRisk: evaluated.length ? Math.round(evaluated.reduce((sum, employee) => sum + employee.riskScore, 0) / evaluated.length) : 0 };
+  });
   const filename = slugify(report.name) || 'eris-report';
   const exportCsv = () => downloadTextFile(`${filename}.csv`, toCsv(highRisk.map(emp => ({
     employeeId: emp.employeeId,
@@ -31,13 +46,12 @@ export default function ReportDetail() {
     riskLevel: emp.riskLevel,
     riskScore: emp.riskScore,
   }))), 'text/csv;charset=utf-8');
-  const downloadPdf = () => downloadTextFile(`${filename}.pdf`, demoPdfContent(report.name, report.description));
 
   return (
     <AppShell breadcrumb={['Reports', report.name]}>
       <button type="button" onClick={() => navigate(returnTo)} className="mb-3 inline-flex min-h-10 items-center gap-2 rounded-full px-3 text-sm font-semibold text-slate-500 transition-colors hover:bg-white hover:text-orange-700 focus-visible:outline-2 focus-visible:outline-orange-500">
         <ArrowLeft size={17} /> {t("Back to Report Library")} </button>
-      <div className="flex items-start justify-between mb-4">
+      <div className="mb-4 flex flex-col items-start justify-between gap-4 sm:flex-row">
         <div>
           <h1 className="text-[22px] font-semibold text-gray-900">{t(report.name)}</h1>
           <div className="flex items-center gap-3 mt-0.5 text-[13px] text-gray-500">
@@ -46,27 +60,26 @@ export default function ReportDetail() {
             <span>·</span><span>{t("Current Workforce")}</span>
           </div>
         </div>
-        <div className="flex items-center gap-1.5">
+        {canGenerate && <div className="flex flex-wrap items-center gap-1.5">
           <Button variant="secondary" size="sm" onClick={() => window.print()}><Printer size={13} /> {t("Print")}</Button>
           <Button variant="secondary" size="sm" onClick={exportCsv}><FileDown size={13} /> {t("Export CSV")}</Button>
-          <Button variant="primary" size="sm" onClick={downloadPdf}><Download size={13} /> {t("Download PDF")}</Button>
-        </div>
+        </div>}
       </div>
 
       <Card className="p-4 mb-4">
         <div className="text-[14px] font-semibold text-gray-800 mb-2">{t("Executive Summary")}</div>
         <p className="text-[13px] font-medium text-gray-700 leading-relaxed">{t(report.description)}</p>
-        <p className="text-[13px] text-gray-600 leading-relaxed"> {t("This report provides an overview of predicted employee attrition risk as of September 2026. Based on AI-assisted analysis, 10.1% of employees (126 individuals) are currently identified as high predicted attrition risk, with Engineering and Sales departments showing the highest concentration. Overtime and low job satisfaction are the most prevalent contributing factors.")} </p>
-        <p className="text-[13px] text-gray-600 leading-relaxed mt-2"> {t("This report informs HR planning and retention initiatives. All information represents model predictions and should be reviewed by qualified HR personnel before informing any employment-related decisions.")} </p>
+        <p className="text-[13px] text-gray-600 leading-relaxed">{tr(`Ảnh chụp hiện tại có ${activeEmployees.length} nhân viên đang hoạt động, ${evaluatedEmployees.length} người đã có kết quả và ${highRisk.length} trường hợp ở mức rủi ro cao.`, `The current snapshot contains ${activeEmployees.length} active employees, ${evaluatedEmployees.length} evaluated employees, and ${highRisk.length} high-risk results.`)}</p>
+        <p className="text-[13px] text-gray-600 leading-relaxed mt-2">{tr('Báo cáo hỗ trợ HR ưu tiên xem xét. Kết quả AI không phải quyết định nhân sự và cần được đối chiếu với bối cảnh thực tế.', 'This report supports HR prioritization. AI results are not employment decisions and must be reviewed against real-world context.')}</p>
       </Card>
 
       <Card className="p-4 mb-4">
         <div className="text-[14px] font-semibold text-gray-800 mb-3">{t("Risk Distribution")}</div>
-        <div className="flex items-center gap-4 mb-3">
+        <div className="mb-3 flex flex-wrap items-center gap-4">
           {[
-            { label: 'High Risk', count: 126, pct: '10.1%', color: 'text-red-600' },
-            { label: 'Medium Risk', count: 312, pct: '25.0%', color: 'text-amber-600' },
-            { label: 'Low Risk', count: 810, pct: '64.9%', color: 'text-green-600' },
+            { label: 'High Risk', count: highRisk.length, pct: percent(highRisk.length), color: 'text-red-600' },
+            { label: 'Medium Risk', count: mediumRisk.length, pct: percent(mediumRisk.length), color: 'text-amber-600' },
+            { label: 'Low Risk', count: lowRisk.length, pct: percent(lowRisk.length), color: 'text-green-600' },
           ].map(r => (
             <div key={r.label} className="flex items-center gap-2.5 px-4 py-2.5 bg-gray-50 border border-gray-200" style={{ borderRadius: '5px' }}>
               <span className={`text-[22px] font-bold ${r.color}`}>{r.count}</span>
@@ -78,15 +91,15 @@ export default function ReportDetail() {
           ))}
         </div>
         <div className="flex h-2 rounded overflow-hidden">
-          <div className="bg-red-500" style={{ width: '10.1%' }} />
-          <div className="bg-amber-500" style={{ width: '25%' }} />
-          <div className="bg-green-500" style={{ width: '64.9%' }} />
+          <div className="bg-red-500" style={{ width: percent(highRisk.length) }} />
+          <div className="bg-amber-500" style={{ width: percent(mediumRisk.length) }} />
+          <div className="bg-green-500" style={{ width: percent(lowRisk.length) }} />
         </div>
       </Card>
 
       <Card className="p-4 mb-4">
         <div className="text-[14px] font-semibold text-gray-800 mb-3">{t("Department Comparison")}</div>
-        <table className="w-full">
+        <div className="overflow-x-auto"><table className="w-full min-w-[620px]">
           <thead>
             <tr className="border-b border-gray-200">
               {['Department', 'Total', 'High Risk', 'High Risk %', 'Avg Score'].map(h => (
@@ -95,22 +108,22 @@ export default function ReportDetail() {
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
-            {departments.map(d => (
+            {departmentRows.map(d => (
               <tr key={d.name}>
                 <td className="py-2 text-[13px] font-medium text-gray-800">{t(d.name)}</td>
                 <td className="py-2 text-[13px] text-gray-600">{d.employees}</td>
                 <td className="py-2 text-[13px] font-semibold text-red-600">{d.highRisk}</td>
-                <td className="py-2 text-[13px] text-gray-600">{Math.round(d.highRisk / d.employees * 100)}%</td>
+                <td className="py-2 text-[13px] text-gray-600">{d.employees ? Math.round(d.highRisk / d.employees * 100) : 0}%</td>
                 <td className="py-2 text-[13px] text-gray-600">{d.avgRisk}%</td>
               </tr>
             ))}
           </tbody>
-        </table>
+        </table></div>
       </Card>
 
       <Card className="p-4 mb-4">
         <div className="text-[14px] font-semibold text-gray-800 mb-3">{t("Employees Requiring Review")}</div>
-        <table className="w-full">
+        <div className="overflow-x-auto"><table className="w-full min-w-[680px]">
           <thead>
             <tr className="border-b border-gray-200 bg-gray-50">
               {['Employee', 'Department', 'Role', 'Risk Level', 'Score'].map(h => (
@@ -134,7 +147,7 @@ export default function ReportDetail() {
               </tr>
             ))}
           </tbody>
-        </table>
+        </table></div>
       </Card>
 
       <Card className="p-4 mb-4">

@@ -93,3 +93,12 @@ test('work inbox is shared by the three active roles and closed to the legacy ro
   }
   assert.equal(canAccessRoute('Data / AI Analyst', '/notifications'), false);
 });
+
+test('reports center and report details are available to HR only', () => {
+  assert.equal(canAccessRoute('HR', '/reports'), true);
+  assert.equal(canAccessRoute('HR', '/reports/1'), true);
+  for (const role of ['System Administrator', 'Data / AI Analyst', 'Employee / ESS']) {
+    assert.equal(canAccessRoute(role, '/reports'), false);
+    assert.equal(canAccessRoute(role, '/reports/1'), false);
+  }
+});

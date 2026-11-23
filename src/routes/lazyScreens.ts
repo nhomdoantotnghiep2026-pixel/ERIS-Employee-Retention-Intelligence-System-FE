@@ -6,6 +6,8 @@ export const PublicDetail = lazy(() => import("../screens/PublicDetail"))
 export const Login = lazy(() => import("../screens/Login"))
 export const ForgotPassword = lazy(() => import("../screens/ForgotPassword"))
 export const WorkInbox = lazy(() => import("../screens/WorkInbox"))
+export const Reports = lazy(() => import("../screens/Reports"))
+export const ReportDetail = lazy(() => import("../screens/ReportDetail"))
 
 // HR and retention workspaces
 export const Dashboard = lazy(() => import("../screens/Dashboard"))

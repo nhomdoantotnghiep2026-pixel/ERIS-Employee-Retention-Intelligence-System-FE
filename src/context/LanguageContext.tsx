@@ -157,6 +157,7 @@ const vi: Dictionary = {
   Workforce: 'Nhân sự',
   Employees: 'Nhân viên',
   Reports: 'Báo cáo',
+  'Reports Center': 'Trung tâm báo cáo',
   'ERIS workspace': 'Không gian ERIS',
   'Demo environment': 'Môi trường demo',
   'Employee Retention Intelligence': 'Trí tuệ giữ chân nhân viên',

@@ -26,6 +26,7 @@ const NAV_BY_ROLE: Record<UserRole, NavGroup[]> = {
       items: [
         { label: 'Overview', icon: LayoutDashboard, to: '/dashboard' },
         { label: 'Work Inbox', icon: Bell, to: '/notifications' },
+        { label: 'Reports Center', icon: BarChart3, to: '/reports' },
       ],
     },
     {
