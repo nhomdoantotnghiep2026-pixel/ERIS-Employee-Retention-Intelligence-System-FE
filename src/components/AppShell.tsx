@@ -25,8 +25,6 @@ const NAV_BY_ROLE: Record<UserRole, NavGroup[]> = {
       group: 'Overview',
       items: [
         { label: 'Overview', icon: LayoutDashboard, to: '/dashboard' },
-        { label: 'Work Inbox', icon: Bell, to: '/notifications' },
-        { label: 'Reports Center', icon: BarChart3, to: '/reports' },
       ],
     },
     {
@@ -58,7 +56,6 @@ const NAV_BY_ROLE: Record<UserRole, NavGroup[]> = {
       group: 'My Workspace',
       items: [
         { label: 'Employee Dashboard', icon: LayoutDashboard, to: '/employee-dashboard' },
-        { label: 'Work Inbox', icon: Bell, to: '/notifications' },
         { label: 'My Profile', icon: User, to: '/my-profile' },
       ],
     },
@@ -108,7 +105,6 @@ const NAV_BY_ROLE: Record<UserRole, NavGroup[]> = {
       group: 'Overview',
       items: [
         { label: 'Admin Overview', icon: ServerCog, to: '/admin-overview' },
-        { label: 'Work Inbox', icon: Bell, to: '/notifications' },
       ],
     },
     {

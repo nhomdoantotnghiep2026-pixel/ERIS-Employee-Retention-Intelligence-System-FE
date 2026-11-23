@@ -14,8 +14,6 @@ const defaultRolesByPermission: Record<string, UserRole[]> = {
   'View Org-Level Risk': ['HR'],
   'View Interventions': ['HR'],
   'View Survey Results': ['HR'],
-  'View Executive Reports': ['HR'],
-  'Generate & Export Reports': ['HR'],
   'View Attendance History': ['HR'],
   'View Own Profile': ['Employee / ESS'],
   'Record Own Attendance': ['Employee / ESS'],
@@ -54,7 +52,6 @@ const permissionByRoute: Array<[string, string]> = [
   ['/interventions', 'View Interventions'],
   ['/policy-demo', 'View Interventions'],
   ['/engagement', 'View Survey Results'],
-  ['/reports', 'View Executive Reports'],
   ['/my-profile', 'View Own Profile'],
   ['/my-attendance', 'Record Own Attendance'],
   ['/my-requests', 'Submit Own Requests'],
@@ -93,7 +90,10 @@ export function permissionForRoute(pathname: string) {
   return permissionByRoute.find(([pattern]) => matchesRoute(pattern, pathname))?.[1] || null;
 }
 
-export function hasPermission(role: UserRole, required: string) {
+export function hasRoutePermission(role: UserRole, pathname: string) {
+  if (!canAccessRoute(role, pathname)) return false;
+  const required = permissionForRoute(pathname);
+  if (!required) return true;
   try {
     const saved = localStorage.getItem(RBAC_STORAGE_KEY);
     const matrix = saved ? JSON.parse(saved) : null;
@@ -105,11 +105,4 @@ export function hasPermission(role: UserRole, required: string) {
     // Fall back to the built-in policy when stored configuration is unavailable.
   }
   return defaultRolesByPermission[required]?.includes(role) ?? false;
-}
-
-export function hasRoutePermission(role: UserRole, pathname: string) {
-  if (!canAccessRoute(role, pathname)) return false;
-  const required = permissionForRoute(pathname);
-  if (!required) return true;
-  return hasPermission(role, required);
 }

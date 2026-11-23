@@ -49,13 +49,6 @@ export const defaultPermissionMatrix: { category: string; items: { label: string
     ],
   },
   {
-    category: 'Reports',
-    items: [
-      { label: 'View Executive Reports', access: { 'HR': true, 'System Administrator': false, 'Employee / ESS': false } },
-      { label: 'Generate & Export Reports', access: { 'HR': true, 'System Administrator': false, 'Employee / ESS': false } },
-    ],
-  },
-  {
     category: 'System Administration',
     items: [
       { label: 'Manage Users', access: { 'HR': false, 'System Administrator': true, 'Employee / ESS': false } },

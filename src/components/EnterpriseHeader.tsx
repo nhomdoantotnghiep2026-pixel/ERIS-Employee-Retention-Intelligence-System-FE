@@ -5,10 +5,17 @@ import { useRole, type UserRole } from '../context/RoleContext';
 import { useLanguage } from '../context/LanguageContext';
 import { logout } from '../services/api';
 import { RoleJourney } from './RoleJourney';
-import { useWorkInbox } from '../hooks/useWorkInbox';
+import { hasRoutePermission } from '../utils/rbacAccess';
 
 type Link = { label: string; to: string };
 type Props = { breadcrumb?: string[]; sidebarOpen: boolean; toggleSidebar: () => void; links: Record<UserRole, { items: Link[] }[]> };
+
+const notices: Record<UserRole, { title: string; detail: string; to: string }[]> = {
+  'HR': [{ title: 'Retention plan needs review', detail: 'Review current interventions and next steps.', to: '/interventions' }, { title: 'Engagement overview available', detail: 'Explore the latest survey results.', to: '/engagement' }],
+  'Data / AI Analyst': [{ title: 'Review data preparation', detail: 'Check data quality before the next model run.', to: '/preparation' }, { title: 'Model monitoring summary', detail: 'Review model versions and drift indicators.', to: '/model-history' }],
+  'System Administrator': [{ title: 'Access review', detail: 'Review user access and role assignments.', to: '/users' }, { title: 'System health overview', detail: 'Inspect service status and recent incidents.', to: '/system-health' }],
+  'Employee / ESS': [{ title: 'Pulse survey available', detail: 'Complete your active employee survey.', to: '/my-surveys' }, { title: 'Attendance reminder', detail: 'Remember to record today’s attendance.', to: '/my-attendance' }],
+};
 
 export function EnterpriseHeader({ breadcrumb, sidebarOpen, toggleSidebar, links }: Props) {
   const { user, signOut } = useRole();
@@ -16,13 +23,15 @@ export function EnterpriseHeader({ breadcrumb, sidebarOpen, toggleSidebar, links
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const [panel, setPanel] = useState<'language' | 'notifications' | 'help' | 'account' | null>(null);
+  const [read, setRead] = useState<string[]>(() => { try { return JSON.parse(sessionStorage.getItem('eris-notifications-read') || '[]'); } catch { return []; } });
   const root = useRef<HTMLElement>(null);
   const helpButton = useRef<HTMLButtonElement>(null);
   const pages = links[user.role].flatMap(group => group.items);
-  const { items, stats, markRead, markAllRead } = useWorkInbox(user.role, user.email);
-  const notificationItems = items.filter(item => !item.archivedAt).slice(0, 4);
-  const unread = stats.unread;
+  const notificationItems = notices[user.role].filter(item => hasRoutePermission(user.role, item.to));
+  const key = (i: number) => `${user.role}:${i}`;
+  const unread = notificationItems.filter((_, i) => !read.includes(key(i))).length;
   const title = t((breadcrumb?.length ? breadcrumb[breadcrumb.length - 1] : pages.find(page => pathname.startsWith(page.to))?.label) || 'Workspace');
+  const markRead = (ids: string[]) => setRead(old => { const next = [...new Set([...old, ...ids])]; sessionStorage.setItem('eris-notifications-read', JSON.stringify(next)); return next; });
   const go = (to: string) => { setPanel(null); navigate(to); };
   const handleSignOut = async () => {
     try {
@@ -94,7 +103,7 @@ export function EnterpriseHeader({ breadcrumb, sidebarOpen, toggleSidebar, links
       </div>
       <div className="relative">
         <button className={iconButton} aria-label={`${t('Notifications')}, ${unread} ${t('unread')}`} onClick={() => setPanel(panel === 'notifications' ? null : 'notifications')}><Bell size={20} />{unread > 0 && <span className="absolute right-1 top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-white px-1 text-[9px] font-bold text-orange-600">{unread}</span>}</button>
-        {panel === 'notifications' && <section className={popover}><div className="flex items-center justify-between border-b border-slate-100 p-4"><div><h2 className="font-bold">{t('Notifications')}</h2><p className="text-xs text-slate-600">{language === 'vi' ? 'Cập nhật mới nhất theo vai trò' : 'Your latest role updates'}</p></div><button disabled={!unread} onClick={markAllRead} className="flex h-9 w-9 items-center justify-center rounded-md text-orange-600 transition-colors hover:bg-orange-50 disabled:cursor-not-allowed disabled:text-slate-300" aria-label={t('Mark all as read')}><CheckCheck size={18} /></button></div>{notificationItems.length ? notificationItems.map(notice => <button key={notice.id} onClick={() => { markRead(notice.id); go(notice.actionTo); }} className="flex w-full gap-3 border-b border-slate-100 p-4 text-left transition-colors hover:bg-orange-50 focus-visible:outline-2 focus-visible:outline-inset focus-visible:outline-orange-500"><span className={`mt-1 h-2 w-2 shrink-0 rounded-full ${notice.readAt ? 'bg-slate-200' : 'bg-orange-500'}`} /><span><b className="block text-sm">{notice.title[language]}</b><span className="mt-1 block text-xs leading-5 text-slate-600">{notice.detail[language]}</span></span></button>) : <p className="px-4 py-8 text-center text-sm text-slate-600">{language === 'vi' ? 'Chưa có thông báo.' : 'No notifications yet.'}</p>}<button onClick={() => go('/notifications')} className="flex h-11 w-full items-center justify-center text-sm font-semibold text-orange-700 transition-colors hover:bg-orange-50 focus-visible:outline-2 focus-visible:outline-inset focus-visible:outline-orange-500">{language === 'vi' ? 'Mở Hộp công việc' : 'Open Work Inbox'}</button></section>}
+        {panel === 'notifications' && <section className={popover}><div className="flex items-center justify-between border-b border-slate-100 p-4"><div><h2 className="font-bold">{t('Notifications')}</h2><p className="text-xs text-slate-500">{t('Your latest updates')}</p></div><button onClick={() => markRead(notificationItems.map((_, i) => key(i)))} className="flex h-9 w-9 items-center justify-center rounded-full text-orange-600 hover:bg-orange-50" aria-label={t('Mark all as read')}><CheckCheck size={18} /></button></div>{notificationItems.map((notice, i) => <button key={notice.to} onClick={() => { markRead([key(i)]); go(notice.to); }} className="flex w-full gap-3 border-b border-slate-100 p-4 text-left hover:bg-orange-50"><span className={`mt-1 h-2 w-2 shrink-0 rounded-full ${read.includes(key(i)) ? 'bg-slate-200' : 'bg-orange-500'}`} /><span><b className="block text-sm">{t(notice.title)}</b><span className="mt-1 block text-xs leading-5 text-slate-500">{t(notice.detail)}</span></span></button>)}</section>}
       </div>
       <div className="relative">
         <button ref={helpButton} type="button" className={iconButton} aria-label={t('Help center')} aria-expanded={panel === 'help'} aria-controls="workspace-guide" onClick={() => setPanel(panel === 'help' ? null : 'help')}><HelpCircle size={20} /></button>
