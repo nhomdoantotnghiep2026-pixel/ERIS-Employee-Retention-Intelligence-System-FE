@@ -42,7 +42,7 @@ export function LandingProductPreview() {
       initial="folded"
       whileInView="spread"
       viewport={{ once: true, amount: 0.2 }}
-      className="relative z-10 mx-auto mt-16 aspect-[1.45/1] w-full max-w-[1320px] sm:mt-20 sm:aspect-[1.65/1] lg:mt-24 lg:aspect-[1.85/1]"
+      className="relative z-10 mx-auto mt-10 aspect-[1.45/1] w-full max-w-[1320px] sm:mt-14 sm:aspect-[1.65/1] lg:mt-16 lg:aspect-[1.85/1]"
     >
       {screens.map(screen => (
         <motion.a
