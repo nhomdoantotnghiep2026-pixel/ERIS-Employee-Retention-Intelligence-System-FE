@@ -59,6 +59,7 @@ import {
   SystemConfig,
   SystemHealth,
   WorkflowActivity,
+  WorkInbox,
   WorkSchedules,
 } from './routes/lazyScreens';
 import { hasRoutePermission, RBAC_UPDATED_EVENT } from './utils/rbacAccess';
@@ -108,6 +109,7 @@ export default function App() {
           {Object.values(PUBLIC_TOPICS).map(topic => <Route key={topic.id} path={topic.path} element={<PublicDetail topicId={topic.id} />} />)}
           <Route path="/login" element={<Login />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/notifications" element={<RoleGuard><WorkInbox /></RoleGuard>} />
 
           {/* HR */}
           <Route path="/dashboard" element={<RoleGuard><Dashboard /></RoleGuard>} />

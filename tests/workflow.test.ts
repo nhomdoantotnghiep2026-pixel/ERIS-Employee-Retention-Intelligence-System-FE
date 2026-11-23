@@ -86,3 +86,10 @@ test('employee account provisioning has its own Admin-only route', () => {
   assert.equal(canAccessRoute('System Administrator', '/users/provisioning'), true);
   for (const role of ['HR', 'Data / AI Analyst', 'Employee / ESS']) assert.equal(canAccessRoute(role, '/users/provisioning'), false);
 });
+
+test('work inbox is shared by the three active roles and closed to the legacy role', () => {
+  for (const role of ['HR', 'System Administrator', 'Employee / ESS']) {
+    assert.equal(canAccessRoute(role, '/notifications'), true);
+  }
+  assert.equal(canAccessRoute('Data / AI Analyst', '/notifications'), false);
+});

@@ -166,6 +166,7 @@ const vi: Dictionary = {
   'Quick navigation': 'Điều hướng nhanh',
   'No results. Try a page name or employee name.': 'Không có kết quả. Hãy thử tên trang hoặc tên nhân viên.',
   Notifications: 'Thông báo',
+  'Work Inbox': 'Hộp công việc',
   'Demo inbox': 'Hộp thư demo',
   'Mark all as read': 'Đánh dấu tất cả đã đọc',
   'Help center': 'Trợ giúp',

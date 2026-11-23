@@ -34,6 +34,7 @@ test('all routed feature pages use VI/EN consistently and preserve navigation an
   const pages: Page[] = [
    [0,'/departments/1','DepartmentPage',{mode:'detail'}],[0,'/departments/1/edit','DepartmentPage',{mode:'edit'}],
    [0,'/portal','PortalHub'],[0,'/ai-analysis','AiAnalysis'],[0,'/policy-demo','PolicyDemo'],
+   [0,'/notifications','WorkInbox'],[2,'/notifications','WorkInbox'],[3,'/notifications','WorkInbox'],
    [0,'/holidays','AttendanceHistory',{holidaysPage:true}],
    [0,'/work-schedules','WorkSchedules'],[0,'/work-schedules/assign','WorkSchedules'],[0,'/work-schedules/list','WorkSchedules'],
    [0,'/employee-requests','LeaveRecords',{own:false}],[0,'/company-location','CompanyLocation'],
