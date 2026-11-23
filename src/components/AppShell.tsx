@@ -68,6 +68,7 @@ const NAV_BY_ROLE: Record<UserRole, NavGroup[]> = {
       ],
     },
   ],
+  // Legacy navigation retained for fixture/test compatibility. Active authentication never maps to this role.
   'Data / AI Analyst': [
     {
       group: 'Overview',

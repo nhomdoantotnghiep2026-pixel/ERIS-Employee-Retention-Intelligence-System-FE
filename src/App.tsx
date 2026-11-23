@@ -155,7 +155,7 @@ export default function App() {
           <Route path="/my-requests" element={<RoleGuard><LeaveRecords own /></RoleGuard>} />
           <Route path="/my-surveys" element={<RoleGuard><ErdSurveys /></RoleGuard>} />
 
-          {/* Data / AI Analyst */}
+          {/* Legacy Data / AI workspace: retained for fixture/test compatibility; not an active login role. */}
           <Route path="/data-overview" element={<RoleGuard><DataWorkspace /></RoleGuard>} />
           <Route path="/data" element={<RoleGuard><Navigate to="/employees" replace /></RoleGuard>} />
           <Route path="/import" element={<RoleGuard><EmployeeImport /></RoleGuard>} />
