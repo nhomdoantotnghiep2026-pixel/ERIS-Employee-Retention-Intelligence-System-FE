@@ -12,3 +12,16 @@
 .ai-workspace .employee-combobox input:focus-visible { outline:none; }
 .ai-workspace .metadata-label { font-size:11px; line-height:1rem; font-weight:600; letter-spacing:.1em; text-transform:uppercase; color:#94a3b8; }
 
+@keyframes eris-progress-shimmer {
+  from { background-position:200% 0; }
+  to { background-position:-200% 0; }
+}
+.ai-workspace .eris-progress-shimmer {
+  background-image:linear-gradient(90deg,#f97316 0%,#fbbf24 42%,#fff7ed 50%,#fbbf24 58%,#f97316 100%);
+  background-size:200% 100%;
+  animation:eris-progress-shimmer 1.35s linear infinite;
+}
+@media (prefers-reduced-motion:reduce) {
+  .ai-workspace .eris-progress-shimmer { animation:none; }
+}
+

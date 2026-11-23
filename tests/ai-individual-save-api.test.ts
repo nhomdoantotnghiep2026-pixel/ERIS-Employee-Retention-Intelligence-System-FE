@@ -72,10 +72,13 @@ test("unified request validates evidence dates before analysis", async () => {
   assert.equal(validEvidencePeriod("2026-02-30","2026-03-01","2026-11-22"),false)
 })
 
-test("analysis route does not connect the legacy prediction pipelines", async () => {
+test("assessment separates the fast prediction endpoint from unified deep analysis", async () => {
  const source=await readFile(new URL("../src/components/ai-workspace/IndividualAnalysis.tsx",import.meta.url),"utf8")
  const workspace=await readFile(new URL("../src/components/ai-workspace/UnifiedWorkspace.tsx",import.meta.url),"utf8")
- assert.doesNotMatch(source+workspace,/predictAiEmployee|policy-recommendations|policy-agent\//)
+ assert.doesNotMatch(source+workspace,/policy-recommendations|policy-agent\//)
+ assert.match(workspace,/async function runPrediction/)
+ assert.match(workspace,/predictAiEmployee\(employee\.id, profile\.snapshotId, false\)/)
+ assert.match(workspace,/async function openDetails/)
  assert.match(workspace,/analyzeAiEmployee/)
 })
 
@@ -100,9 +103,16 @@ test("saved and preview assessments compare with the immediately previous saved 
 test("assessment UI gates the detailed signals and action dossier behind stage two", async () => {
   const workspace = await readFile(new URL("../src/components/ai-workspace/UnifiedWorkspace.tsx", import.meta.url), "utf8")
   const dossier = await readFile(new URL("../src/components/ai-workspace/ActionDossier.tsx", import.meta.url), "utf8")
-  assert.match(workspace, /Tính điểm rủi ro gắn kết/)
+  assert.match(workspace, /Dự báo % rủi ro/)
   assert.match(workspace, /detailsUnlocked/)
-  assert.match(workspace, /Bóc tách nguyên nhân & Đề xuất kế hoạch hành động/)
+  assert.match(workspace, /Khởi chạy phân tích chuyên sâu \(~12s\)/)
+  assert.match(workspace, /Quá trình mất khoảng 10 – 15 giây/)
+  assert.match(workspace, /eris-progress-shimmer/)
+  assert.match(workspace, /Trích xuất lịch sử chấm công & phản hồi khảo sát/)
+  assert.doesNotMatch(workspace, /RiskSpectrum|An toàn \(0 - 10%\)/)
+  assert.match(workspace, /Ngưỡng cảnh báo:/)
+  assert.match(workspace, /Điểm số đã vượt ngưỡng cảnh báo của mô hình/)
+  assert.match(workspace, /Mức độ hài lòng công việc/)
   assert.match(workspace, /TrendSparkline/)
   assert.match(workspace, /Xem chi tiết phiên/)
   assert.match(dossier, /Nhân sự cần xác minh/)
