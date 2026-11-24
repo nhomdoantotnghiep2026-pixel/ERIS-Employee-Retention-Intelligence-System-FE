@@ -247,7 +247,7 @@ function WorkspaceHub({
             <span className="sr-only">Tìm kiếm nhân viên</span>
             <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
             <input
-              className="field h-11 w-full pl-9 pr-9"
+              className="field field-with-leading-icon field-with-trailing-action h-11 w-full"
               value={query}
               onChange={(event) => onQueryChange(event.target.value)}
               placeholder="Tìm tên, mã, phòng ban hoặc chức danh…"
@@ -291,7 +291,7 @@ function WorkspaceHub({
             <span className="sr-only">Sắp xếp</span>
             <SlidersHorizontal className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
             <select
-              className="field h-11 w-full pl-9"
+              className="field field-with-leading-icon h-11 w-full"
               value={sort}
               onChange={(event) => setSort(event.target.value)}
             >
