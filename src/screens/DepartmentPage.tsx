@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Building2, FileText, Pencil } from 'lucide-react';
+import { ArrowLeft, Building2, FileText, Pencil, Users } from 'lucide-react';
 import { Dialog } from 'radix-ui';
 import { AppShell } from '../components/AppShell';
 import { Button, Card } from '../components/ui';
 import { useLanguage } from '../context/LanguageContext';
 import { useAutoDismissFeedback } from '../hooks/useAutoDismissState';
-import { deactivateDepartment, getDepartmentById, updateDepartment, getApiErrorMessage, type ApiDepartment } from '../services/api';
+import { deactivateDepartment, getDepartmentById, listEmployeeProfiles, updateDepartment, getApiErrorMessage, type ApiDepartment } from '../services/api';
 import { Button as FormButton } from '../components/ui/button';
 
 const control = 'mt-2 block w-full rounded-lg border border-slate-300 bg-white px-3 text-sm focus:outline-orange-500 disabled:bg-slate-50';
@@ -24,9 +24,10 @@ export default function DepartmentPage({ mode }: { mode: 'detail' | 'edit' }) {
   </AppShell>;
 }
 
-export function DepartmentPanel({ id, mode, onModeChange, onUpdated, onPendingChange }: {
+export function DepartmentPanel({ id, mode, headcount: providedHeadcount, onModeChange, onUpdated, onPendingChange }: {
   id: string | undefined;
   mode: 'detail' | 'edit';
+  headcount?: number;
   onModeChange?: (mode: 'detail' | 'edit') => void;
   onUpdated?: (department: ApiDepartment) => void;
   onPendingChange?: (pending: boolean) => void;
@@ -41,10 +42,21 @@ export function DepartmentPanel({ id, mode, onModeChange, onUpdated, onPendingCh
   const [loadError, setLoadError] = useState('');
   const [pending, setPending] = useState(false);
   const [revision, setRevision] = useState(0);
+  const [loadedHeadcount, setLoadedHeadcount] = useState<number | null>(null);
   const { error, message, setError, setMessage } = useAutoDismissFeedback();
   const nameInput = useRef<HTMLInputElement>(null);
   const editing = mode === 'edit';
   const routeMode = onModeChange ? undefined : mode;
+  const headcount = providedHeadcount ?? loadedHeadcount;
+
+  useEffect(() => {
+    if (providedHeadcount !== undefined || !id || !/^[1-9]\d*$/.test(id)) return;
+    const controller = new AbortController();
+    void listEmployeeProfiles({ page: 1, limit: 1, departmentId: Number(id), employmentStatus: 'ACTIVE' }, controller.signal)
+      .then(result => { if (!controller.signal.aborted) setLoadedHeadcount(result.pagination.total); })
+      .catch(() => { if (!controller.signal.aborted) setLoadedHeadcount(null); });
+    return () => controller.abort();
+  }, [id, providedHeadcount, revision]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -106,7 +118,7 @@ export function DepartmentPanel({ id, mode, onModeChange, onUpdated, onPendingCh
         <div className="border-b border-slate-100 p-5 sm:p-6">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div className="flex min-w-0 items-center gap-3"><span className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-orange-50 text-orange-600"><Building2 size={24} /></span><div className="min-w-0"><p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{t(editing ? 'Edit department' : 'Department details')}</p><h1 className="mt-1 break-words text-xl font-bold text-slate-900">{department?.name || t('Departments')}</h1></div></div>
-            {department && <span className={`rounded-full px-3 py-1.5 text-xs font-semibold ${department.status === 'INACTIVE' ? 'bg-slate-100 text-slate-600' : 'bg-emerald-50 text-emerald-700'}`}>{t(department.status === 'INACTIVE' ? 'Department inactive' : 'Department active')}</span>}
+            {department && <div className="flex flex-wrap items-center justify-end gap-2"><span className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold tabular-nums text-slate-700"><Users size={14} aria-hidden="true" />{headcount ?? '—'} {language === 'vi' ? 'nhân sự' : 'employees'}</span><span className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${department.status === 'INACTIVE' ? 'border-slate-200 bg-slate-100 text-slate-600' : 'border-emerald-200 bg-emerald-50 text-emerald-700'}`}>{t(department.status === 'INACTIVE' ? 'Department inactive' : 'Department active')}</span></div>}
           </div>
           {department && <nav aria-label={t('Department views')} className="mt-5 inline-flex flex-wrap gap-1 rounded-xl bg-slate-100 p-1">
             {onModeChange ? <>

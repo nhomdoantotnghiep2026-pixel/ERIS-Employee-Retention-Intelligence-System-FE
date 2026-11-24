@@ -2,13 +2,13 @@ import { Button as TableButton } from '../components/ui/button';
 import { CreateRecordDialog } from '../components/CreateRecordDialog';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Dialog } from 'radix-ui';
-import { X } from 'lucide-react';
+import { Users, X } from 'lucide-react';
 import { DepartmentPanel } from './DepartmentPage';
 import { AppShell } from '../components/AppShell';
 import { Card, SectionHeader } from '../components/ui';
 import { useLanguage } from '../context/LanguageContext';
 import { useAutoDismissFeedback } from '../hooks/useAutoDismissState';
-import { createDepartment, deactivateDepartment, getApiErrorMessage, listDepartments, type ApiDepartment } from '../services/api';
+import { createDepartment, deactivateDepartment, getApiErrorMessage, listDepartments, listEmployeeProfiles, type ApiDepartment } from '../services/api';
 
 const control = 'mt-2 w-full rounded-xl border border-slate-300 bg-white p-3 text-sm focus:outline-orange-500 disabled:opacity-60';
 const pageSize = 20;
@@ -25,6 +25,7 @@ export default function Departments() {
     setSelectedDepartment({ id, mode });
   }
   const [departments, setDepartments] = useState<ApiDepartment[]>([]);
+  const [headcountByDepartment, setHeadcountByDepartment] = useState<Record<number, number>>({});
   const [total, setTotal] = useState<number | null>(null);
   const [hasMore, setHasMore] = useState(false);
   const [page, setPage] = useState(1);
@@ -56,6 +57,20 @@ export default function Departments() {
       .finally(() => { if (!controller.signal.aborted) setLoading(false); });
     return () => controller.abort();
   }, [revision, page, search]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    void listEmployeeProfiles({ page: 1, limit: 10000, employmentStatus: 'ACTIVE' }, controller.signal)
+      .then(result => {
+        if (controller.signal.aborted) return;
+        setHeadcountByDepartment(result.data.reduce<Record<number, number>>((counts, employee) => {
+          counts[employee.departmentId] = (counts[employee.departmentId] || 0) + 1;
+          return counts;
+        }, {}));
+      })
+      .catch(() => { if (!controller.signal.aborted) setHeadcountByDepartment({}); });
+    return () => controller.abort();
+  }, [revision]);
 
   async function save(event: FormEvent) {
     event.preventDefault();
@@ -137,10 +152,11 @@ export default function Departments() {
       {loading ? <p role="status" className="py-6 text-sm text-slate-600">{t('Loading departments...')}</p> : listError ? <div role="alert" className="rounded-xl bg-red-50 p-4 text-sm text-red-800"><p>{t(listError)}</p><TableButton variant="outline" className="mt-3 h-9 rounded-lg border-slate-200 bg-white px-3 text-sm text-slate-700 hover:bg-slate-50" onClick={() => setRevision(value => value + 1)}>{t('Retry departments')}</TableButton></div> : <>
         {!departments.length ? <p role="status" className="py-6 text-sm text-slate-600">{t('No departments found.')}</p> : <div className="overflow-x-auto"><table className="w-full text-left text-sm">
           <caption className="sr-only">{t('Department list')}</caption>
-          <thead><tr className="border-b text-slate-500"><th scope="col" className="p-3">{t('Department code')}</th><th scope="col" className="p-3">{t('Department name')}</th><th scope="col" className="p-3">{t('Department status')}</th><th scope="col" className="p-3">{t('Department actions')}</th></tr></thead>
-          <tbody>{departments.map(department => <tr key={department.id} className="border-b border-slate-100">
+          <thead><tr className="border-b text-slate-500"><th scope="col" className="p-3">{t('Department code')}</th><th scope="col" className="p-3">{t('Department name')}</th><th scope="col" className="p-3">{language === 'vi' ? 'Nhân sự' : 'Headcount'}</th><th scope="col" className="p-3">{t('Department status')}</th><th scope="col" className="p-3">{t('Department actions')}</th></tr></thead>
+          <tbody>{departments.map(department => <tr key={department.id} className="border-b border-slate-100 transition-all duration-200 hover:-translate-y-px hover:border-orange-200 hover:bg-slate-50/80 motion-reduce:transform-none">
             <td className="p-3">{department.code || '—'}</td>
             <th scope="row" className="max-w-64 break-words p-3 font-medium text-slate-800">{department.name}</th>
+            <td className="p-3"><span className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold tabular-nums text-slate-700"><Users size={14} aria-hidden="true" />{headcountByDepartment[department.id] ?? 0}</span></td>
             <td className="p-3"><span className={'inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium ' + (department.status === 'INACTIVE' ? 'bg-slate-100 text-slate-700' : 'bg-emerald-50 text-emerald-700')}><span aria-hidden="true" className={'size-1.5 rounded-full ' + (department.status === 'INACTIVE' ? 'bg-slate-500' : 'bg-emerald-500')} />{t(department.status === 'INACTIVE' ? 'Department inactive' : 'Department active')}</span></td>
             <td className="w-px p-3"><div className="flex flex-nowrap gap-2">
               <TableButton size="sm" variant="outline" className="h-auto rounded-lg border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-50" disabled={pending || loading} onClick={event => openDepartment(department.id, 'detail', event.currentTarget)} aria-label={t('View department {name}', { name: department.name })}>{t('View details')}</TableButton>
@@ -157,7 +173,7 @@ export default function Departments() {
     </Card>
     <Dialog.Root open={Boolean(selectedDepartment)} onOpenChange={open => { if (!open && !detailPending) setSelectedDepartment(null); }}>
       <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 z-[80] bg-slate-950/40 backdrop-blur-sm motion-safe:animate-in motion-safe:fade-in motion-safe:duration-150" />
+        <Dialog.Overlay className="fixed inset-0 z-[80] bg-slate-950/40 backdrop-blur-sm data-[state=closed]:animate-out data-[state=closed]:fade-out data-[state=open]:animate-in data-[state=open]:fade-in motion-safe:duration-[180ms]" />
         <Dialog.Content
           aria-describedby={undefined}
           onPointerDownOutside={event => event.preventDefault()}
@@ -166,7 +182,7 @@ export default function Departments() {
             event.preventDefault();
             (detailTrigger.current?.isConnected ? detailTrigger.current : searchInput.current)?.focus();
           }}
-          className="fixed left-1/2 top-1/2 z-[81] max-h-[90dvh] w-[calc(100%-2rem)] max-w-2xl -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-xl motion-safe:animate-in motion-safe:fade-in motion-safe:duration-150"
+          className="fixed left-1/2 top-1/2 z-[81] max-h-[90dvh] w-[calc(100%-2rem)] max-w-2xl -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-2xl data-[state=closed]:animate-out data-[state=closed]:fade-out data-[state=closed]:zoom-out-95 data-[state=open]:animate-in data-[state=open]:fade-in data-[state=open]:zoom-in-95 motion-safe:duration-[180ms]"
         >
           <Dialog.Title className="sr-only">{t(selectedDepartment?.mode === 'edit' ? 'Edit department' : 'Department details')}</Dialog.Title>
           <div className="flex justify-end px-3 pt-3">
@@ -175,6 +191,7 @@ export default function Departments() {
           {selectedDepartment && <DepartmentPanel
             id={String(selectedDepartment.id)}
             mode={selectedDepartment.mode}
+            headcount={headcountByDepartment[selectedDepartment.id] ?? 0}
             onModeChange={mode => setSelectedDepartment({ id: selectedDepartment.id, mode })}
             onPendingChange={setDetailPending}
             onUpdated={updated => {

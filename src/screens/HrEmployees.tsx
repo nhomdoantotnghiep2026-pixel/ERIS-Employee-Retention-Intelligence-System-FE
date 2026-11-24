@@ -3,7 +3,7 @@ import { useAutoDismissState } from '../hooks/useAutoDismissState';
 import { useEffect, useState, type FormEvent, type MouseEvent, type ReactNode } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { BadgeCheck, BarChart3, BriefcaseBusiness, Building2, CalendarDays, CheckCircle2, IdCard, Mail, MapPin, Phone, Route, Search, SlidersHorizontal, Upload, UserRound, WalletCards, X } from 'lucide-react';
-import { MotionConfig, motion } from 'motion/react';
+import { AnimatePresence, MotionConfig, motion } from 'motion/react';
 import { SearchableSelect } from '../components/SearchableSelect';
 import { AppShell } from '../components/AppShell';
 import { EmployeeCreateBackgroundFields, type CreateEducationDraft } from '../components/EmployeeCreateBackgroundFields';
@@ -287,6 +287,7 @@ export default function HrEmployees() {
       emptyText={text('Không tìm thấy kết quả.', 'No results found.')}
       invalidText={text('Vui lòng chọn một mục trong danh sách.', 'Please select an existing item.')} />;
   const active = (value: string) => value === 'ACTIVE' ? text('Đang hoạt động', 'Active') : value === 'INACTIVE' ? text('Ngừng hoạt động', 'Inactive') : value;
+  const initials = (name: string) => name.split(/\s+/).filter(Boolean).slice(-2).map(part => part[0]).join('').toUpperCase() || 'NV';
   const currentPosition = positions.find(position => String(position.id) === (form.positionId || String(detail?.positionId)));
   const editPositions = new Map<string, (typeof positions)[number]>();
   for (const position of positions) {
@@ -349,10 +350,10 @@ export default function HrEmployees() {
     }, 300);
     return () => window.clearTimeout(timer);
   }, [creating, form, educations]);
-  return <AppShell breadcrumb={['Workforce', 'Employees']}>
+  return <MotionConfig reducedMotion="user"><AppShell breadcrumb={['Workforce', 'Employees']}>
     <Card className="mb-5 p-6"><div className="flex flex-wrap items-center justify-between gap-3">
       <h1 className="text-2xl font-bold">{text(creating ? 'Thêm nhân viên' : showingRecord ? 'Chi tiết nhân viên' : 'Danh sách nhân viên', creating ? 'Add employee' : showingRecord ? 'Employee details' : 'Employee directory')}</h1>
-      <div className="flex flex-wrap justify-end gap-2">{!creating && !showingRecord && <><Button variant="secondary" className="rounded-md" onClick={() => navigate('/employees/dashboard')}><BarChart3 size={16} aria-hidden="true" />{text('Xem tổng quan', 'View dashboard')}</Button><Button variant="secondary" onClick={() => navigate('/employees/import')}><Upload size={16}/>{text('Nhập danh sách', 'Import employees')}</Button><Button onClick={() => navigate('/employees/new')}><UserRound size={16}/>{text('Thêm nhân viên', 'Add employee')}</Button></>}
+       <div className="flex flex-wrap justify-end gap-2">{!creating && !showingRecord && <><Button variant="secondary" className="rounded-md transition-all duration-150 active:scale-[0.97]" onClick={() => navigate('/employees/dashboard')}><BarChart3 size={16} aria-hidden="true" />{text('Xem tổng quan', 'View dashboard')}</Button><Button variant="secondary" className="transition-all duration-150 active:scale-[0.97]" onClick={() => navigate('/employees/import')}><Upload size={16}/>{text('Nhập danh sách', 'Import employees')}</Button><Button className="transition-all duration-150 active:scale-[0.97]" onClick={() => navigate('/employees/new')}><UserRound size={16}/>{text('Thêm nhân viên', 'Add employee')}</Button></>}
         {(creating || showingRecord) && <Button variant="secondary" onClick={() => navigate('/employees')}>{text('Về danh sách', 'Back to list')}</Button>}</div>
     </div></Card>
     {message && <p role="status" className="mb-5 rounded-xl bg-emerald-50 p-4 text-emerald-800">{t(message)}</p>}
@@ -360,7 +361,13 @@ export default function HrEmployees() {
       <p>{t(pageError)}</p>
       <Button variant="secondary" onClick={() => setRevision(v => v + 1)}>{text('Thử lại', 'Retry')}</Button>
     </div>}
-    {loading ? <Card className="p-6"><p role="status">{text('Đang tải nhân viên...', 'Loading employees...')}</p></Card>
+    <AnimatePresence mode="wait" initial={false}><motion.div
+      key={loading ? 'loading' : creating ? 'create' : showingRecord ? `detail-${employeeId}` : 'list'}
+      initial={showingRecord ? { opacity: 0, x: '100%' } : { opacity: 0, y: 10 }}
+      animate={{ opacity: 1, x: 0, y: 0 }}
+      exit={showingRecord ? { opacity: 0, x: '100%' } : { opacity: 0, y: -6 }}
+      transition={showingRecord ? { type: 'spring', damping: 28, stiffness: 320 } : { duration: 0.2, ease: 'easeOut' }}
+    >{loading ? <Card className="p-6"><p role="status">{text('Đang tải nhân viên...', 'Loading employees...')}</p></Card>
       : creating ? <MotionConfig reducedMotion="user"><motion.form noValidate onChange={() => setCreateValidationError('')} onSubmit={save} initial="hidden" animate="visible" variants={createContainerMotion} className="grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_300px]">
         <fieldset disabled={pending} className="min-w-0 space-y-5 border-0 p-0">
           <motion.div variants={createItemMotion}><Card className="border-orange-100 bg-gradient-to-r from-orange-50/80 to-white p-5 transition-shadow duration-300 hover:shadow-[0_14px_36px_rgba(249,115,22,0.10)] sm:p-6">
@@ -519,14 +526,14 @@ export default function HrEmployees() {
           {positionId && <AppliedFilter label={`${text('Chức danh', 'Position')}: ${appliedPosition || positionId}`} onRemove={() => { setPositionId(''); setDraftPositionId(''); setPage(1); }}/>}
           {status !== 'ACTIVE' && <AppliedFilter label={`${text('Trạng thái', 'Status')}: ${status === 'INACTIVE' ? text('Ngừng hoạt động', 'Inactive') : text('Tất cả', 'All')}`} onRemove={() => { setStatus('ACTIVE'); setDraftStatus('ACTIVE'); setPage(1); }}/>}
         </div>}
-        {!error && <><div className="max-w-full overflow-x-auto"><table className="w-full min-w-[1220px] table-fixed whitespace-nowrap text-left text-sm"><colgroup><col className="w-[9%]"/><col className="w-[13%]"/><col className="w-[19%]"/><col className="w-[10%]"/><col className="w-[16%]"/><col className="w-[11%]"/><col className="w-[22%]"/></colgroup><thead className="bg-slate-50 text-slate-500"><tr>{[text('Mã nhân viên', 'Employee code'), text('Họ và tên', 'Full name'), 'Email', text('Phòng ban', 'Department'), text('Chức danh', 'Position'), text('Trạng thái', 'Status'), text('Thao tác', 'Actions')].map(h => <th key={h} scope="col" className="p-3">{h}</th>)}</tr></thead><tbody>
-          {rows.map(row => { const departmentName = departments.find(d => d.id === row.departmentId)?.name || '-'; const positionName = positions.find(p => p.id === row.positionId)?.name || '-'; return <tr key={row.id} className="border-b border-slate-100"><td className="p-3">{row.employeeCode}</td><td className="truncate p-3 font-medium" title={row.fullName}>{row.fullName}</td><td className="truncate p-3" title={row.email}>{row.email}</td><td className="truncate p-3" title={departmentName}>{departmentName}</td><td className="truncate p-3" title={positionName}>{positionName}</td><td className="p-3"><span className={'inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium ' + (row.employmentStatus === 'ACTIVE' ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-700')}><span aria-hidden="true" className={'size-1.5 rounded-full ' + (row.employmentStatus === 'ACTIVE' ? 'bg-emerald-500' : 'bg-slate-500')} />{active(row.employmentStatus)}</span></td><td className="p-3"><div className="flex flex-nowrap items-center gap-2"><Link className="inline-flex shrink-0 items-center rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-50" to={'/employees/' + row.id}>{text('Xem chi tiết', 'View details')}</Link>{row.employmentStatus !== 'INACTIVE' && <ListButton size="sm" variant="outline" className="h-auto shrink-0 rounded-lg border-red-100 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-600 transition-colors hover:bg-red-100 hover:text-red-600" disabled={pending} onClick={() => void deactivate(row)}>{text('Ngừng hoạt động', 'Deactivate')}</ListButton>}</div></td></tr>; })}
+        {!error && <><div className="max-w-full overflow-x-auto"><table className="w-full min-w-[980px] table-fixed whitespace-nowrap text-left text-sm"><colgroup><col className="w-[30%]"/><col className="w-[16%]"/><col className="w-[18%]"/><col className="w-[14%]"/><col className="w-[22%]"/></colgroup><thead className="bg-slate-50 text-slate-600"><tr>{[text('Nhân viên', 'Employee'), text('Phòng ban', 'Department'), text('Chức danh', 'Position'), text('Trạng thái', 'Status'), text('Thao tác', 'Actions')].map(h => <th key={h} scope="col" className="p-3 text-xs font-bold uppercase tracking-wide">{h}</th>)}</tr></thead><tbody>
+          {rows.map(row => { const departmentName = departments.find(d => d.id === row.departmentId)?.name || '-'; const positionName = positions.find(p => p.id === row.positionId)?.name || '-'; return <tr key={row.id} className="border-b border-slate-100 transition-colors duration-150 hover:bg-slate-50/80"><td className="p-3"><div className="flex items-center gap-3"><span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-orange-100 text-xs font-bold text-orange-800">{initials(row.fullName)}</span><div className="min-w-0"><p className="truncate font-semibold text-slate-950" title={row.fullName}>{row.fullName}</p><p className="mt-0.5 truncate text-xs text-slate-600" title={row.email}>{row.email}</p><p className="mt-0.5 text-xs font-medium text-slate-500">{row.employeeCode}</p></div></div></td><td className="p-3"><span className="inline-flex max-w-full truncate rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700" title={departmentName}>{departmentName}</span></td><td className="p-3"><span className="inline-flex max-w-full truncate rounded-md border border-violet-200 bg-violet-50 px-2.5 py-1 text-xs font-semibold text-violet-700" title={positionName}>{positionName}</span></td><td className="p-3"><span className={'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium ' + (row.employmentStatus === 'ACTIVE' ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-slate-200 bg-slate-100 text-slate-700')}><span aria-hidden="true" className={'size-1.5 rounded-full ' + (row.employmentStatus === 'ACTIVE' ? 'bg-emerald-500' : 'bg-slate-500')} />{active(row.employmentStatus)}</span></td><td className="p-3"><div className="flex flex-nowrap items-center gap-2"><Link className="inline-flex shrink-0 items-center rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 transition-all duration-150 hover:bg-slate-50 active:scale-[0.97]" to={'/employees/' + row.id}>{text('Xem chi tiết', 'View details')}</Link>{row.employmentStatus !== 'INACTIVE' && <ListButton size="sm" variant="outline" className="h-auto shrink-0 rounded-lg border-red-100 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-600 transition-all duration-150 hover:bg-red-100 hover:text-red-600 active:scale-[0.97]" disabled={pending} onClick={() => void deactivate(row)}>{text('Ngừng hoạt động', 'Deactivate')}</ListButton>}</div></td></tr>; })}
         </tbody></table>{!rows.length && <p className="py-8 text-center text-slate-500">{text('Không tìm thấy nhân viên.', 'No employees found.')}</p>}</div>
         <div className="mt-5 flex flex-wrap items-center justify-between gap-3"><p className="text-sm text-slate-500">{text('Trang', 'Page')} {page} / {Math.max(1, pages)} · {total} {text('nhân viên', 'employees')}</p><div className="flex gap-3"><ListButton variant="outline" className="h-10 rounded-lg border-slate-200 bg-white px-4 text-slate-700 hover:bg-slate-50" disabled={page <= 1} onClick={() => setPage(p => p - 1)}>{text('Trang trước', 'Previous')}</ListButton><ListButton variant="outline" className="h-10 rounded-lg border-slate-200 bg-white px-4 text-slate-700 hover:bg-slate-50" disabled={page >= pages} onClick={() => setPage(p => p + 1)}>{text('Trang sau', 'Next')}</ListButton></div></div></>}
-      </Card>}
+      </Card>}</motion.div></AnimatePresence>
     {showingRecord && detail && <EmployeeApiHistory employeeId={detail.id} employeeEmail={detail.email} dateOfBirth={detail.dateOfBirth} editable={editing && detail.employmentStatus === 'ACTIVE'} />}
     {showingRecord && detail && <CareerGoals employeeId={detail.id} />}
-  </AppShell>;
+  </AppShell></MotionConfig>;
 }
 
 function AppliedFilter({ label, onRemove }: { label: string; onRemove: () => void }) {

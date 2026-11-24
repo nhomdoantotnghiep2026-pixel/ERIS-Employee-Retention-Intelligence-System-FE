@@ -22,13 +22,20 @@ type NavGroup = { group?: string; items: NavItem[] };
 const NAV_BY_ROLE: Record<UserRole, NavGroup[]> = {
   'HR': [
     {
-      group: 'Overview',
+      group: 'OVERVIEW',
       items: [
         { label: 'Overview', icon: LayoutDashboard, to: '/dashboard' },
       ],
     },
     {
-      group: 'Workforce',
+      group: 'Employee Retention Intelligence',
+      items: [
+        { label: 'Engagement assessment', icon: BrainCircuit, to: '/ai-analysis' },
+        { label: 'Engagement Surveys', icon: MessageSquare, to: '/engagement' },
+      ],
+    },
+    {
+      group: 'WORKFORCE MANAGEMENT',
       items: [
         { label: 'Employee Directory', icon: Users, to: '/employees' },
         { label: 'Departments', icon: Network, to: '/departments' },
@@ -36,18 +43,6 @@ const NAV_BY_ROLE: Record<UserRole, NavGroup[]> = {
         { label: 'Work schedules', icon: CalendarDays, to: '/work-schedules' },
         { label: 'Attendance data', icon: Activity, to: '/attendance' },
         { label: 'Leave data', icon: ClipboardList, to: '/employee-requests' },
-      ],
-    },
-    {
-      group: 'Retention',
-      items: [
-        { label: 'Engagement assessment', icon: BrainCircuit, to: '/ai-analysis' },
-      ],
-    },
-    {
-      group: 'Engagement',
-      items: [
-        { label: 'Engagement Surveys', icon: MessageSquare, to: '/engagement' },
       ],
     },
   ],
@@ -134,14 +129,14 @@ function SidebarLink({ to, icon: Icon, label, onNavigate, collapsed = false, nes
       onClick={onNavigate}
       title={collapsed ? t(label) : undefined}
       aria-label={collapsed ? t(label) : undefined}
-      className={`flex items-center transition-all duration-300 ${nested && !collapsed ? 'ml-5 min-h-10 gap-3 text-[15px]' : `min-h-12 text-[16px] ${collapsed ? 'mx-auto h-12 w-12 justify-center gap-0 rounded-2xl' : 'gap-4'}`} ${
+      className={`group flex items-center active:scale-[0.99] transition-all duration-150 motion-reduce:transform-none motion-reduce:transition-none ${collapsed ? 'mx-auto h-11 w-11 justify-center gap-0 rounded-xl' : 'min-h-11 gap-3 rounded-xl px-3.5 text-sm'} ${
         isActive
-          ? `${collapsed ? 'bg-[#f47721] px-0 text-white shadow-[0_7px_18px_rgba(244,119,33,0.24)]' : nested ? 'rounded-full bg-orange-50 px-4 text-orange-700' : '-ml-3 rounded-r-full bg-[#f47721] pl-8 pr-4 text-white shadow-[0_7px_18px_rgba(244,119,33,0.22)]'} font-bold`
-          : `${collapsed ? 'px-0 text-[#64748b] hover:bg-orange-50 hover:text-orange-700' : nested ? 'rounded-full px-4' : 'rounded-r-full px-5'} font-semibold text-[#475569] hover:bg-orange-50 hover:text-orange-700`
+          ? `${collapsed ? 'bg-gradient-to-br from-orange-500 to-orange-600 text-white shadow-md shadow-orange-500/20' : 'bg-gradient-to-r from-orange-500 to-orange-600 text-white shadow-md shadow-orange-500/20'} font-semibold`
+          : `${collapsed ? 'text-slate-500 hover:bg-orange-50 hover:text-orange-600' : 'font-medium text-slate-600 hover:bg-orange-50/70 hover:text-orange-600'}`
       }`}
     >
-      <Icon size={nested && !collapsed ? 17 : 23} strokeWidth={1.8} className={`flex-shrink-0 ${isActive ? nested && !collapsed ? 'text-orange-600' : 'text-white' : 'text-[#71809d]'}`} />
-      <span className={`truncate transition-all duration-200 ${collapsed ? 'w-0 overflow-hidden opacity-0' : 'w-auto opacity-100'}`}>{t(label)}</span>
+      <Icon aria-hidden="true" size={collapsed ? 20 : nested ? 17 : 19} strokeWidth={1.8} className={`flex-shrink-0 transition-colors duration-150 ${isActive ? 'text-white' : 'text-slate-400 group-hover:text-orange-500'}`} />
+      <span className={`truncate transition-opacity duration-200 ${collapsed ? 'w-0 overflow-hidden opacity-0' : 'w-auto opacity-100'}`}>{t(label)}</span>
     </NavLink>
   );
 }
@@ -152,6 +147,7 @@ function Sidebar({ onNavigate, collapsed, onToggle, quiet }: { quiet?: boolean; 
   const [navQuery, setNavQuery] = useState('');
   const [historyOpen, setHistoryOpen] = useState(() => ['/employee-history', '/employee-education', '/employee-job-history'].includes(pathname));
   const navigationRef = useRef<HTMLElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const scrollStorageKey = `eris-sidebar-scroll:${user.role}`;
   const [, setPermissionRevision] = useState(0);
   const navGroups = NAV_BY_ROLE[user.role].map(group => ({
@@ -174,6 +170,17 @@ function Sidebar({ onNavigate, collapsed, onToggle, quiet }: { quiet?: boolean; 
     return () => window.removeEventListener(RBAC_UPDATED_EVENT, refresh);
   }, []);
 
+  useEffect(() => {
+    const focusSearch = (event: KeyboardEvent) => {
+      if (event.key.toLowerCase() !== 'k' || (!event.metaKey && !event.ctrlKey)) return;
+      event.preventDefault();
+      if (collapsed) onToggle();
+      requestAnimationFrame(() => searchInputRef.current?.focus());
+    };
+    document.addEventListener('keydown', focusSearch);
+    return () => document.removeEventListener('keydown', focusSearch);
+  }, [collapsed, onToggle]);
+
   useLayoutEffect(() => {
     const navigation = navigationRef.current;
     if (!navigation) return;
@@ -185,54 +192,53 @@ function Sidebar({ onNavigate, collapsed, onToggle, quiet }: { quiet?: boolean; 
   }, [scrollStorageKey]);
 
   return (
-    <aside aria-label={t('Main navigation')} className={`fixed inset-y-0 left-0 z-50 flex h-dvh max-w-[88vw] flex-shrink-0 flex-col overflow-visible bg-white transition-[width,transform] duration-300 ease-out lg:sticky lg:top-0 lg:z-40 lg:translate-x-0 ${quiet ? 'border-r border-slate-200' : 'rounded-br-[40px] shadow-2xl lg:shadow-[5px_0_26px_rgba(30,41,59,0.10)]'} ${collapsed ? (quiet ? '-translate-x-full w-[292px] lg:w-16' : '-translate-x-full w-[292px] lg:w-[96px]') : 'w-[320px] translate-x-0 lg:w-[292px]'}`}>
-      <button type="button" onClick={onToggle} aria-label={collapsed ? t('Expand sidebar') : t('Collapse sidebar')} className={`absolute top-[11px] z-50 hidden h-9 w-9 items-center justify-center rounded-full ${quiet ? 'border border-slate-200 bg-white text-slate-700 shadow-xs' : 'bg-[#f47721] text-white shadow-lg shadow-orange-700/25'} transition-[right,transform] duration-300 hover:scale-105 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-500 lg:flex ${collapsed && !quiet ? 'right-3' : '-right-2'}`}>
-        <ChevronLeft size={20} className={`transition-transform duration-300 ${collapsed ? 'rotate-180' : ''}`} />
-      </button>
-      <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-br-[40px] bg-white">
+    <aside aria-label={t('Main navigation')} className={`fixed inset-y-0 left-0 z-50 flex h-dvh max-w-[88vw] flex-shrink-0 flex-col overflow-visible bg-white transition-[width,transform] duration-300 ease-in-out motion-reduce:transition-none lg:sticky lg:top-0 lg:z-40 lg:translate-x-0 ${quiet ? 'border-r border-slate-200' : 'rounded-br-[32px] shadow-2xl lg:shadow-[5px_0_26px_rgba(30,41,59,0.10)]'} ${collapsed ? '-translate-x-full w-[292px] lg:w-[88px]' : 'w-[320px] translate-x-0 lg:w-[292px]'}`}>
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-br-[32px] bg-white">
       {/* Logo */}
-      <div className={`flex items-center justify-between py-4 transition-[min-height,padding] duration-300 ${collapsed ? (quiet ? 'min-h-[96px] px-2.5' : 'min-h-[96px] px-6') : 'min-h-[112px] px-7'}`}>
-        <div className={`flex items-center ${collapsed ? 'gap-0' : 'gap-2.5'}`}>
-          <div className={`relative flex flex-shrink-0 items-center justify-center rounded-full border-[3px] border-orange-500 text-orange-500 transition-all duration-300 ${collapsed ? 'h-11 w-11' : 'h-12 w-12'}`}>
+      <div className={`flex items-center justify-between gap-2 py-4 transition-[min-height,padding] duration-300 ${collapsed ? 'min-h-[88px] px-2' : 'min-h-[96px] px-5'}`}>
+        <div className={`flex min-w-0 items-center ${collapsed ? 'gap-0' : 'gap-2.5'}`}>
+          <div className={`relative flex flex-shrink-0 items-center justify-center rounded-full border-[3px] border-orange-500 text-orange-500 transition-all duration-300 ${collapsed ? 'h-10 w-10' : 'h-11 w-11'}`}>
             <Leaf size={20} className={`absolute -right-1 -top-3 rotate-[25deg] text-emerald-500 transition-opacity ${collapsed ? 'opacity-0' : 'opacity-100'}`} fill="currentColor" />
             <span className="text-xl font-black">e</span>
           </div>
-          <div className={`overflow-hidden whitespace-nowrap transition-all duration-200 ${collapsed ? 'w-0 opacity-0' : 'w-[150px] opacity-100'}`}>
-            <div className="text-2xl font-extrabold leading-none tracking-tight text-slate-700">ERIS</div>
+          <div className={`overflow-hidden whitespace-nowrap transition-[width,opacity] duration-200 ${collapsed ? 'w-0 opacity-0' : 'w-[156px] opacity-100'}`}>
+            <div className="text-2xl font-extrabold leading-none tracking-tight text-slate-800">ERIS</div>
             <div className="mt-1 text-[10px] font-medium leading-none text-emerald-600">{t('Retention Intelligence')}</div>
           </div>
         </div>
+        <button type="button" onClick={onToggle} aria-label={collapsed ? t('Expand sidebar') : t('Collapse sidebar')} aria-expanded={!collapsed} className="hidden h-8 w-8 shrink-0 items-center justify-center rounded-lg text-slate-400 transition-all duration-200 hover:bg-slate-100 hover:text-slate-700 active:scale-95 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-500 motion-reduce:transition-none lg:flex">
+          <ChevronLeft size={18} className={`transition-transform duration-300 motion-reduce:transition-none ${collapsed ? 'rotate-180' : ''}`} />
+        </button>
         <button type="button" onClick={onNavigate} aria-label={t('Close navigation')} className="flex h-11 w-11 items-center justify-center rounded-full text-[#71809d] hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-500 lg:hidden">
           <X size={20} />
         </button>
       </div>
 
-      <div className={`border-b border-slate-100 transition-[padding] duration-300 ${collapsed ? (quiet ? 'px-2 pb-3' : 'px-6 pb-3') : 'px-7 pb-5'}`}>
-        <div className={`relative ${collapsed ? 'flex h-12 w-12 items-center justify-center rounded-2xl hover:bg-orange-50' : ''}`}>
-          <Search size={24} strokeWidth={1.8} className={`pointer-events-none text-[#71809d] ${collapsed ? '' : 'absolute left-1 top-1/2 -translate-y-1/2'}`} />
-          <input value={navQuery} onChange={event => setNavQuery(event.target.value)} aria-label={t('Search menu')} placeholder={t('Search')} className={`h-12 border-0 bg-transparent text-base text-slate-700 outline-none placeholder:text-slate-500 focus:ring-0 ${collapsed ? 'pointer-events-none w-0 p-0 opacity-0' : 'w-full pl-11 pr-3 opacity-100'}`} />
-        </div>
+      <div className={`border-b border-slate-100 transition-[padding] duration-300 ${collapsed ? 'px-5 pb-3' : 'px-4 pb-4'}`}>
+        {collapsed ? <button type="button" onClick={onToggle} aria-label={t('Search menu')} className="mx-auto flex h-11 w-11 items-center justify-center rounded-xl border border-transparent text-slate-400 transition-all duration-150 hover:border-orange-100 hover:bg-orange-50 hover:text-orange-600 active:scale-95 focus-visible:outline-2 focus-visible:outline-orange-500"><Search size={20} strokeWidth={1.8} /></button> : <div className="flex min-h-11 items-center gap-2.5 rounded-xl border border-slate-200/80 bg-slate-100/80 px-3 transition-all duration-200 hover:bg-slate-100 focus-within:border-orange-500 focus-within:bg-white focus-within:ring-2 focus-within:ring-orange-500/20">
+          <Search aria-hidden="true" size={18} strokeWidth={1.8} className="shrink-0 text-slate-400" />
+          <input ref={searchInputRef} value={navQuery} onChange={event => setNavQuery(event.target.value)} aria-label={t('Search menu')} placeholder={t('Search')} className="h-10 min-w-0 flex-1 border-0 bg-transparent p-0 text-sm text-slate-700 outline-none placeholder:text-slate-500 focus:ring-0" />
+          <kbd aria-label={t('Search menu')} className="rounded border border-slate-200 bg-white px-1.5 py-0.5 font-mono text-[10px] text-slate-400 shadow-sm">⌘<span aria-hidden="true" className="after:content-['K']" /></kbd>
+        </div>}
       </div>
 
       {/* Role-specific nav */}
-      <nav ref={navigationRef} onScroll={event => sessionStorage.setItem(scrollStorageKey, String(event.currentTarget.scrollTop))} className={`flex-1 overflow-y-auto py-3 ${collapsed ? 'space-y-2 px-0' : 'space-y-1 px-3'}`}>
+      <nav ref={navigationRef} onScroll={event => sessionStorage.setItem(scrollStorageKey, String(event.currentTarget.scrollTop))} className={`flex-1 overflow-y-auto py-2 ${collapsed ? 'space-y-2 px-0' : 'space-y-1 px-3'}`}>
         {collapsed ? visibleGroups.map((group, index) => {
           const groupKey = group.group || `group-${index}`;
           if (!group.group || group.items.length === 1) return group.items.map(item => <SidebarLink key={item.to} {...item} collapsed onNavigate={onNavigate} />);
           const GroupIcon = group.items[0].icon;
           const groupActive = activeGroup === group.group;
-          return <button key={groupKey} type="button" title={t(group.group)} aria-label={t(group.group)} onClick={() => { updateOpenGroups(openGroups.includes(groupKey) ? openGroups : [...openGroups, groupKey]); onToggle(); }} className={`mx-auto flex h-12 w-12 items-center justify-center rounded-2xl transition-all duration-200 ${groupActive ? (quiet ? 'bg-orange-50 text-orange-500' : 'bg-[#f47721] text-white shadow-[0_7px_18px_rgba(244,119,33,0.24)]') : 'text-[#71809d] hover:bg-orange-50 hover:text-orange-700'}`}><GroupIcon size={23} strokeWidth={1.8} /></button>;
+          return <button key={groupKey} type="button" title={t(group.group)} aria-label={t(group.group)} onClick={() => { updateOpenGroups(openGroups.includes(groupKey) ? openGroups : [...openGroups, groupKey]); onToggle(); }} className={`mx-auto flex h-11 w-11 items-center justify-center rounded-xl transition-all duration-150 active:scale-95 ${groupActive ? (quiet ? 'bg-orange-50 text-orange-600' : 'bg-gradient-to-br from-orange-500 to-orange-600 text-white shadow-md shadow-orange-500/20') : 'text-slate-400 hover:bg-orange-50 hover:text-orange-600'}`}><GroupIcon size={20} strokeWidth={1.8} /></button>;
         }) : visibleGroups.map((group, index) => {
           const groupKey = group.group || `group-${index}`;
           const expanded = Boolean(navQuery) || openGroups.includes(groupKey);
-          if (!group.group || group.items.length === 1) return group.items.map(item => <SidebarLink key={item.to} {...item} onNavigate={onNavigate} />);
-          const GroupIcon = group.items[0].icon;
+          if (!group.group) return group.items.map(item => <SidebarLink key={item.to} {...item} onNavigate={onNavigate} />);
           const groupActive = activeGroup === group.group;
           return <div key={groupKey} className="py-0.5">
-            <button type="button" onClick={() => updateOpenGroups(openGroups.includes(groupKey) ? openGroups.filter(key => key !== groupKey) : [...openGroups, groupKey])} aria-expanded={expanded} className={`flex min-h-12 w-full items-center gap-4 rounded-r-full px-5 text-left text-[16px] font-semibold transition-colors ${groupActive ? 'font-bold text-orange-700' : 'text-[#475569] hover:bg-orange-50 hover:text-orange-700'}`}>
-              <GroupIcon size={23} strokeWidth={1.8} className={groupActive ? 'text-orange-600' : 'text-[#71809d]'} />
-              <span className="min-w-0 flex-1 truncate">{t(group.group)}</span>
-              <ChevronDown size={16} className={`transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`} />
+            <button type="button" onClick={() => updateOpenGroups(openGroups.includes(groupKey) ? openGroups.filter(key => key !== groupKey) : [...openGroups, groupKey])} aria-expanded={expanded} className={`flex w-full items-center gap-2 px-4 pb-1.5 pt-5 text-left text-[11px] font-bold uppercase tracking-wider transition-colors ${groupActive ? 'text-orange-600' : 'text-slate-400 hover:text-slate-600'}`}>
+              <span className="min-w-0 flex-1 truncate">{t(group.group)}{group.group === 'Employee Retention Intelligence' ? ' (AI)' : ''}</span>
+              <ChevronDown size={14} className={`shrink-0 transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`} />
             </button>
             <div aria-hidden={!expanded} inert={!expanded} className={`grid transition-[grid-template-rows,opacity] duration-200 ${expanded ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'}`}><div className="min-h-0 overflow-hidden space-y-0.5 pb-1">{group.items.map(item => item.to === '/employee-history' ? <div key={item.to}>
               <button type="button" aria-expanded={historyOpen} onClick={() => setHistoryOpen(open => !open)} className="ml-5 flex min-h-10 w-[calc(100%-1.25rem)] items-center gap-3 rounded-full px-4 text-left text-[15px] font-semibold text-slate-700 hover:bg-orange-50 hover:text-orange-700"><History size={17} className="shrink-0"/><span className="min-w-0 flex-1 truncate">{t(item.label)}</span><ChevronDown size={16} className={historyOpen ? 'rotate-180' : ''}/></button>

@@ -3,6 +3,7 @@ import { BriefcaseBusiness, FileText, Pencil, X } from 'lucide-react';
 import { Button as TableButton } from '../components/ui/button';
 import { CreateRecordDialog } from '../components/CreateRecordDialog';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { AnimatePresence, MotionConfig, motion } from 'motion/react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { AppShell } from '../components/AppShell';
 import { Button, Card, SectionHeader } from '../components/ui';
@@ -12,6 +13,13 @@ import { createPosition, deactivatePosition, getApiErrorMessage, getPositionById
 
 const createControl = 'mt-2 block w-full rounded-lg border border-slate-300 bg-white px-3 text-sm focus:outline-orange-500 disabled:opacity-60';
 const pageSize = 20;
+const levelTone: Record<number, string> = {
+  1: 'border-slate-200 bg-slate-100 text-slate-700',
+  2: 'border-sky-200 bg-sky-50 text-sky-700',
+  3: 'border-violet-200 bg-violet-50 text-violet-700',
+  4: 'border-orange-200 bg-orange-50 text-orange-700',
+  5: 'border-rose-200 bg-rose-50 text-rose-700',
+};
 
 export default function Positions() {
   const { t, language } = useLanguage();
@@ -129,7 +137,7 @@ export default function Positions() {
     finally { setPending(false); }
   }
 
-  return <AppShell breadcrumb={['Workforce', 'Positions']}>
+  return <MotionConfig reducedMotion="user"><AppShell breadcrumb={['Workforce', 'Positions']}>
     <SectionHeader title="Positions" description="Manage position names and descriptions.">
 <CreateRecordDialog title={t('Add position')} open={createOpen} onOpenChange={value => { setCreateOpen(value); setError(''); }} pending={pending}>
       {error && <p role="alert" className="mt-4 rounded-md bg-red-50 p-3 text-sm text-red-800">{t(error)}</p>}
@@ -165,7 +173,7 @@ export default function Positions() {
         <h2 className="text-lg font-bold text-slate-900">{t('Position list')}</h2>
         <TableButton variant="outline" className="h-10 rounded-lg border-slate-200 bg-white px-4 font-semibold text-slate-700 hover:bg-slate-50" disabled={pending || loading} onClick={() => setRevision(value => value + 1)}>{t('Reload positions')}</TableButton>
       </div>
-      <form onSubmit={find} className="my-4 flex flex-col items-stretch gap-3 sm:flex-row sm:flex-wrap sm:items-end">
+      <form onSubmit={find} className="my-4 flex flex-col items-stretch gap-3 rounded-md border border-slate-200 bg-slate-50/70 p-3 xl:flex-row xl:items-end">
         <label className="min-w-0 w-full sm:w-auto sm:flex-1 text-sm font-medium text-slate-700">{t('Search positions')}<input type="search" maxLength={100} value={query} disabled={pending || loading} onChange={event => changeSearch(event.target.value)} className="mt-2 h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-orange-200" /></label>
         <label className="text-sm font-medium text-slate-700">{t('Department')}<select aria-label={tr('Lọc phòng ban', 'Filter department')} value={filterDepartment} disabled={pending || loading || departmentError} onChange={event => { setFilterDepartment(event.target.value); setPage(1); }} className="mt-2 block h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm sm:w-48"><option value="">{tr('Tất cả phòng ban', 'All departments')}</option>{departments.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
         <label className="text-sm font-medium text-slate-700">{t('Position level')}<select aria-label={tr('Lọc cấp bậc', 'Filter level')} value={filterLevel} disabled={pending || loading} onChange={event => { setFilterLevel(event.target.value); setPage(1); }} className="mt-2 block h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm sm:w-48"><option value="">{tr('Tất cả cấp bậc', 'All levels')}</option>{POSITION_LEVELS.map(level => <option key={level.value} value={level.value}>{t(level.label)}</option>)}</select></label>
@@ -175,17 +183,19 @@ export default function Positions() {
         {!positions.length ? <p role="status" className="py-6 text-sm text-slate-600">{t('No positions found.')}</p> : <div className="overflow-x-auto"><table className="w-full text-left text-sm">
           <caption className="sr-only">{t('Position list')}</caption>
           <thead><tr className="border-b text-slate-500"><th scope="col" className="p-3">{t('Position name')}</th><th scope="col" className="p-3">{t('Department')}</th><th scope="col" className="p-3">{t('Position level')}</th><th scope="col" className="p-3">{t('Position status')}</th><th scope="col" className="p-3">{t('Position actions')}</th></tr></thead>
-          <tbody>{positions.map(position => <tr key={position.id} className="border-b border-slate-100">
+          <AnimatePresence mode="wait" initial={false}>
+          <motion.tbody key={`${search}-${filterDepartment}-${filterLevel}-${page}-${revision}`} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.16 }}>{positions.map(position => <tr key={position.id} className="border-b border-slate-100 transition-colors duration-150 hover:bg-slate-50/80">
             <th scope="row" className="max-w-64 break-words p-3 font-medium text-slate-800">{position.name}</th>
             <td className="p-3">{departmentName(position.departmentId)}</td>
-            <td className="p-3"><span className="inline-flex rounded-md bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-700">{t(POSITION_LEVELS.find(level => level.value === Number(position.jobLevel))?.label || 'Unknown level')}</span></td>
+            <td className="p-3"><span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold ${levelTone[Number(position.jobLevel)] || levelTone[1]}`}>{t(POSITION_LEVELS.find(level => level.value === Number(position.jobLevel))?.label || 'Unknown level')}</span></td>
             <td className="p-3"><span className={'inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium ' + (position.status === 'INACTIVE' ? 'bg-slate-100 text-slate-700' : 'bg-emerald-50 text-emerald-700')}><span aria-hidden="true" className={'size-1.5 rounded-full ' + (position.status === 'INACTIVE' ? 'bg-slate-500' : 'bg-emerald-500')} />{t(position.status === 'INACTIVE' ? 'Position inactive' : 'Position active')}</span></td>
             <td className="w-px p-3"><div className="flex flex-nowrap gap-2">
               <TableButton size="sm" variant="outline" className="h-auto rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors border-slate-200 bg-white text-slate-700 hover:bg-slate-50" disabled={pending || loading} onClick={event => openPosition(position.id, 'detail', event.currentTarget)} aria-label={t('View position {name}', { name: position.name })}>{t('View details')}</TableButton>
               <TableButton size="sm" variant="outline" className="h-auto rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors border-slate-200 bg-white text-slate-700 hover:border-orange-300 hover:bg-white hover:text-orange-600" disabled={pending || loading} onClick={event => openPosition(position.id, 'edit', event.currentTarget)} aria-label={t('Edit position {name}', { name: position.name })}>{t('Edit')}</TableButton>
               <TableButton size="sm" variant="outline" className="h-auto rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors border-red-100 bg-red-50 text-red-600 hover:bg-red-100 hover:text-red-600" disabled={pending || loading || position.status === 'INACTIVE'} onClick={() => void deactivate(position)} aria-label={t('Deactivate position {name}', { name: position.name })}>{t('Deactivate position')}</TableButton>
             </div></td>
-          </tr>)}</tbody>
+          </tr>)}</motion.tbody>
+          </AnimatePresence>
         </table></div>}
         <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
           <p className="text-sm text-slate-600">{tr(`Trang ${page}${total === null ? '' : ` (Tổng ${total} chức danh)`}`, `Page ${page}${total === null ? '' : ` (${total} positions total)`}`)}</p>
@@ -195,13 +205,13 @@ export default function Positions() {
     </Card>
     <Dialog.Root open={Boolean(selection)} onOpenChange={open => { if (!open && !modalPending) setSelection(null); }}>
       <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 z-[80] bg-slate-950/40 backdrop-blur-sm motion-safe:animate-in motion-safe:fade-in motion-safe:duration-150" />
+        <Dialog.Overlay className="fixed inset-0 z-[80] bg-slate-950/40 backdrop-blur-sm data-[state=closed]:animate-out data-[state=closed]:fade-out data-[state=open]:animate-in data-[state=open]:fade-in motion-safe:duration-[180ms]" />
         <Dialog.Content
           aria-describedby={undefined}
           onPointerDownOutside={event => event.preventDefault()}
           onEscapeKeyDown={event => { if (modalPending) event.preventDefault(); }}
           onCloseAutoFocus={event => { event.preventDefault(); trigger.current?.focus(); }}
-          className="fixed left-1/2 top-1/2 z-[81] max-h-[90dvh] w-[calc(100%-2rem)] max-w-2xl -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-xl motion-safe:animate-in motion-safe:fade-in motion-safe:duration-150"
+          className="fixed left-1/2 top-1/2 z-[81] max-h-[90dvh] w-[calc(100%-2rem)] max-w-2xl -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-xl data-[state=closed]:animate-out data-[state=closed]:fade-out data-[state=closed]:zoom-out-95 data-[state=open]:animate-in data-[state=open]:fade-in data-[state=open]:zoom-in-95 motion-safe:duration-[180ms]"
         >
           <Dialog.Title className="sr-only">{t(selection?.mode === 'edit' ? 'Edit position' : 'Position details')}</Dialog.Title>
           <div className="flex justify-end px-3 pt-3">
@@ -217,7 +227,7 @@ export default function Positions() {
         </Dialog.Content>
       </Dialog.Portal>
     </Dialog.Root>
-  </AppShell>;
+  </AppShell></MotionConfig>;
 }
 
 export function PositionEdit() {
