@@ -12,7 +12,7 @@ import type {
 } from "../../services/api"
 
 import { SurveyDraftQuestionWizard } from "./SurveyQuestionWizards"
-import { surveyControlClass } from "./surveyStyles"
+import { surveyAreaClass, surveyControlClass, surveyStudioBody, surveyStudioFooter, surveyStudioQuestions, surveyStudioSettings, surveyStudioShell } from "./surveyStyles"
 import {
   createEmptySurveyQuestion,
   type SurveyDraft,
@@ -32,6 +32,8 @@ type SurveyDraftEditorProps = {
   metadata: SurveyDraft
   totalEmployees: number
   pending: boolean
+  hidden: boolean
+  error: string
   onMetadata: (value: SurveyDraft) => void
   onSave: (
     questions: SurveyQuestion[],
@@ -60,6 +62,8 @@ export function SurveyDraftEditor({
   metadata,
   totalEmployees,
   pending,
+  hidden,
+  error,
   onMetadata,
   onSave,
   onPreview,
@@ -70,11 +74,10 @@ export function SurveyDraftEditor({
   const [questions, setQuestions] = useState<SurveyQuestion[]>(survey.questions)
   const [newQuestion, setNewQuestion] = useState<SurveyQuestionDraft>({
     ...createEmptySurveyQuestion(),
-    categoryId: metadata.categoryIds[0] || 0,
   })
   const [studioError, setStudioError] = useState("")
 
-  useDialogBehavior(true, onClose)
+  useDialogBehavior(!hidden, () => { if (!pending) onClose() })
 
   const duration = useMemo(() => {
     if (!metadata.startDate || !metadata.endDate) return null
@@ -88,6 +91,15 @@ export function SurveyDraftEditor({
   }, [metadata.endDate, metadata.startDate])
 
   const selectedIds = new Set(metadata.categoryIds)
+  const customCount = questions.filter(question =>
+    !question.isSatisfactionCore && !categories.some(category =>
+      category.id === question.categoryId && category.questionBank.some(bank =>
+        bank.questionText.trim().toLocaleLowerCase() === question.questionText.trim().toLocaleLowerCase(),
+      ),
+    ),
+  ).length
+  const standardCount = questions.filter(question => question.isSatisfactionCore).length
+  const bankCount = questions.length - standardCount - customCount
 
   const updateQuestion = (
     id: number,
@@ -142,7 +154,6 @@ export function SurveyDraftEditor({
 
     if (
       !draft.questionText.trim() ||
-      !draft.categoryId ||
       (needsOptions &&
         (!isChoiceConfig(answerConfig) || answerConfig.options.length < 2))
     ) {
@@ -153,7 +164,7 @@ export function SurveyDraftEditor({
       id: -(Date.now() + order),
       surveyId: survey.id,
       questionText: draft.questionText.trim(),
-      categoryId: draft.categoryId,
+      categoryId: metadata.categoryIds[0] || 0,
       questionType: draft.questionType,
       answerConfig,
       displayOrder: order + 1,
@@ -171,13 +182,14 @@ export function SurveyDraftEditor({
 
   const addQuestion = () => {
     if (!newQuestion.questionText.trim()) return
+    if (customCount > 0) return
 
     const question = buildQuestion(newQuestion, questions.length)
     if (!question) {
       setStudioError(
         tr(
-          "Câu hỏi đang nhập cần chủ đề và ít nhất 2 phương án.",
-          "The pending question needs a topic and at least two options.",
+          "Câu hỏi lựa chọn đang nhập cần ít nhất 2 phương án.",
+          "The pending choice question needs at least two options.",
         ),
       )
       return
@@ -188,10 +200,18 @@ export function SurveyDraftEditor({
     setStudioError("")
   }
 
-  const submitStudio = (publishAfterSave: boolean) => {
+  const collectQuestions = () => {
+    if (!metadata.title.trim() || duration === null) {
+      setStudioError(tr("Nhập tiêu đề và khoảng ngày khảo sát hợp lệ.", "Enter a title and a valid survey date range."))
+      return
+    }
     let merged = questions
 
     if (newQuestion.questionText.trim()) {
+      if (customCount > 0) {
+        setStudioError(tr("Chỉ được thêm một câu hỏi tự tạo. Hãy sửa hoặc xóa câu hiện có.", "You can add one custom question. Edit or remove the existing question first."))
+        return
+      }
       const question = buildQuestion(newQuestion, questions.length)
       if (!question) {
         setStudioError(
@@ -208,19 +228,30 @@ export function SurveyDraftEditor({
       resetNewQuestion()
     }
 
+    if (!merged.length || merged.length > 200) {
+      setStudioError(tr("Khảo sát phải có từ 1 đến 200 câu hỏi.", "A survey must have between 1 and 200 questions."))
+      return
+    }
     setStudioError("")
-    onSave(merged, publishAfterSave)
+    return merged
+  }
+
+  const submitStudio = (publishAfterSave: boolean) => {
+    const merged = collectQuestions()
+    if (merged) onSave(merged, publishAfterSave)
   }
 
   return (
     <div
       className="fixed inset-0 z-[85] flex animate-in items-center justify-center bg-slate-950/50 p-3 backdrop-blur-sm fade-in duration-200 sm:p-5"
       role="dialog"
-      aria-modal="true"
+      aria-modal={!hidden}
+      hidden={hidden}
+      style={hidden ? { display: "none" } : undefined}
       aria-labelledby="survey-studio-title"
     >
-      <section className="flex max-h-[90vh] w-full max-w-5xl animate-in flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl slide-in-from-bottom-2 zoom-in-95 duration-200">
-        <header className="border-b border-slate-200 bg-white px-5 py-4 sm:px-6">
+      <section className={`${surveyStudioShell} animate-in slide-in-from-bottom-2 zoom-in-95 duration-200`}>
+        <header className="min-h-16 shrink-0 border-b border-slate-200 bg-white px-4 py-3 sm:px-6">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
@@ -248,7 +279,11 @@ export function SurveyDraftEditor({
               <Button
                 type="button"
                 variant="secondary"
-                onClick={() => onPreview(questions)}
+                disabled={pending}
+                onClick={() => {
+                  const merged = collectQuestions()
+                  if (merged) onPreview(merged)
+                }}
               >
                 <Eye size={16} />
                 {tr(
@@ -260,6 +295,7 @@ export function SurveyDraftEditor({
                 type="button"
                 aria-label={tr("Đóng", "Close")}
                 className="grid size-10 place-items-center rounded-lg text-slate-500 transition-colors hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-500"
+                disabled={pending}
                 onClick={onClose}
               >
                 <X size={20} />
@@ -268,7 +304,9 @@ export function SurveyDraftEditor({
           </div>
         </header>
 
-        <div className="space-y-6 overflow-y-auto bg-slate-50/60 p-5 sm:p-6">
+        <div className={surveyStudioBody}>
+          <div className={surveyStudioSettings} aria-label={tr("Thiết lập & chủ đề", "Settings and topics")}>
+          {error && <p role="alert" className="rounded-lg bg-rose-50 p-3 text-sm text-rose-800">{error}</p>}
           <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
             <div className="flex items-center justify-between gap-3">
               <h3 className="font-semibold text-slate-950">
@@ -284,8 +322,8 @@ export function SurveyDraftEditor({
               )}
             </div>
 
-            <div className="mt-4 grid gap-4 sm:grid-cols-2">
-              <label className="text-sm font-semibold text-slate-700">
+            <div className="mt-4 grid grid-cols-2 gap-3">
+              <label className="col-span-2 text-sm font-semibold text-slate-700">
                 {tr("Tiêu đề", "Title")}
                 <input
                   required
@@ -301,10 +339,12 @@ export function SurveyDraftEditor({
                   }
                 />
               </label>
-              <label className="text-sm font-semibold text-slate-700">
+              <label className="col-span-2 text-sm font-semibold text-slate-700">
                 {tr("Mục đích khảo sát", "Survey purpose")}
-                <input
-                  className={surveyControlClass}
+                <textarea
+                  rows={2}
+                  maxLength={4000}
+                  className={`${surveyAreaClass} min-h-16 resize-y`}
                   value={metadata.description}
                   placeholder={tr(
                     "Mô tả ngắn mục tiêu khảo sát",
@@ -365,7 +405,7 @@ export function SurveyDraftEditor({
               )}
             </p>
 
-            <div className="mt-2 grid grid-cols-2 gap-2 md:grid-cols-3 lg:grid-cols-4">
+            <div className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-1">
               {categories.map((category) => {
                 const selected = selectedIds.has(category.id)
                 const count = questions.filter(
@@ -408,10 +448,8 @@ export function SurveyDraftEditor({
             </div>
           </section>
 
-          <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-            <h3 className="font-semibold text-slate-950">
-              3. {tr("Quản lý câu hỏi", "Question management")}
-            </h3>
+          </div>
+          <section className={surveyStudioQuestions} aria-label={tr("Quản lý câu hỏi", "Question management")}>
             <SurveyDraftQuestionWizard
               questions={questions}
               categories={categories.filter((category) =>
@@ -437,12 +475,12 @@ export function SurveyDraftEditor({
           </section>
         </div>
 
-        <footer className="flex flex-col gap-3 border-t border-slate-200 bg-white px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+        <footer className={surveyStudioFooter}>
           <div>
             <p className="text-sm font-medium text-slate-600">
               {tr(
-                `Đang có: ${metadata.categoryIds.length} chủ đề · ${questions.length} câu hỏi · Tiếp cận ${totalEmployees} nhân sự`,
-                `${metadata.categoryIds.length} topics · ${questions.length} questions · ${totalEmployees} recipients`,
+                `Đang có: ${metadata.categoryIds.length} chủ đề · ${questions.length} câu hỏi (${standardCount} chuẩn · ${bankCount} bổ sung · ${customCount} tự tạo) · ${totalEmployees} nhân sự`,
+                `${metadata.categoryIds.length} topics · ${questions.length} questions (${standardCount} standard · ${bankCount} bank · ${customCount} custom) · ${totalEmployees} recipients`,
               )}
             </p>
             {studioError && (
@@ -453,7 +491,7 @@ export function SurveyDraftEditor({
           </div>
 
           <div className="flex flex-wrap justify-end gap-2">
-            <Button type="button" variant="secondary" onClick={onClose}>
+            <Button type="button" variant="ghost" disabled={pending} onClick={onClose}>
               {tr("Hủy / Đóng", "Cancel / Close")}
             </Button>
             <Button
@@ -467,6 +505,7 @@ export function SurveyDraftEditor({
             <Button
               type="button"
               disabled={pending || !metadata.title.trim() || !duration}
+              className="bg-gradient-to-r from-orange-600 to-red-600 text-white hover:from-orange-700 hover:to-red-700"
               onClick={() => submitStudio(true)}
             >
               🚀 {tr("Lưu & Xuất bản ngay", "Save & publish")}

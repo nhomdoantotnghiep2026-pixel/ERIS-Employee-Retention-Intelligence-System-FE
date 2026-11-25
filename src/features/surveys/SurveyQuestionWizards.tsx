@@ -1,11 +1,12 @@
 import { SelectControl } from "../../components/ui/select-control"
-import { useState } from "react"
-import { Plus, Trash2 } from "lucide-react"
+import { Fragment, useId, useState } from "react"
+import { ChevronDown, Plus, Trash2 } from "lucide-react"
 
 import { Button } from "../../components/ui"
 import { useLanguage } from "../../context/LanguageContext"
 import type {
   SurveyCategory,
+  SurveyCatalogQuestion,
   SurveyQuestion,
   SurveyQuestionInput,
   SurveyQuestionType,
@@ -23,15 +24,96 @@ import {
 
 type WizardStep = 0 | 1 | 2
 
+function QuestionSample({ question }: { question: SurveyQuestionInput }) {
+  const { language } = useLanguage()
+  const id = useId()
+  const [rating, setRating] = useState<number | null>(null)
+  const vi = language === "vi"
+  if (question.questionType === "RATING") {
+    const labels = question.answerConfig && "labels" in question.answerConfig ? question.answerConfig.labels : []
+    return <div className="mt-2 flex flex-wrap gap-1.5" role="group" aria-label={vi ? "Thử thang điểm" : "Try the rating scale"}>
+      {[1, 2, 3, 4, 5].map(value => <button key={value} type="button" aria-pressed={rating === value} title={labels[value - 1]}
+        onClick={() => setRating(value)} className={`size-7 rounded-md border text-xs font-semibold focus-visible:outline-2 focus-visible:outline-orange-500 ${rating === value ? "border-orange-500 bg-orange-50 text-orange-800" : "border-slate-200 bg-white text-slate-700 hover:border-orange-300"}`}>{value}</button>)}
+    </div>
+  }
+  if (isChoiceConfig(question.answerConfig)) return <div className="mt-2 flex flex-wrap gap-2">
+    {question.answerConfig.options.map(option => <label key={option.code} className="flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-2 py-1 text-xs text-slate-700">
+      <input name={id} className="accent-orange-600" type={question.questionType === "MULTIPLE_CHOICE" ? "checkbox" : "radio"} />{option.label}
+    </label>)}
+  </div>
+  return <input className="mt-2 w-full max-w-sm rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-xs" onKeyDown={event => { if (event.key === "Enter") event.preventDefault() }} aria-label={vi ? "Thử câu trả lời" : "Try a response"} placeholder={vi ? "Ý kiến của nhân sự..." : "Employee feedback..."} />
+}
+
 const isChoiceType = (type: SurveyQuestionType) =>
   type === "SINGLE_CHOICE" || type === "MULTIPLE_CHOICE"
+
+const bankTypes = {
+  SINGLE_CHOICE: ["Chọn 1 đáp án", "Single choice", "bg-blue-50 text-blue-700"],
+  MULTIPLE_CHOICE: ["Chọn nhiều đáp án", "Multiple choice", "bg-indigo-50 text-indigo-700"],
+  TEXT: ["Câu hỏi mở / Ý kiến", "Open response", "bg-emerald-50 text-emerald-700"],
+  RATING: ["Thang điểm 1–5", "Rating 1–5", "bg-amber-50 text-amber-800"],
+} as const
+
+function BankGroup({ category, isSelected, onToggle, onSelectAll, onClear }: {
+  category: SurveyCategory
+  isSelected: (question: SurveyCatalogQuestion) => boolean
+  onToggle: (question: SurveyCatalogQuestion) => void
+  onSelectAll: () => void
+  onClear: () => void
+}) {
+  const { language } = useLanguage()
+  const tr = (vi: string, en: string) => language === "vi" ? vi : en
+  const [open, setOpen] = useState(true)
+  const panelId = useId()
+  const count = category.questionBank.filter(isSelected).length
+  return <section className="space-y-2">
+    <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200 bg-gradient-to-r from-slate-100 to-slate-50 p-3">
+      <button type="button" aria-expanded={open} aria-controls={panelId} onClick={() => setOpen(value => !value)} className="flex min-w-0 flex-wrap items-center gap-2 rounded-md text-left text-sm font-semibold text-slate-900 focus-visible:outline-2 focus-visible:outline-orange-500">
+        <ChevronDown size={16} aria-hidden="true" className={open ? "rotate-180 transition-transform" : "transition-transform"} />
+        <span aria-hidden="true">{topicIcon(category.name)}</span>
+        {topicLabel(category.name, language)}
+        <span className="rounded-full bg-orange-100 px-2 py-0.5 text-xs text-orange-800">{tr("Đã chọn", "Selected")} {count}/{category.questionBank.length}</span>
+      </button>
+      <div className="flex gap-2">
+        <Button type="button" size="sm" variant="secondary" disabled={count === category.questionBank.length} onClick={onSelectAll}>{tr("Chọn tất cả", "Select all")}</Button>
+        <Button type="button" size="sm" variant="secondary" disabled={count === 0} onClick={onClear}>{tr("Bỏ chọn", "Clear selection")}</Button>
+      </div>
+    </div>
+    <div id={panelId} hidden={!open} className="space-y-2" style={open ? undefined : { display: "none" }}>
+      {category.questionBank.map(question => {
+        const selected = isSelected(question)
+        const [vi, en, tone] = bankTypes[question.questionType]
+        return <article key={question.bankCode || question.catalogQuestionId} className={`rounded-lg border p-3 transition-colors ${selected ? "border-orange-300 bg-orange-50/50 shadow-sm" : "border-slate-200 bg-white hover:border-slate-300"}`}>
+          <div className="flex flex-wrap items-center justify-between gap-2 pl-6">
+            <span className={`rounded-md px-2 py-0.5 text-[11px] font-medium ${tone}`}>{tr(vi, en)}</span>
+            {selected && <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-800">{tr("✓ Đã thêm vào khảo sát", "✓ Added to survey")}</span>}
+          </div>
+          <label className="mt-2 flex cursor-pointer items-start gap-2 text-sm font-medium leading-relaxed text-slate-900">
+            <input type="checkbox" className="mt-1 size-4 shrink-0 accent-orange-600" checked={selected} onChange={() => onToggle(question)} />
+            <span>{question.questionText}</span>
+          </label>
+          <div className="mt-2 pl-6">
+            {question.questionType === "RATING" ? <div className="flex gap-1.5" aria-label={tr("Thang điểm từ 1 đến 5", "Scale from 1 to 5")}>
+              {[1, 2, 3, 4, 5].map(value => <span key={value} className="grid size-7 place-items-center rounded-md border border-slate-200 bg-slate-50 text-xs text-slate-600">{value}</span>)}
+            </div> : isChoiceConfig(question.answerConfig) ? <div className="flex flex-wrap gap-1.5">
+              {question.answerConfig.options.map(option => <span key={option.code} className="rounded-md border border-slate-200 bg-slate-100 px-2.5 py-1 text-xs text-slate-700">{option.label}</span>)}
+            </div> : <p className="max-w-sm rounded-lg border border-dashed border-slate-300 bg-slate-50 px-3 py-2 text-xs italic text-slate-600">{tr("Ý kiến của nhân sự…", "Employee feedback…")}</p>}
+          </div>
+        </article>
+      })}
+      {!category.questionBank.length && <p className="px-3 py-2 text-sm text-slate-600">{tr("Chưa có câu hỏi bổ sung.", "No bank questions.")}</p>}
+    </div>
+  </section>
+}
 
 type SurveyQuestionWizardProps = {
   categories: SurveyCategory[]
   stagedQuestions: SurveyQuestionInput[]
   customQuestions: SurveyQuestionInput[]
   customDraft: SurveyQuestionDraft
+  editingCustom: boolean
   onToggleBank: (question: SurveyQuestionInput) => void
+  onSetBank: (category: SurveyCategory, selected: boolean) => void
   onCustomDraft: (value: SurveyQuestionDraft) => void
   onAddCustom: () => void
   onRemoveCustom: (index: number) => void
@@ -43,7 +125,9 @@ export function SurveyQuestionWizard({
   stagedQuestions,
   customQuestions,
   customDraft,
+  editingCustom,
   onToggleBank,
+  onSetBank,
   onCustomDraft,
   onAddCustom,
   onRemoveCustom,
@@ -52,6 +136,7 @@ export function SurveyQuestionWizard({
   const { language } = useLanguage()
   const tr = (vi: string, en: string) => (language === "vi" ? vi : en)
   const [step, setStep] = useState<WizardStep>(0)
+  const [customFormOpen, setCustomFormOpen] = useState(false)
   const defaultQuestions = categories.flatMap((category) =>
     category.defaultQuestions.map((question) => ({ category, question })),
   )
@@ -61,8 +146,8 @@ export function SurveyQuestionWizard({
       `1. Standard questions (${defaultQuestions.length})`,
     ),
     tr(
-      `2. Ngân hàng bổ sung (${stagedQuestions.length})`,
-      `2. Question bank (${stagedQuestions.length})`,
+      `2. Ngân hàng bổ sung (${stagedQuestions.length}/${categories.reduce((sum, category) => sum + category.questionBank.length, 0)})`,
+      `2. Question bank (${stagedQuestions.length}/${categories.reduce((sum, category) => sum + category.questionBank.length, 0)})`,
     ),
     tr(
       `3. Câu hỏi tự tạo (${customQuestions.length})`,
@@ -72,9 +157,9 @@ export function SurveyQuestionWizard({
   const choice = isChoiceType(customDraft.questionType)
 
   return (
-    <section className="overflow-hidden rounded-xl border border-slate-200 bg-white sm:col-span-2">
+    <section className="flex min-h-0 flex-1 flex-col bg-white">
       <div
-        className="grid border-b border-slate-200 sm:grid-cols-3"
+        className="sticky top-0 z-10 grid shrink-0 border-b border-slate-200 bg-white sm:grid-cols-3 lg:static"
         role="tablist"
         aria-label={tr("Các bước chọn câu hỏi", "Question selection steps")}
       >
@@ -106,13 +191,16 @@ export function SurveyQuestionWizard({
         id={`survey-create-panel-${step}`}
         role="tabpanel"
         aria-labelledby={`survey-create-step-${step}`}
-        className="min-h-[380px] max-h-[50vh] overflow-y-auto rounded-b-xl bg-slate-50/50 p-4"
+        className="min-h-0 flex-1 bg-slate-50/50 p-4 lg:overflow-y-auto"
       >
         {step === 0 && (
           <div className="space-y-2">
             {defaultQuestions.map(({ category, question }, index) => (
+              <Fragment key={`${category.id}-${question.templateCode || question.catalogQuestionId}`}>
+              {defaultQuestions[index - 1]?.category.id !== category.id && (
+                <h3 className="pt-2 text-sm font-semibold text-slate-800">{topicIcon(category.name)} {topicLabel(category.name, language)}</h3>
+              )}
               <article
-                key={question.templateCode || question.catalogQuestionId}
                 className="flex gap-3 rounded-lg border border-emerald-100 bg-emerald-50/40 p-3"
               >
                 <span className="grid size-7 shrink-0 place-items-center rounded-full bg-white text-xs font-bold text-emerald-700">
@@ -130,81 +218,31 @@ export function SurveyQuestionWizard({
                   <p className="mt-1.5 text-sm text-slate-700">
                     {question.questionText}
                   </p>
+                  <QuestionSample question={question} />
                 </div>
               </article>
+              </Fragment>
             ))}
           </div>
         )}
 
         {step === 1 && (
           <div className="space-y-3">
-            {categories.map((category) => (
-              <details
-                key={category.id}
-                className="rounded-lg border border-slate-200 bg-white"
-                open
-              >
-                <summary className="cursor-pointer px-3 py-2.5 text-sm font-semibold text-slate-800">
-                  {topicIcon(category.name)} {topicLabel(category.name, language)} · {category.questionBank.length}
-                </summary>
-                <div className="space-y-2 border-t border-slate-100 p-3">
-                  {category.questionBank.map((question) => {
-                    const selected = stagedQuestions.some(
-                      (item) =>
-                        item.categoryId === question.categoryId &&
-                        item.questionText === question.questionText,
-                    )
-                    return (
-                      <button
-                        key={question.bankCode || question.catalogQuestionId}
-                        type="button"
-                        aria-pressed={selected}
-                        onClick={() => onToggleBank(question)}
-                        className={`flex w-full items-start gap-2 rounded-lg border px-3 py-2.5 text-left text-sm transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-orange-500 ${
-                          selected
-                            ? "border-blue-400 bg-blue-50 text-blue-900"
-                            : "border-slate-200 text-slate-600 hover:bg-slate-50"
-                        }`}
-                      >
-                        <span className="font-bold">{selected ? "✓" : "+"}</span>
-                        <span>{question.questionText}</span>
-                      </button>
-                    )
-                  })}
-                  {category.questionBank.length === 0 && (
-                    <p className="text-xs text-slate-600">
-                      {tr("Chưa có câu hỏi bổ sung.", "No optional questions.")}
-                    </p>
-                  )}
-                </div>
-              </details>
-            ))}
+            {categories.map(category =>
+              <BankGroup key={category.id} category={category}
+                isSelected={question => stagedQuestions.some(item => item.categoryId === question.categoryId && item.questionText === question.questionText)}
+                onToggle={onToggleBank}
+                onSelectAll={() => onSetBank(category, true)}
+                onClear={() => onSetBank(category, false)}
+              />
+            )}
           </div>
         )}
 
         {step === 2 && (
-          <div className="grid gap-4 lg:grid-cols-[1fr_.9fr]">
-            <div className="space-y-3">
-              <label className="block text-xs font-semibold text-slate-600">
-                {tr("Chủ đề", "Topic")}
-                <SelectControl
-                  className={`${surveyControlClass} mt-1`}
-                  value={customDraft.categoryId}
-                  onChange={(event) =>
-                    onCustomDraft({
-                      ...customDraft,
-                      categoryId: Number(event.target.value),
-                    })
-                  }
-                >
-                  <option value={0}>{tr("Chọn chủ đề", "Choose topic")}</option>
-                  {categories.map((category) => (
-                    <option key={category.id} value={category.id}>
-                      {topicLabel(category.name, language)}
-                    </option>
-                  ))}
-                </SelectControl>
-              </label>
+          <div className="space-y-4">
+            {!customFormOpen && !editingCustom && customQuestions.length === 0 && <Button type="button" onClick={() => setCustomFormOpen(true)}><Plus size={15} />{tr("Thêm câu hỏi mới", "New question")}</Button>}
+            {(editingCustom || (customFormOpen && customQuestions.length === 0)) && <div className="space-y-3 rounded-lg border border-slate-200 bg-white p-3">
 
               <label className="block text-xs font-semibold text-slate-600">
                 {tr("Nội dung câu hỏi", "Question text")}
@@ -247,13 +285,13 @@ export function SurveyQuestionWizard({
                 />
               )}
 
-              <Button type="button" size="sm" onClick={onAddCustom}>
+              <Button type="button" size="sm" disabled={customQuestions.length > 0 && !editingCustom} onClick={onAddCustom}>
                 <Plus size={14} />
-                {tr("Thêm vào khảo sát", "Add to survey")}
+                {editingCustom ? tr("Cập nhật câu hỏi", "Update question") : tr("Thêm vào khảo sát", "Add to survey")}
               </Button>
-            </div>
+            </div>}
 
-            <div className="space-y-2 border-t border-slate-100 pt-3 lg:border-l lg:border-t-0 lg:pl-4 lg:pt-0">
+            <div className="space-y-2">
               <h4 className="text-sm font-semibold text-slate-800">
                 {tr("Câu hỏi đã thêm", "Added questions")}
               </h4>
@@ -296,7 +334,7 @@ export function SurveyQuestionWizard({
         )}
       </div>
 
-      <footer className="flex items-center justify-between border-t border-slate-200 bg-slate-50 px-4 py-3">
+      <footer className="flex shrink-0 items-center justify-between border-t border-slate-200 bg-slate-50 px-4 py-2">
         <Button
           type="button"
           size="sm"
@@ -349,6 +387,7 @@ export function SurveyDraftQuestionWizard({
   const { language } = useLanguage()
   const tr = (vi: string, en: string) => (language === "vi" ? vi : en)
   const [step, setStep] = useState<WizardStep>(0)
+  const [customFormOpen, setCustomFormOpen] = useState(false)
   const bankKey = (categoryId: number, questionText: string) =>
     `${categoryId}|${questionText.trim().toLocaleLowerCase()}`
   const bankKeys = new Set(
@@ -370,12 +409,6 @@ export function SurveyDraftQuestionWizard({
       !bankKeys.has(bankKey(question.categoryId, question.questionText)),
   )
   const choiceDraft = isChoiceType(newQuestion.questionType)
-  const labelFor = (categoryId: number) =>
-    topicLabel(
-      categories.find((category) => category.id === categoryId)?.name ||
-        `#${categoryId}`,
-      language,
-    )
   const optionsFor = (question: SurveyQuestion) =>
     isChoiceConfig(question.answerConfig)
       ? question.answerConfig.options.map((option) => option.label).join("\n")
@@ -471,7 +504,7 @@ export function SurveyDraftQuestionWizard({
       <article key={question.id} className="rounded-lg border border-slate-200 p-3">
         <div className="flex items-center justify-between gap-2">
           <span className="text-xs font-semibold text-slate-500">
-            {tr("Câu", "Question")} {index + 1} · {labelFor(question.categoryId)}
+            {tr("Câu", "Question")} {index + 1} · {tr("Tự tạo", "Custom")}
           </span>
           <button
             type="button"
@@ -524,9 +557,9 @@ export function SurveyDraftQuestionWizard({
   }
 
   return (
-    <div className="mt-4 overflow-hidden rounded-xl border border-slate-200">
+    <div className="flex min-h-0 flex-1 flex-col bg-white">
       <div
-        className="grid border-b border-slate-200 sm:grid-cols-3"
+        className="sticky top-0 z-10 grid shrink-0 border-b border-slate-200 bg-white sm:grid-cols-3 lg:static"
         role="tablist"
         aria-label={tr("Các bước chỉnh sửa câu hỏi", "Question editing steps")}
       >
@@ -558,7 +591,7 @@ export function SurveyDraftQuestionWizard({
         id={`survey-edit-panel-${step}`}
         role="tabpanel"
         aria-labelledby={`survey-edit-step-${step}`}
-        className="min-h-[380px] max-h-[50vh] overflow-y-auto rounded-b-xl bg-slate-50/50 p-4"
+        className="min-h-0 flex-1 bg-slate-50/50 p-4 lg:overflow-y-auto"
       >
         {step === 0 && (
           <div className="space-y-3">
@@ -588,9 +621,7 @@ export function SurveyDraftQuestionWizard({
                         <span className="grid size-7 shrink-0 place-items-center rounded-md bg-white text-xs font-bold text-slate-600">
                           {String(index + 1).padStart(2, "0")}
                         </span>
-                        <p className="min-w-0 flex-1 text-sm leading-relaxed text-slate-800">
-                          {question.questionText}
-                        </p>
+                        <div className="min-w-0 flex-1"><p className="text-sm leading-relaxed text-slate-800">{question.questionText}</p><QuestionSample question={question} /></div>
                         <span
                           title={tr("Câu hỏi chuẩn tính điểm", "Core scoring question")}
                           className="shrink-0 text-slate-500"
@@ -611,107 +642,21 @@ export function SurveyDraftQuestionWizard({
 
         {step === 1 && (
           <div className="space-y-3">
-            {categories.map((category, categoryIndex) => {
-              const selectedCount = category.questionBank.filter((question) =>
-                isBankSelected(category.id, question.questionText),
-              ).length
-              return (
-                <details
-                  key={category.id}
-                  open={categoryIndex === 0}
-                  className="overflow-hidden rounded-xl border border-slate-200 bg-white"
-                >
-                  <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-semibold text-slate-900">
-                    <span>{topicIcon(category.name)} {topicLabel(category.name, language)}</span>
-                    <span className="text-xs font-medium text-slate-600">
-                      {selectedCount}/{category.questionBank.length} {tr("đã chọn", "selected")}
-                    </span>
-                  </summary>
-                  <div className="border-t border-slate-100 p-3">
-                    <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-                      <p className="text-xs font-semibold text-slate-600">
-                        + {tr("Thêm/bớt câu hỏi bổ sung từ ngân hàng", "Add/remove bank questions")}
-                      </p>
-                      <div className="flex gap-2">
-                        <button
-                          type="button"
-                          onClick={() => selectAllBankQuestions(category)}
-                          className="text-xs font-semibold text-blue-700 hover:underline focus-visible:outline-2 focus-visible:outline-blue-500"
-                        >
-                          {tr("Chọn tất cả", "Select all")}
-                        </button>
-                        <span className="text-slate-300">/</span>
-                        <button
-                          type="button"
-                          onClick={() => clearBankQuestions(category)}
-                          className="text-xs font-semibold text-slate-600 hover:underline focus-visible:outline-2 focus-visible:outline-orange-500"
-                        >
-                          {tr("Bỏ chọn", "Clear")}
-                        </button>
-                      </div>
-                    </div>
-                    <div className="space-y-2">
-                      {category.questionBank.map((question) => {
-                        const selected = isBankSelected(
-                          category.id,
-                          question.questionText,
-                        )
-                        return (
-                          <label
-                            key={question.bankCode || question.catalogQuestionId}
-                            className={`flex cursor-pointer items-start gap-3 rounded-lg border p-3 text-sm leading-relaxed transition-colors duration-150 ${
-                              selected
-                                ? "border-orange-300 bg-orange-50/70 text-slate-900"
-                                : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
-                            }`}
-                          >
-                            <input
-                              type="checkbox"
-                              checked={selected}
-                              onChange={() =>
-                                toggleBankQuestion(category.id, question)
-                              }
-                              className="mt-0.5 size-4 accent-orange-600"
-                            />
-                            <span>{question.questionText}</span>
-                          </label>
-                        )
-                      })}
-                      {category.questionBank.length === 0 && (
-                        <p className="py-4 text-center text-xs text-slate-600">
-                          {tr("Chưa có câu hỏi bổ sung trong chủ đề này.", "No bank questions in this topic.")}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                </details>
-              )
-            })}
+            {categories.map(category =>
+              <BankGroup key={category.id} category={category}
+                isSelected={question => isBankSelected(category.id, question.questionText)}
+                onToggle={question => toggleBankQuestion(category.id, question)}
+                onSelectAll={() => selectAllBankQuestions(category)}
+                onClear={() => clearBankQuestions(category)}
+              />
+            )}
           </div>
         )}
 
         {step === 2 && (
-          <div className="grid gap-4 lg:grid-cols-[1.15fr_.85fr]">
-            <div className="space-y-3">
-              <label className="block text-xs font-semibold text-slate-600">
-                {tr("Chủ đề", "Topic")}
-                <SelectControl
-                  className={`${surveyControlClass} mt-1`}
-                  value={newQuestion.categoryId}
-                  onChange={(event) =>
-                    onNewQuestion({
-                      ...newQuestion,
-                      categoryId: Number(event.target.value),
-                    })
-                  }
-                >
-                  {categories.map((category) => (
-                    <option key={category.id} value={category.id}>
-                      {topicLabel(category.name, language)}
-                    </option>
-                  ))}
-                </SelectControl>
-              </label>
+          <div className="space-y-4">
+            {!customFormOpen && customQuestions.length === 0 && <Button type="button" onClick={() => setCustomFormOpen(true)}><Plus size={15} />{tr("Thêm câu hỏi mới", "New question")}</Button>}
+            {customFormOpen && customQuestions.length === 0 && <div className="space-y-3 rounded-lg border border-slate-200 bg-white p-3">
               <label className="block text-xs font-semibold text-slate-600">
                 {tr("Nội dung câu hỏi", "Question text")}
                 <textarea
@@ -752,12 +697,12 @@ export function SurveyDraftQuestionWizard({
                   }
                 />
               )}
-              <Button type="button" size="sm" onClick={onAdd}>
+              <Button type="button" size="sm" disabled={customQuestions.length > 0} onClick={onAdd}>
                 <Plus size={14} />
                 {tr("Thêm vào danh sách câu hỏi", "Add question")}
               </Button>
-            </div>
-            <div className="space-y-2 border-t border-slate-100 pt-3 lg:border-l lg:border-t-0 lg:pl-4 lg:pt-0">
+            </div>}
+            <div className="space-y-2">
               <h4 className="text-sm font-semibold text-slate-800">
                 {tr(
                   `Câu hỏi tự tạo (${customQuestions.length})`,
@@ -775,7 +720,7 @@ export function SurveyDraftQuestionWizard({
         )}
       </div>
 
-      <footer className="flex items-center justify-between border-t border-slate-200 bg-slate-50 px-4 py-3">
+      <footer className="flex shrink-0 items-center justify-between border-t border-slate-200 bg-slate-50 px-4 py-2">
         <Button
           type="button"
           size="sm"
