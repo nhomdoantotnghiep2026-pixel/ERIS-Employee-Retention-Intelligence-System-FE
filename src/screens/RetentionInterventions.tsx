@@ -1,3 +1,4 @@
+import { SelectControl } from "../components/ui/select-control"
 import { useLanguage } from '../context/LanguageContext';
 import { AppShell } from '../components/AppShell';
 import { Card, SectionHeader, RiskBadge, Button, Tabs, AIAdvisoryBanner, ConfirmationDialog } from '../components/ui';
@@ -388,18 +389,18 @@ export default function RetentionInterventions() {
                   </div>
                   <div>
                     <label className="mb-1 block text-[13px] font-medium text-slate-700">{t("Department")}</label>
-                    <select value={form.dept} onChange={e => setForm({ ...form, dept: e.target.value })} className="h-10 w-full rounded border border-slate-300 px-3 text-[13px] focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-100">
+                    <SelectControl value={form.dept} onChange={e => setForm({ ...form, dept: e.target.value })} className="h-10 w-full rounded border border-slate-300 px-3 text-[13px] focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-100">
                       {departments.map(dept => <option key={dept} value={dept}>{t(dept)}</option>)}
-                    </select>
+                    </SelectControl>
                   </div>
                 </div>
               )}
               {modal !== 'escalate' ? <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div>
                   <label className="mb-1 block text-[13px] font-medium text-slate-700">{t("Intervention type")}</label>
-                  <select value={form.type} onChange={e => setForm({ ...form, type: e.target.value })} className="h-10 w-full rounded border border-slate-300 px-3 text-[13px] focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-100">
+                  <SelectControl value={form.type} onChange={e => setForm({ ...form, type: e.target.value })} className="h-10 w-full rounded border border-slate-300 px-3 text-[13px] focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-100">
                     {['1-on-1 Meeting', 'Action Plan', 'Salary Review', 'Workload Review', 'Career Path Discussion'].map(type => <option key={type} value={type}>{t(type)}</option>)}
-                  </select>
+                  </SelectControl>
                 </div>
                 <div>
                   <label className="mb-1 block text-[13px] font-medium text-slate-700">{t("Next action date")}</label>
@@ -410,15 +411,15 @@ export default function RetentionInterventions() {
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <div>
                       <label className="mb-1 block text-[13px] font-medium text-slate-700">{t("Escalate to")}</label>
-                      <select value={escalation.owner} onChange={e => setEscalation({ ...escalation, owner: e.target.value })} className="h-10 w-full rounded border border-slate-300 px-3 text-[13px] focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-100">
+                      <SelectControl value={escalation.owner} onChange={e => setEscalation({ ...escalation, owner: e.target.value })} className="h-10 w-full rounded border border-slate-300 px-3 text-[13px] focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-100">
                         {['Director of People Operations', 'Engineering Director', 'Sales Director', 'Department Head', 'CHRO'].map(owner => <option key={owner} value={owner}>{t(owner)}</option>)}
-                      </select>
+                      </SelectControl>
                     </div>
                     <div>
                       <label className="mb-1 block text-[13px] font-medium text-slate-700">{t("Priority")}</label>
-                      <select value={escalation.priority} onChange={e => setEscalation({ ...escalation, priority: e.target.value })} className="h-10 w-full rounded border border-slate-300 px-3 text-[13px] focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-100">
+                      <SelectControl value={escalation.priority} onChange={e => setEscalation({ ...escalation, priority: e.target.value })} className="h-10 w-full rounded border border-slate-300 px-3 text-[13px] focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-100">
                         {['High', 'Critical'].map(priority => <option key={priority} value={priority}>{t(priority)}</option>)}
-                      </select>
+                      </SelectControl>
                     </div>
                   </div>
                   <div>

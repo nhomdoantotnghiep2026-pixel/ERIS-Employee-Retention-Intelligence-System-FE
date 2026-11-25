@@ -1,3 +1,4 @@
+import { SelectControl } from "../../components/ui/select-control"
 import { useState } from "react"
 import { Plus, Trash2 } from "lucide-react"
 
@@ -186,7 +187,7 @@ export function SurveyQuestionWizard({
             <div className="space-y-3">
               <label className="block text-xs font-semibold text-slate-600">
                 {tr("Chủ đề", "Topic")}
-                <select
+                <SelectControl
                   className={`${surveyControlClass} mt-1`}
                   value={customDraft.categoryId}
                   onChange={(event) =>
@@ -202,7 +203,7 @@ export function SurveyQuestionWizard({
                       {topicLabel(category.name, language)}
                     </option>
                   ))}
-                </select>
+                </SelectControl>
               </label>
 
               <label className="block text-xs font-semibold text-slate-600">
@@ -222,7 +223,7 @@ export function SurveyQuestionWizard({
 
               <label className="block text-xs font-semibold text-slate-600">
                 {tr("Loại trả lời", "Answer type")}
-                <select
+                <SelectControl
                   className={`${surveyControlClass} mt-1`}
                   value={customDraft.questionType}
                   onChange={(event) =>
@@ -236,7 +237,7 @@ export function SurveyQuestionWizard({
                   <option value="MULTIPLE_CHOICE">☑️ {tr("Nhiều lựa chọn", "Multiple choice")}</option>
                   <option value="RATING">⭐ {tr("Thang điểm 1–5", "Rating 1–5")}</option>
                   <option value="TEXT">✍️ {tr("Tự luận", "Free text")}</option>
-                </select>
+                </SelectControl>
               </label>
 
               {choice && (
@@ -493,7 +494,7 @@ export function SurveyDraftQuestionWizard({
               onUpdate(question.id, { questionText: event.target.value })
             }
           />
-          <select
+          <SelectControl
             aria-label={tr("Loại trả lời", "Answer type")}
             className="h-10 rounded-lg border border-slate-300 px-2 text-sm outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100"
             value={question.questionType}
@@ -508,7 +509,7 @@ export function SurveyDraftQuestionWizard({
             <option value="MULTIPLE_CHOICE">{tr("Nhiều lựa chọn", "Multiple choice")}</option>
             <option value="RATING">{tr("Điểm 1–5", "Rating 1–5")}</option>
             <option value="TEXT">{tr("Tự luận", "Free text")}</option>
-          </select>
+          </SelectControl>
         </div>
         {choice && (
           <div className="mt-3">
@@ -694,7 +695,7 @@ export function SurveyDraftQuestionWizard({
             <div className="space-y-3">
               <label className="block text-xs font-semibold text-slate-600">
                 {tr("Chủ đề", "Topic")}
-                <select
+                <SelectControl
                   className={`${surveyControlClass} mt-1`}
                   value={newQuestion.categoryId}
                   onChange={(event) =>
@@ -709,7 +710,7 @@ export function SurveyDraftQuestionWizard({
                       {topicLabel(category.name, language)}
                     </option>
                   ))}
-                </select>
+                </SelectControl>
               </label>
               <label className="block text-xs font-semibold text-slate-600">
                 {tr("Nội dung câu hỏi", "Question text")}
@@ -727,7 +728,7 @@ export function SurveyDraftQuestionWizard({
               </label>
               <label className="block text-xs font-semibold text-slate-600">
                 {tr("Dạng trả lời", "Answer type")}
-                <select
+                <SelectControl
                   className={`${surveyControlClass} mt-1`}
                   value={newQuestion.questionType}
                   onChange={(event) =>
@@ -741,7 +742,7 @@ export function SurveyDraftQuestionWizard({
                   <option value="SINGLE_CHOICE">🔘 {tr("Chọn một đáp án (Single Choice)", "Single choice")}</option>
                   <option value="MULTIPLE_CHOICE">☑️ {tr("Chọn nhiều đáp án (Multiple Choice)", "Multiple choice")}</option>
                   <option value="TEXT">📝 {tr("Điền văn bản (Text/Tự luận)", "Text response")}</option>
-                </select>
+                </SelectControl>
               </label>
               {choiceDraft && (
                 <CompactOptionInputs

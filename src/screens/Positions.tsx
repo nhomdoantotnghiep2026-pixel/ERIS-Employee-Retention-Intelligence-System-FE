@@ -1,3 +1,4 @@
+import { SelectControl } from "../components/ui/select-control"
 import { Dialog } from 'radix-ui';
 import { BriefcaseBusiness, FileText, Pencil, X } from 'lucide-react';
 import { Button as TableButton } from '../components/ui/button';
@@ -146,14 +147,14 @@ export default function Positions() {
           {t('Position name')} <span aria-hidden="true" className="text-red-600">*</span>
           <input ref={nameInput} required maxLength={150} value={name} disabled={pending} placeholder={language === 'vi' ? 'Ví dụ: Chuyên viên nhân sự' : 'e.g. HR Specialist'} onChange={event => setName(event.target.value)} className={`${createControl} h-10`} />
         </label>
-        <label className="min-w-0 text-sm font-medium text-slate-700">{t('Department')} <span aria-hidden="true" className="text-red-600">*</span><select required value={departmentId} disabled={pending || departmentError} onChange={event => setDepartmentId(event.target.value)} className={`${createControl} h-10 ${departmentId ? 'text-slate-900' : 'text-slate-600'}`}>
+        <label className="min-w-0 text-sm font-medium text-slate-700">{t('Department')} <span aria-hidden="true" className="text-red-600">*</span><SelectControl required value={departmentId} disabled={pending || departmentError} onChange={event => setDepartmentId(event.target.value)} className={`${createControl} h-10 ${departmentId ? 'text-slate-900' : 'text-slate-600'}`}>
           <option value="">{t('Select department')}</option>
           {departments.map(department => <option key={department.id} value={department.id}>{department.name}</option>)}
-        </select>{departmentError && <span role="alert" className="mt-1 block text-red-700">{t('Could not load departments. Please try again.')} <button type="button" className="underline" onClick={() => setRevision(value => value + 1)}>{t('Retry')}</button></span>}</label>
-        <label className="min-w-0 text-sm font-medium text-slate-700 sm:col-start-1">{t('Position level')}<select required value={jobLevel} disabled={pending} onChange={event => setJobLevel(event.target.value)} className={`${createControl} h-10 ${jobLevel ? 'text-slate-900' : 'text-slate-600'}`}>
+        </SelectControl>{departmentError && <span role="alert" className="mt-1 block text-red-700">{t('Could not load departments. Please try again.')} <button type="button" className="underline" onClick={() => setRevision(value => value + 1)}>{t('Retry')}</button></span>}</label>
+        <label className="min-w-0 text-sm font-medium text-slate-700 sm:col-start-1">{t('Position level')}<SelectControl required value={jobLevel} disabled={pending} onChange={event => setJobLevel(event.target.value)} className={`${createControl} h-10 ${jobLevel ? 'text-slate-900' : 'text-slate-600'}`}>
           <option value="">{t('Select a position level.').replace(/\.$/, '')}</option>
           {POSITION_LEVELS.map(level => <option key={level.value} value={level.value}>{t(level.label)}</option>)}
-        </select></label>
+        </SelectControl></label>
         <label className="min-w-0 text-sm font-medium text-slate-700">
           {t('Position description')}
           <textarea rows={1} value={description} disabled={pending} placeholder={language === 'vi' ? 'Mô tả ngắn về nhiệm vụ của chức danh' : 'Briefly describe the responsibilities of this position'} onChange={event => setDescription(event.target.value)} className={`${createControl} h-10 resize-none py-[9px] leading-5`} />
@@ -175,8 +176,8 @@ export default function Positions() {
       </div>
       <form onSubmit={find} className="my-4 flex flex-col items-stretch gap-3 rounded-md border border-slate-200 bg-slate-50/70 p-3 xl:flex-row xl:items-end">
         <label className="min-w-0 w-full sm:w-auto sm:flex-1 text-sm font-medium text-slate-700">{t('Search positions')}<input type="search" maxLength={100} value={query} disabled={pending || loading} onChange={event => changeSearch(event.target.value)} className="mt-2 h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-orange-200" /></label>
-        <label className="text-sm font-medium text-slate-700">{t('Department')}<select aria-label={tr('Lọc phòng ban', 'Filter department')} value={filterDepartment} disabled={pending || loading || departmentError} onChange={event => { setFilterDepartment(event.target.value); setPage(1); }} className="mt-2 block h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm sm:w-48"><option value="">{tr('Tất cả phòng ban', 'All departments')}</option>{departments.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
-        <label className="text-sm font-medium text-slate-700">{t('Position level')}<select aria-label={tr('Lọc cấp bậc', 'Filter level')} value={filterLevel} disabled={pending || loading} onChange={event => { setFilterLevel(event.target.value); setPage(1); }} className="mt-2 block h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm sm:w-48"><option value="">{tr('Tất cả cấp bậc', 'All levels')}</option>{POSITION_LEVELS.map(level => <option key={level.value} value={level.value}>{t(level.label)}</option>)}</select></label>
+        <label className="text-sm font-medium text-slate-700">{t('Department')}<SelectControl aria-label={tr('Lọc phòng ban', 'Filter department')} value={filterDepartment} disabled={pending || loading || departmentError} onChange={event => { setFilterDepartment(event.target.value); setPage(1); }} className="mt-2 block h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm sm:w-48"><option value="">{tr('Tất cả phòng ban', 'All departments')}</option>{departments.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</SelectControl></label>
+        <label className="text-sm font-medium text-slate-700">{t('Position level')}<SelectControl aria-label={tr('Lọc cấp bậc', 'Filter level')} value={filterLevel} disabled={pending || loading} onChange={event => { setFilterLevel(event.target.value); setPage(1); }} className="mt-2 block h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm sm:w-48"><option value="">{tr('Tất cả cấp bậc', 'All levels')}</option>{POSITION_LEVELS.map(level => <option key={level.value} value={level.value}>{t(level.label)}</option>)}</SelectControl></label>
         <TableButton type="submit" variant="outline" className="h-10 rounded-lg border-orange-500 bg-orange-500 px-5 font-bold text-white hover:border-orange-600 hover:bg-orange-600" disabled={pending || loading}>{t('Search')}</TableButton>
       </form>
       {loading ? <p role="status" className="py-6 text-sm text-slate-600">{t('Loading positions...')}</p> : listError ? <div role="alert" className="rounded-xl bg-red-50 p-4 text-sm text-red-800"><p>{t(listError)}</p><TableButton variant="outline" className="mt-3 h-10 rounded-lg border-slate-200 bg-white px-4 font-semibold text-slate-700 hover:bg-slate-50" onClick={() => setRevision(value => value + 1)}>{t('Retry positions')}</TableButton></div> : <>
@@ -393,10 +394,10 @@ function PositionPanel({ id, mode, onModeChange, onPendingChange, onUpdated }: {
                   <input ref={nameInput} required maxLength={150} value={name} disabled={pending} onChange={event => setName(event.target.value)} className={`${createControl} h-10`} />
                 </label>
                 <label className="text-sm font-medium text-slate-700 sm:col-span-1">{t('Position level')}
-                  <select required value={jobLevel} disabled={pending} onChange={event => setJobLevel(event.target.value)} className={`${createControl} h-10`}>
+                  <SelectControl required value={jobLevel} disabled={pending} onChange={event => setJobLevel(event.target.value)} className={`${createControl} h-10`}>
                     <option value="">{t('Select a position level.')}</option>
                     {POSITION_LEVELS.map(level => <option key={level.value} value={level.value}>{t(level.label)}</option>)}
-                  </select>
+                  </SelectControl>
                 </label>
                 <label className="min-w-0 text-sm font-medium text-slate-700">
                   {t('Position code')}

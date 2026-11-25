@@ -1,3 +1,4 @@
+import { SelectControl } from "../components/ui/select-control"
 import { useLanguage } from '../context/LanguageContext';
 import { useAutoDismissState } from '../hooks/useAutoDismissState';
 import { AppShell } from '../components/AppShell';
@@ -205,16 +206,16 @@ export default function ExecutiveReports() {
             <div className="space-y-4 px-5 py-4">
               <div>
                 <label className="mb-1 block text-[13px] font-medium text-slate-700">Report</label>
-                <select value={scheduleForm.title} onChange={e => setScheduleForm({ ...scheduleForm, title: e.target.value })} className="h-10 w-full rounded border border-slate-300 px-3 text-[13px] text-slate-700 focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-100">
+                <SelectControl value={scheduleForm.title} onChange={e => setScheduleForm({ ...scheduleForm, title: e.target.value })} className="h-10 w-full rounded border border-slate-300 px-3 text-[13px] text-slate-700 focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-100">
                   {generated.map(r => <option key={r.title} value={r.title}>{r.title}</option>)}
-                </select>
+                </SelectControl>
               </div>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div>
                   <label className="mb-1 block text-[13px] font-medium text-slate-700">Frequency</label>
-                  <select value={scheduleForm.frequency} onChange={e => setScheduleForm({ ...scheduleForm, frequency: e.target.value })} className="h-10 w-full rounded border border-slate-300 px-3 text-[13px] text-slate-700 focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-100">
+                  <SelectControl value={scheduleForm.frequency} onChange={e => setScheduleForm({ ...scheduleForm, frequency: e.target.value })} className="h-10 w-full rounded border border-slate-300 px-3 text-[13px] text-slate-700 focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-100">
                     {['Weekly', 'Bi-weekly', 'Monthly', 'Quarterly'].map(freq => <option key={freq}>{freq}</option>)}
-                  </select>
+                  </SelectControl>
                 </div>
                 <div>
                   <label className="mb-1 block text-[13px] font-medium text-slate-700">Next run</label>

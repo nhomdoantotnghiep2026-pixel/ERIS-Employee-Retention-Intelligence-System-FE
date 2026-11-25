@@ -1,3 +1,4 @@
+import { SelectControl } from "../components/ui/select-control"
 import { useEffect, useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { AlertTriangle, ArrowRight, BarChart3, CalendarCheck2, CalendarRange, Clock3, Download, FileSpreadsheet, History, Inbox, RotateCcw, Search, Upload, UserRound, Users, X, } from "lucide-react";
@@ -836,7 +837,7 @@ export default function AttendanceWorkspace({ own = false, }: {
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-12 xl:items-end">
             <label className="text-sm font-semibold text-slate-700 xl:col-span-2">
               {tr("Kỳ làm việc", "Work period")}
-              <select className={control} value={periodPreset} onChange={(event) => {
+              <SelectControl className={control} value={periodPreset} onChange={(event) => {
             const preset = event.target.value as PeriodPreset;
             setPeriodPreset(preset);
             if (preset === "CURRENT_WEEK")
@@ -853,7 +854,7 @@ export default function AttendanceWorkspace({ own = false, }: {
                 <option value="CUSTOM">
                   {tr("Khoảng tùy chỉnh", "Custom range")}
                 </option>
-              </select>
+              </SelectControl>
             </label>
             {periodPreset === "CUSTOM" && (<>
                 <label className="text-sm font-semibold text-slate-700 xl:col-span-2">
@@ -873,7 +874,7 @@ export default function AttendanceWorkspace({ own = false, }: {
               </>)}
             {!own && (<label className="text-sm font-semibold text-slate-700 xl:col-span-2">
                 {tr("Phòng ban", "Department")}
-                <select className={control} value={departmentId} onChange={(event) => {
+                <SelectControl className={control} value={departmentId} onChange={(event) => {
                 setDepartmentId(event.target.value);
                 setOffset(0);
             }}>
@@ -883,11 +884,11 @@ export default function AttendanceWorkspace({ own = false, }: {
                   {departments.map((department) => (<option key={department.id} value={department.id}>
                       {department.name}
                     </option>))}
-                </select>
+                </SelectControl>
               </label>)}
             <label className="text-sm font-semibold text-slate-700 xl:col-span-2">
               {tr("Trạng thái", "Status")}
-              <select className={control} value={draft.record_status} onChange={(event) => setDraft((current) => ({
+              <SelectControl className={control} value={draft.record_status} onChange={(event) => setDraft((current) => ({
             ...current,
             record_status: event.target
                 .value as RecordFilters["record_status"],
@@ -895,7 +896,7 @@ export default function AttendanceWorkspace({ own = false, }: {
                 <option value="ACTIVE">{tr("Đang sử dụng", "Active")}</option>
                 <option value="CANCEL">{tr("Đã hủy", "Cancelled")}</option>
                 <option value="ALL">{tr("Tất cả", "All")}</option>
-              </select>
+              </SelectControl>
             </label>
             <label className={`text-sm font-semibold text-slate-700 ${periodPreset === "CUSTOM" ? "xl:col-span-4" : "xl:col-span-3"}`}>
               {tr("Tìm nhân viên", "Search employee")}
@@ -1092,14 +1093,14 @@ export default function AttendanceWorkspace({ own = false, }: {
               </p>
               <label className="flex items-center gap-2">
                 {tr("Số dòng", "Rows")}
-                <select value={pageSize} onChange={(event) => {
+                <SelectControl value={pageSize} onChange={(event) => {
                 setPageSize(Number(event.target.value));
                 setOffset(0);
             }} className="h-9 rounded-md border border-slate-300 bg-white px-2 text-sm font-semibold text-slate-700">
                   {[20, 50, 100].map((size) => (<option key={size} value={size}>
                       {size}
                     </option>))}
-                </select>
+                </SelectControl>
               </label>
             </div>
             <div className="flex gap-2">
