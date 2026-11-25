@@ -54,8 +54,8 @@ test("known language leaks are translated at their source", async () => {
   ])
   assert.match(shell, /label: 'Engagement assessment'/)
   assert.doesNotMatch(shell, /label: 'Đánh giá gắn kết'/)
-  assert.match(attendance, /\$\{\(monthOvertime \/ 60\)\.toFixed\(1\)\} giờ/)
-  assert.match(attendance, /\$\{\(monthOvertime \/ 60\)\.toFixed\(1\)\}h/)
+  assert.match(attendance, /tr\("Quỹ giờ tăng ca", "Overtime"\)/)
+  assert.match(attendance, /tr\("Tổng giờ làm việc", "Total working hours"\)/)
   assert.doesNotMatch(
     insight,
     />Top 3 tín hiệu theo mức tác động Explainable SHAP</,

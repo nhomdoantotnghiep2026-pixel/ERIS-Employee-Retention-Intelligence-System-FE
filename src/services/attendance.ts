@@ -62,6 +62,7 @@ export interface PreviewRow {
   working_minutes?: number
   late_mins?: number
   early_mins?: number
+  overtime_minutes?: number
   outside_shift_minutes?: number
   issues: ImportIssue[]
   validation_status: string
@@ -77,7 +78,7 @@ export interface ConfirmResult {
   skipped: number
   excluded: number
   skipped_invalid?: number
-  rows: unknown[]
+  rows: Array<{ excel_row: number; action: "INSERT" | "SKIP"; attendance_id?: Id }>
 }
 export interface AttendanceBatch {
   status: string
@@ -187,6 +188,8 @@ export function attendanceMessage(error: unknown, fallback: string) {
         "Đợt nhập đã được xác nhận. Tải lại để xem kết quả đã lưu.",
       UNRESOLVED_ROWS:
         "Cần xử lý hoặc loại các dòng lỗi và chọn ngày ca còn mơ hồ.",
+      INVALID_PREVIEW: "Bản xem trước đã hết hạn hoặc không còn hợp lệ. Hãy kiểm tra lại tệp trước khi lưu.",
+      NO_VALID_ROWS: "Không còn dòng hợp lệ để thêm mới. Hãy kiểm tra lại tệp và lựa chọn bỏ qua.",
       WARNINGS_UNCONFIRMED: "Cần đọc và xác nhận cảnh báo trước khi lưu.",
       FILE_CHANGED: "Tệp đã thay đổi. Hãy tạo bản xem trước mới.",
       LEGACY_RECORD:
