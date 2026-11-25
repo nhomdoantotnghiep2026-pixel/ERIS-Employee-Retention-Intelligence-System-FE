@@ -1,3 +1,4 @@
+import { SelectControl } from "../components/ui/select-control"
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { AppShell } from '../components/AppShell';
@@ -68,10 +69,10 @@ export default function EmployeeHistory() {
     <Card className="p-5">
       <div className="grid gap-3 sm:grid-cols-2">
         <label className="text-sm font-medium text-slate-700">{t('Employee')}
-          <select className="mt-1 w-full rounded-xl border border-slate-300 bg-white p-3 text-sm" value={filterEmployee} onChange={event => setFilterEmployee(event.target.value)}>
+          <SelectControl className="mt-1 w-full rounded-xl border border-slate-300 bg-white p-3 text-sm" value={filterEmployee} onChange={event => setFilterEmployee(event.target.value)}>
             <option value="">{t('All employees')}</option>
             {employees.map(employee => <option key={employee.id} value={employee.id}>{employee.employeeCode} · {employee.fullName}</option>)}
-          </select>
+          </SelectControl>
         </label>
         <label className="text-sm font-medium text-slate-700">{t('Search')}
           <input type="search" className="mt-1 w-full rounded-xl border border-slate-300 bg-white p-3 text-sm" value={query} onChange={event => setQuery(event.target.value)} />

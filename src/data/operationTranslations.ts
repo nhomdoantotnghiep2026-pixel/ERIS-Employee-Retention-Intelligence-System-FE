@@ -1,5 +1,6 @@
 // Application feedback and API-owned copy. Never translate arbitrary profile data.
 const pairs: Array<[string, string]> = [
+  ["Could not load analysis data. Please try again.", "Không tải được dữ liệu phân tích. Vui lòng thử lại."],
   ["Clear search", "Xóa tìm kiếm"],
   ["Next", "Tiếp"],
   ["System accounts", "Tài khoản hệ thống"],

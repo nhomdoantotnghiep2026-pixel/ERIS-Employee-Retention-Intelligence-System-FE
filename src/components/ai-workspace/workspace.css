@@ -1,9 +1,6 @@
 .ai-workspace { color:#334155; font-family:Inter,"Plus Jakarta Sans",ui-sans-serif,system-ui,sans-serif; }
 .ai-workspace .panel { background:#fff; border:1px solid #e2e8f0; border-radius:12px; box-shadow:0 1px 2px rgb(15 23 42 / .05); }
-.ai-workspace .field { width:100%; min-width:0; border:1px solid #cbd5e1; border-radius:12px; background:white; padding:10px 12px; color:#0f172a; }
-.ai-workspace .field.field-with-leading-icon { padding-left:2.5rem; }
-.ai-workspace .field.field-with-trailing-action { padding-right:2.5rem; }
-.ai-workspace select.field { padding-right:2.25rem; text-overflow:ellipsis; }
+.ai-workspace .field { width:100%; min-width:0; border:1px solid #cbd5e1; border-radius:12px; background:white; color:#0f172a; }
 .ai-workspace .field:focus-visible, .ai-workspace button:focus-visible, .ai-workspace summary:focus-visible { outline:2px solid #f97316; outline-offset:3px; }
 .ai-workspace .btn { display:inline-flex; align-items:center; justify-content:center; gap:8px; padding:10px 16px; border-radius:12px; font-weight:600; font-size:14px; cursor:pointer; }
 .ai-workspace .btn-primary { background:#f97316; color:white; }

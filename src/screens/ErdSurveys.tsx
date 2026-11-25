@@ -1,3 +1,4 @@
+import { SelectControl } from "../components/ui/select-control"
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react"
 
 import {
@@ -1500,7 +1501,7 @@ export default function ErdSurveys() {
                           <div className="mt-4 space-y-3">
                             <label className="block text-xs font-semibold text-slate-600">
                               {tr("Chủ đề", "Topic")}
-                              <select
+                              <SelectControl
                                 className={`${control} mt-1`}
                                 value={customDraft.categoryId}
                                 onChange={(event) => setCustomDraft((current) => ({ ...current, categoryId: Number(event.target.value) }))}
@@ -1509,11 +1510,11 @@ export default function ErdSurveys() {
                                 {selectedCategories.map((category) => (
                                   <option key={category.id} value={category.id}>{topicLabel(category.name, language)}</option>
                                 ))}
-                              </select>
+                              </SelectControl>
                             </label>
                             <label className="block text-xs font-semibold text-slate-600">
                               {tr("Dạng trả lời", "Answer type")}
-                              <select
+                              <SelectControl
                                 className={`${control} mt-1`}
                                 value={customDraft.questionType}
                                 onChange={(event) => setCustomDraft((current) => ({ ...current, questionType: event.target.value as SurveyQuestionType }))}
@@ -1522,7 +1523,7 @@ export default function ErdSurveys() {
                                 <option value="MULTIPLE_CHOICE">{tr("Chọn nhiều", "Multiple choice")}</option>
                                 <option value="RATING">{tr("Thang điểm 1–5", "Rating 1–5")}</option>
                                 <option value="TEXT">{tr("Văn bản", "Free text")}</option>
-                              </select>
+                              </SelectControl>
                             </label>
                             <label className="block text-xs font-semibold text-slate-600">
                               {tr("Nội dung câu hỏi", "Question text")}
@@ -1725,7 +1726,7 @@ export default function ErdSurveys() {
                 </label>
                 <label>
                   <span className="sr-only">{tr("Sắp xếp khảo sát", "Sort surveys")}</span>
-                  <select
+                  <SelectControl
                     className="h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 outline-none focus:border-orange-400 focus:ring-4 focus:ring-orange-100"
                     value={sortBy}
                     onChange={(event) => setSortBy(event.target.value as typeof sortBy)}
@@ -1733,7 +1734,7 @@ export default function ErdSurveys() {
                     <option value="NEWEST">{tr("Mới nhất", "Newest")}</option>
                     <option value="END_SOON">{tr("Hạn chót gần nhất", "Nearest deadline")}</option>
                     <option value="RESPONSE_DESC">{tr("Tỷ lệ tham gia cao nhất", "Highest response rate")}</option>
-                  </select>
+                  </SelectControl>
                 </label>
               </div>
             </Card>
@@ -2279,7 +2280,7 @@ function SurveyContentEditor({
             </h3>
             <label className="mt-4 block text-sm font-semibold text-slate-700">
               Chủ đề
-              <select
+              <SelectControl
                 required
                 className={control}
                 value={draft.categoryId}
@@ -2293,11 +2294,11 @@ function SurveyContentEditor({
                     {topicLabel(category.name)}
                   </option>
                 ))}
-              </select>
+              </SelectControl>
             </label>
             <label className="mt-4 block text-sm font-semibold text-slate-700">
               Loại câu hỏi
-              <select
+              <SelectControl
                 className={control}
                 value={draft.questionType}
                 onChange={(event) =>
@@ -2312,7 +2313,7 @@ function SurveyContentEditor({
                     {label}
                   </option>
                 ))}
-              </select>
+              </SelectControl>
             </label>
             <label className="mt-4 block text-sm font-semibold text-slate-700">
               Nội dung

@@ -1,3 +1,4 @@
+import { SelectControl } from "../components/ui/select-control"
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Building2, FileText, Pencil, Users } from 'lucide-react';
@@ -140,10 +141,10 @@ export function DepartmentPanel({ id, mode, headcount: providedHeadcount, onMode
                 <div className="grid gap-5 pb-5 sm:grid-cols-2">
                   <label className="text-sm font-medium text-slate-700">{t('Department name')} <span aria-hidden="true" className="text-red-600">*</span><input ref={nameInput} required maxLength={150} className={`${control} h-10`} disabled={pending} value={name} onChange={event => setName(event.target.value)} /></label>
                   <label className="text-sm font-medium text-slate-700">{t('Department status')}
-                    <select className={`${control} h-10`} disabled={pending || department.status === 'INACTIVE'} value={status} onChange={event => setStatus(event.target.value === 'INACTIVE' ? 'INACTIVE' : 'ACTIVE')}>
+                    <SelectControl className={`${control} h-10`} disabled={pending || department.status === 'INACTIVE'} value={status} onChange={event => setStatus(event.target.value === 'INACTIVE' ? 'INACTIVE' : 'ACTIVE')}>
                       <option value="ACTIVE">{t('Department active')}</option>
                       <option value="INACTIVE">{t('Department inactive')}</option>
-                    </select>
+                    </SelectControl>
                     {department.status === 'INACTIVE' && <span className="mt-1 block text-xs text-slate-600">{language === 'vi' ? 'Hiện chưa hỗ trợ kích hoạt lại.' : 'Reactivation is currently unavailable.'}</span>}
                   </label>
                   <label className="text-sm font-medium text-slate-700 sm:col-span-2">{t('Department description')}<textarea rows={2} className={`${control} min-h-[80px] resize-none py-2 leading-5`} disabled={pending} value={description} onChange={event => setDescription(event.target.value)} /></label>

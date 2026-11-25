@@ -1,3 +1,4 @@
+import { SelectControl } from "../components/ui/select-control"
 import { useEffect, useMemo, useState } from "react"
 import { Link } from "react-router-dom"
 import {
@@ -239,10 +240,10 @@ export default function LeaveDataDashboard() {
               <input type="date" min={draftFrom} value={draftTo} onChange={(event) => setDraftTo(event.target.value)} className={control} />
             </label>
             <label className="text-sm font-semibold text-slate-700">{tr("Loại nghỉ", "Leave type")}
-              <select value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)} className={control}>
+              <SelectControl value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)} className={control}>
                 <option value="">{tr("Tất cả loại nghỉ", "All leave types")}</option>
                 {types.map((type) => <option key={type.id} value={type.id}>{type.code} · {type.name}</option>)}
-              </select>
+              </SelectControl>
             </label>
             <Button className="self-end" disabled={!draftFrom || !draftTo || draftFrom > draftTo}>{tr("Áp dụng", "Apply")}</Button>
           </form>
