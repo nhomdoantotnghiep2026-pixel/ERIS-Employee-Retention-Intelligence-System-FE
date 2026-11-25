@@ -129,7 +129,7 @@ function SidebarLink({ to, icon: Icon, label, onNavigate, collapsed = false, nes
       onClick={onNavigate}
       title={collapsed ? t(label) : undefined}
       aria-label={collapsed ? t(label) : undefined}
-      className={`group flex items-center active:scale-[0.99] transition-all duration-150 motion-reduce:transform-none motion-reduce:transition-none ${collapsed ? 'mx-auto h-11 w-11 justify-center gap-0 rounded-xl' : 'min-h-11 gap-3 rounded-xl px-3.5 text-sm'} ${
+      className={`group flex items-center active:scale-[0.99] transition-all duration-150 motion-reduce:transform-none motion-reduce:transition-none ${collapsed ? 'mx-auto h-11 w-11 justify-center gap-0 rounded-xl' : 'min-h-11 gap-3 rounded-xl px-3.5 text-[15px] leading-5'} ${
         isActive
           ? `${collapsed ? 'bg-gradient-to-br from-orange-500 to-orange-600 text-white shadow-md shadow-orange-500/20' : 'bg-gradient-to-r from-orange-500 to-orange-600 text-white shadow-md shadow-orange-500/20'} font-semibold`
           : `${collapsed ? 'text-slate-500 hover:bg-orange-50 hover:text-orange-600' : 'font-medium text-slate-600 hover:bg-orange-50/70 hover:text-orange-600'}`

@@ -1,3 +1,4 @@
+import { SelectControl } from "./ui/select-control"
 import { type ReactNode, type ButtonHTMLAttributes, useEffect } from 'react';
 import { useLanguage } from '../context/LanguageContext';
 
@@ -243,16 +244,15 @@ export function Input({ placeholder, value, onChange, icon, className = '', aria
 export function Select({ value, onChange, options, placeholder, className = '', ariaLabel }: { value: string; onChange: (v: string) => void; options: string[]; placeholder?: string; className?: string; ariaLabel?: string }) {
   const { t } = useLanguage();
   return (
-    <select
+    <SelectControl
       value={value}
       aria-label={t(ariaLabel || placeholder || 'Select option')}
       onChange={e => onChange(e.target.value)}
       className={`h-11 border border-slate-300 bg-white px-3 text-base text-slate-700 focus:outline-none focus:ring-2 focus:ring-orange-100 focus:border-[#F97316] cursor-pointer sm:h-10 sm:text-[13px] ${className}`}
-      style={{ borderRadius: '10px' }}
     >
       {placeholder && <option value="">{t(placeholder)}</option>}
       {options.map(o => <option key={o} value={o}>{t(o)}</option>)}
-    </select>
+    </SelectControl>
   );
 }
 

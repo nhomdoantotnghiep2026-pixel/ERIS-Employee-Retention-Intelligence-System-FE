@@ -1,3 +1,4 @@
+import { SelectControl } from "./ui/select-control"
 import { useAutoDismissState } from '../hooks/useAutoDismissState';
 import { useLanguage } from '../context/LanguageContext';
 import { useState } from 'react';
@@ -21,9 +22,9 @@ export default function AiPolicyRecommendationsPanel({ predictionId }: { predict
     <h2 className="text-lg font-bold">{t("Đề xuất hỗ trợ")}</h2>
     <p className="mt-2 text-sm text-slate-600">{t("HR cần xem xét trước khi áp dụng.")}</p>
     <div className="mt-4 flex flex-wrap items-end gap-3">
-      <label className="text-sm font-medium">{t("Số đề xuất tối đa")}<select className="mt-1 block rounded-xl border border-slate-300 bg-white px-3 py-2" value={limit} disabled={busy} onChange={e => { setLimit(Number(e.target.value)); setResult(null); }}>
+      <label className="text-sm font-medium">{t("Số đề xuất tối đa")}<SelectControl className="mt-1 block rounded-xl border border-slate-300 bg-white px-3 py-2" value={limit} disabled={busy} onChange={e => { setLimit(Number(e.target.value)); setResult(null); }}>
         {[1, 2, 3, 4, 5].map(n => <option key={n} value={n}>{n}</option>)}
-      </select></label>
+      </SelectControl></label>
       <Button disabled={busy} onClick={() => void generate(false)}>{t(busy ? 'Đang xử lý…' : 'Xem đề xuất')}</Button>
       {result && result.recommendations.some(item => item.policy) && <Button variant="secondary" disabled={busy} onClick={() => void generate(true)}>{t("Lưu đề xuất có chính sách")}</Button>}
     </div>

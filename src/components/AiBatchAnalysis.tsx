@@ -1,3 +1,4 @@
+import { SelectControl } from "./ui/select-control"
 import { useAutoDismissState } from '../hooks/useAutoDismissState';
 import { useLanguage } from '../context/LanguageContext';
 import { useState } from 'react';
@@ -42,18 +43,18 @@ export default function AiBatchAnalysis({ employees }: { employees: AiEmployee[]
     <p className="mt-2 text-sm text-slate-600">{t("Chọn nhân viên và dữ liệu cần phân tích.")}</p>
     {error && <p role="alert" className="mt-3 rounded-xl bg-red-50 p-3 text-sm text-red-700">{t(error)}</p>}
     <div className="mt-4 flex flex-wrap items-end gap-3">
-      <label className="min-w-64 flex-1 text-sm font-medium">{t("Nhân viên")}<select className="mt-2 w-full rounded-xl border border-slate-300 bg-white p-3" value={employeeId} disabled={busy || selected.length >= 25} onChange={e => setEmployeeId(e.target.value)}>
+      <label className="min-w-64 flex-1 text-sm font-medium">{t("Nhân viên")}<SelectControl className="mt-2 w-full rounded-xl border border-slate-300 bg-white p-3" value={employeeId} disabled={busy || selected.length >= 25} onChange={e => setEmployeeId(e.target.value)}>
           <option value="">{t("Chọn nhân viên")}</option>{employees.filter(employee => !selected.some(item => item.employee.id === employee.id)).map(employee => <option key={employee.id} value={employee.id}>{employee.employeeCode} · {employee.fullName}</option>)}
-        </select>
+        </SelectControl>
       </label>
       <Button variant="secondary" disabled={!employeeId || busy || selected.length >= 25} onClick={() => void addEmployee()}>{t("Thêm vào nhóm")}</Button>
     </div>
     <p className="mt-3 text-sm text-slate-500">{t("Selected {p0}/25 employees", { p0: selected.length })}</p>
     <div className="mt-3 space-y-3">{selected.map(item => <div key={item.employee.id} className="flex flex-wrap items-end gap-3 rounded-xl border border-slate-200 p-4">
       <label className="min-w-56 flex-1 text-sm font-medium">{item.employee.employeeCode} · {item.employee.fullName}
-        <select className="mt-2 w-full rounded-xl border border-slate-300 bg-white p-3" value={item.snapshotId ?? ''} disabled={busy} onChange={e => { const value = e.target.value ? Number(e.target.value) : null; setSelected(items => items.map(row => row.employee.id === item.employee.id ? { ...row, snapshotId: value } : row)); setResult(null); }}>
+        <SelectControl className="mt-2 w-full rounded-xl border border-slate-300 bg-white p-3" value={item.snapshotId ?? ''} disabled={busy} onChange={e => { const value = e.target.value ? Number(e.target.value) : null; setSelected(items => items.map(row => row.employee.id === item.employee.id ? { ...row, snapshotId: value } : row)); setResult(null); }}>
           <option value="">{t("Chọn bản dữ liệu")}</option>{item.snapshots.map(snapshot => <option key={snapshot.snapshotId} value={snapshot.snapshotId ?? ''}>#{snapshot.snapshotId} · {new Date(snapshot.capturedAt).toLocaleString(language === 'vi' ? 'vi-VN' : 'en-US')}</option>)}
-        </select>
+        </SelectControl>
         {!item.snapshots.length && <span className="mt-1 block font-normal text-amber-700">{t("Chưa có dữ liệu sẵn sàng.")}</span>}
       </label>
       <Button variant="secondary" disabled={busy} onClick={() => { setSelected(items => items.filter(row => row.employee.id !== item.employee.id)); setResult(null); }}>{t("Bỏ khỏi nhóm")}</Button>

@@ -1,3 +1,4 @@
+import { SelectControl } from "../ui/select-control"
 import { forwardRef, useId, useMemo, useState } from "react";
 import { buildInsights } from "./insight-engine";
 import { InsightPlaybook } from "./InsightPlaybook";
@@ -492,7 +493,7 @@ function HistoryToolbar({
           <History className="h-4 w-4 shrink-0 text-slate-500" aria-hidden />
           <label className="flex min-w-0 flex-1 items-center gap-2 text-sm font-medium text-slate-700">
             <span className="shrink-0">Phiên đánh giá:</span>
-            <select
+            <SelectControl
               className="field h-10 min-w-[280px] flex-1"
               disabled={busy || loading || history.length === 0}
               value={selectedId}
@@ -514,7 +515,7 @@ function HistoryToolbar({
                   {index === 0 ? " (Mới nhất)" : ""}
                 </option>
               ))}
-            </select>
+            </SelectControl>
           </label>
         </div>
         <div className="flex shrink-0 flex-wrap justify-end gap-2">

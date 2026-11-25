@@ -1,3 +1,4 @@
+import { SelectControl } from "../components/ui/select-control"
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AppShell } from '../components/AppShell';
@@ -101,9 +102,9 @@ export default function ImportData() {
               {columnMappings.map(m => (
                 <div key={m.source} className={`grid grid-cols-3 gap-3 items-center px-2 py-1.5 ${!m.ok ? 'bg-amber-50' : 'hover:bg-gray-50'}`} style={{ borderRadius: '4px' }}>
                   <span className="font-mono text-[12px] text-gray-700">{m.source}</span>
-                  <select className={`h-[28px] text-[12px] border px-2 focus:outline-none focus:ring-1 focus:ring-[#2563EB] ${!m.ok ? 'border-amber-300 bg-amber-50' : 'border-gray-200 bg-white'}`} style={{ borderRadius: '4px' }}>
+                  <SelectControl className={`h-[28px] text-[12px] border px-2 focus:outline-none focus:ring-1 focus:ring-[#2563EB] ${!m.ok ? 'border-amber-300 bg-amber-50' : 'border-gray-200 bg-white'}`}>
                     <option>{m.target || '— Select field —'}</option>
-                  </select>
+                  </SelectControl>
                   <span className={`text-[12px] font-medium ${m.ok ? 'text-green-600' : 'text-amber-600'}`}>
                     {m.ok ? '✓ Mapped' : '⚠ Review'}
                   </span>

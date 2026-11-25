@@ -1,3 +1,4 @@
+import { SelectControl } from "../components/ui/select-control"
 import { useAutoDismissState } from "../hooks/useAutoDismissState"
 
 import { useRecordAudit } from "../workflows/useRecordAudit"
@@ -587,7 +588,7 @@ export default function Users() {
                 <label className="block text-[13px] font-medium text-gray-700 mb-1">
                   Role
                 </label>
-                <select
+                <SelectControl
                   value={form.role}
                   onChange={(e) => setForm({ ...form, role: e.target.value })}
                   className="w-full h-[32px] px-2.5 border border-gray-300 text-[13px] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB]"
@@ -596,7 +597,7 @@ export default function Users() {
                   {roles.map((r) => (
                     <option key={r}>{r}</option>
                   ))}
-                </select>
+                </SelectControl>
               </div>
               {formError && (
                 <p role="alert" className="text-xs font-semibold text-red-600">

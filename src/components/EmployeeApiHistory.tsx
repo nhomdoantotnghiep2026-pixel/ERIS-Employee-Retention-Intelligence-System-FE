@@ -1,3 +1,4 @@
+import { SelectControl } from "./ui/select-control"
 import { useAutoDismissState } from '../hooks/useAutoDismissState';
 import { useEffect, useState, type FormEvent } from 'react';
 import { BriefcaseBusiness, CalendarDays, GraduationCap, Pencil, Power } from 'lucide-react';
@@ -277,10 +278,10 @@ export function EmployeeApiHistory({ employeeId, employeeEmail, dateOfBirth, own
         <h3 className="text-base font-bold text-slate-950">{t(editing ? 'Edit education' : 'Add education')}</h3>
         <div className="mt-3 grid gap-4 sm:grid-cols-2">
           <label className="text-sm font-semibold text-slate-700">{t('Education level')}
-            <select required className={inputClass} value={draft.educationLevel} disabled={saving}
+            <SelectControl required className={inputClass} value={draft.educationLevel} disabled={saving}
               onChange={event => setDraft(value => ({ ...value, educationLevel: event.target.value }))}>
               {educationLevels.map(level => <option key={level} value={level}>{t(level)}</option>)}
-            </select>
+            </SelectControl>
           </label>
           <label className="text-sm font-semibold text-slate-700">{t('Field of study')}
             <input maxLength={150} className={inputClass} value={draft.fieldOfStudy} disabled={saving}
