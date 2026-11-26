@@ -1,6 +1,7 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { SelectControl } from "../components/ui/select-control"
+import { useDeferredValue, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { AlertTriangle, ArrowRight, BarChart3, CalendarCheck2, CalendarRange, Clock3, Download, FileSpreadsheet, History, Inbox, RotateCcw, Search, Upload, UserRound, Users, X, } from "lucide-react";
+import { AlertTriangle, ArrowRight, BarChart3, CalendarCheck2, CalendarRange, Clock3, Download, FileSpreadsheet, History, Inbox, RotateCcw, Search, Upload, UserRound, X, } from "lucide-react";
 import { AppShell } from "../components/AppShell";
 import { Button, Card, SectionHeader } from "../components/ui";
 import { downloadAttendanceTemplate } from "../utils/attendanceTemplate";
@@ -9,16 +10,20 @@ import AttendanceReconcile from "../components/AttendanceReconcile";
 import { useLanguage } from "../context/LanguageContext";
 import { useAutoDismissFeedback } from "../hooks/useAutoDismissState";
 import { listDepartments, listEmployeeProfiles, listWorkSchedules, type EmployeeProfile, } from "../services/api";
-import { fetchAttendance, fetchAttendanceSummary, fetchAttendanceDetail, fetchAttendanceAudit, cancelAttendance, attendanceMessage, type ImportedAttendance, type AttendanceSummary, type AttendanceAudit, type RecordFilters, } from "../services/attendance";
+import { fetchAttendance, fetchAttendanceDetail, fetchAttendanceAudit, cancelAttendance, attendanceMessage, type ImportedAttendance, type AttendanceAudit, type RecordFilters, } from "../services/attendance";
 const control = "mt-1 h-11 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100";
 const displayTime = (value: string | null) => value?.slice(11, 16) || "—";
+const workDayFormat = {
+    vi: new Intl.DateTimeFormat("vi-VN", { weekday: "short", day: "2-digit", month: "2-digit", year: "numeric", timeZone: "UTC" }),
+    en: new Intl.DateTimeFormat("en-GB", { weekday: "short", day: "2-digit", month: "2-digit", year: "numeric", timeZone: "UTC" }),
+};
 const durationLabel = (value: number) => {
     const minutes = Math.max(0, Number(value) || 0);
     const hours = Math.floor(minutes / 60);
     const remainder = minutes % 60;
     return remainder ? `${hours}h ${remainder}m` : `${hours.toFixed(1)}h`;
 };
-const isoDate = (date: Date) => date.toISOString().slice(0, 10);
+const isoDate = (date: Date) => [date.getFullYear(), date.getMonth() + 1, date.getDate()].map(value => String(value).padStart(2, "0")).join("-");
 const getWeekRange = (anchor = new Date()) => {
     const date = new Date(anchor);
     const day = date.getDay() || 7;
@@ -38,7 +43,27 @@ const formatShortDate = (value: string) => {
     const [year, month, day] = value.split("-");
     return `${day}/${month}/${year}`;
 };
-type PeriodPreset = "CURRENT_WEEK" | "PREVIOUS_WEEK" | "CUSTOM";
+type PeriodPreset = "CURRENT_WEEK" | "PREVIOUS_WEEK" | "CURRENT_MONTH" | "CUSTOM";
+const eventFilters = ["ALL", "LATE", "EARLY", "OVERTIME", "ON_TIME", "INCOMPLETE"] as const;
+type EventFilter = typeof eventFilters[number];
+function matchesEvent(row: ImportedAttendance, filter: EventFilter) {
+    if (filter === "ALL") return true;
+    if (row.record_status !== "ACTIVE") return false;
+    if (filter === "LATE") return row.late_mins > 0;
+    if (filter === "EARLY") return row.early_mins > 0;
+    if (filter === "OVERTIME") return row.overtime_minutes > 0;
+    if (filter === "INCOMPLETE") return Boolean(row.check_in) !== Boolean(row.check_out);
+    return Boolean(row.check_in && row.check_out && !row.late_mins && !row.early_mins);
+}
+async function loadAttendanceRange(filters: RecordFilters, own: boolean, signal: AbortSignal) {
+    const records: ImportedAttendance[] = [];
+    const limit = 200;
+    for (let offset = 0; ; offset += limit) {
+        const { data } = await fetchAttendance({ ...filters, limit, offset }, own, signal);
+        records.push(...data);
+        if (data.length < limit) return records;
+    }
+}
 type AuditValueMap = Record<string, unknown>;
 const asAuditValueMap = (value: unknown): AuditValueMap => value !== null && typeof value === "object" && !Array.isArray(value)
     ? value as AuditValueMap
@@ -60,14 +85,15 @@ export default function AttendanceWorkspace({ own = false, }: {
         ...defaultPeriod,
         record_status: "ACTIVE",
     });
-    const [rows, setRows] = useState<ImportedAttendance[]>([]), [summary, setSummary] = useState<AttendanceSummary | null>(null);
+    const [rows, setRows] = useState<ImportedAttendance[]>([]);
     const [hasAnyRecords, setHasAnyRecords] = useState<boolean | null>(null);
     const [selected, setSelected] = useState<ImportedAttendance | null>(null), [logs, setLogs] = useState<AttendanceAudit[]>([]), [logOffset, setLogOffset] = useState(0);
-    const [offset, setOffset] = useState(0), [pageSize, setPageSize] = useState(20), [revision, setRevision] = useState(0), [loading, setLoading] = useState(true), [busy, setBusy] = useState(false);
+    const [offset, setOffset] = useState(0), [pageSize, setPageSize] = useState(25), [revision, setRevision] = useState(0), [loading, setLoading] = useState(true), [busy, setBusy] = useState(false);
     const { error, message: notice, setError, setMessage: setNotice, } = useAutoDismissFeedback();
     const [logError, setLogError] = useState("");
     const [reason, setReason] = useState("");
     const [importOpen, setImportOpen] = useState(false);
+    const recordsHeading = useRef<HTMLHeadingElement>(null);
     const [importBusy, setImportBusy] = useState(false);
     const [importStage, setImportStage] = useState<AttendanceImportStage | "complete">("idle");
     const [reconcileOpen, setReconcileOpen] = useState(false);
@@ -81,19 +107,19 @@ export default function AttendanceWorkspace({ own = false, }: {
     }>>([]);
     const [departmentId, setDepartmentId] = useState("");
     const [tableSearch, setTableSearch] = useState("");
+    const deferredSearch = useDeferredValue(tableSearch);
+    const [eventFilter, setEventFilter] = useState<EventFilter>("ALL");
     const [periodPreset, setPeriodPreset] = useState<PeriodPreset>("CURRENT_WEEK");
-    const [periodRows, setPeriodRows] = useState<ImportedAttendance[]>([]);
     const [previousPeriodRows, setPreviousPeriodRows] = useState<ImportedAttendance[]>([]);
-    const [monthOvertime, setMonthOvertime] = useState(0);
     useEffect(() => {
         const c = new AbortController();
         setLoading(true);
         setError("");
         setRows([]);
-        void fetchAttendance({ ...filters, limit: pageSize, offset }, own, c.signal)
+        void loadAttendanceRange(filters, own, c.signal)
             .then((response) => {
             if (!c.signal.aborted)
-                setRows(response.data);
+                setRows(response);
         })
             .catch((e) => {
             if (!c.signal.aborted)
@@ -103,18 +129,6 @@ export default function AttendanceWorkspace({ own = false, }: {
             if (!c.signal.aborted)
                 setLoading(false);
         });
-        if (!own) {
-            setSummary(null);
-            void fetchAttendanceSummary(filters, c.signal)
-                .then((response) => {
-                if (!c.signal.aborted)
-                    setSummary(response.data);
-            })
-                .catch(() => {
-                if (!c.signal.aborted)
-                    setSummary(null);
-            });
-        }
         void fetchAttendance({ record_status: "ALL", limit: 1, offset: 0 }, own, c.signal)
             .then((response) => {
             if (!c.signal.aborted)
@@ -122,7 +136,7 @@ export default function AttendanceWorkspace({ own = false, }: {
         })
             .catch(() => undefined);
         return () => c.abort();
-    }, [filters, offset, pageSize, revision, own]);
+    }, [filters, revision, own]);
     useEffect(() => {
         if (own)
             return;
@@ -159,35 +173,24 @@ export default function AttendanceWorkspace({ own = false, }: {
         previousEnd.setDate(previousEnd.getDate() - 1);
         const previousStart = new Date(previousEnd);
         previousStart.setDate(previousStart.getDate() - span + 1);
-        const monthStart = `${from.slice(0, 7)}-01`;
-        const monthEndDate = new Date(Number(from.slice(0, 4)), Number(from.slice(5, 7)), 0);
-        const monthEnd = isoDate(monthEndDate);
         void Promise.allSettled([
             listEmployeeProfiles({ page: 1, limit: 1000, employmentStatus: "ACTIVE" }, controller.signal),
             listDepartments(controller.signal, { limit: 1000 }),
-            fetchAttendance({ from, to, record_status: "ACTIVE", limit: 1000, offset: 0 }, false, controller.signal),
-            fetchAttendance({
+            loadAttendanceRange({
                 from: isoDate(previousStart),
                 to: isoDate(previousEnd),
                 record_status: "ACTIVE",
-                limit: 1000,
-                offset: 0,
             }, false, controller.signal),
-            fetchAttendanceSummary({ from: monthStart, to: monthEnd, record_status: "ACTIVE" }, controller.signal),
         ]).then((results) => {
             if (controller.signal.aborted)
                 return;
-            const [employeeResult, departmentResult, currentResult, previousResult, overtimeResult,] = results;
+            const [employeeResult, departmentResult, previousResult] = results;
             if (employeeResult.status === "fulfilled")
                 setEmployees(employeeResult.value.data);
             if (departmentResult.status === "fulfilled")
                 setDepartments(departmentResult.value.data);
-            if (currentResult.status === "fulfilled")
-                setPeriodRows(currentResult.value.data);
             if (previousResult.status === "fulfilled")
-                setPreviousPeriodRows(previousResult.value.data);
-            if (overtimeResult.status === "fulfilled")
-                setMonthOvertime(Number(overtimeResult.value.data.overtime_minutes) || 0);
+                setPreviousPeriodRows(previousResult.value);
         });
         return () => controller.abort();
     }, [own, filters.from, filters.to, revision]);
@@ -215,7 +218,7 @@ export default function AttendanceWorkspace({ own = false, }: {
         const previousOverflow = document.body.style.overflow;
         document.body.style.overflow = "hidden";
         const closeOnEscape = (event: KeyboardEvent) => {
-            if (event.key !== "Escape" || busy || importBusy || reconcileBusy)
+            if (event.key !== "Escape" || event.defaultPrevented || busy || importBusy || reconcileBusy)
                 return;
             if (selected && reason.trim())
                 return;
@@ -278,51 +281,47 @@ export default function AttendanceWorkspace({ own = false, }: {
         }
     }
     const invalid = !!(draft.from && draft.to && draft.from > draft.to);
-    const employeeDepartment = new Map(employees.map((employee) => [employee.employeeCode, employee.departmentId]));
-    const normalizedSearch = tableSearch
-        .trim()
-        .toLocaleLowerCase(language === "vi" ? "vi-VN" : "en-US");
-    const useClientDirectory = !own && Boolean(departmentId || normalizedSearch);
-    const tablePool = useClientDirectory ? periodRows : rows;
-    const departmentRows = departmentId
-        ? tablePool.filter((row) => String(employeeDepartment.get(row.employee_code) || "") ===
-            departmentId)
-        : tablePool;
-    const searchedRows = normalizedSearch
-        ? departmentRows.filter((row) => `${row.employee_code} ${row.full_name}`
-            .toLocaleLowerCase(language === "vi" ? "vi-VN" : "en-US")
-            .includes(normalizedSearch))
-        : departmentRows;
-    const visibleRows = useClientDirectory
-        ? searchedRows.slice(offset, offset + pageSize)
-        : searchedRows;
-    const filteredRowCount = useClientDirectory ? searchedRows.length : null;
-    const hasNextPage = useClientDirectory
-        ? offset + pageSize < searchedRows.length
-        : rows.length >= pageSize;
-    const filteredPeriodRows = departmentId
-        ? periodRows.filter((row) => String(employeeDepartment.get(row.employee_code) || "") ===
-            departmentId)
-        : periodRows;
+    const employeeDepartment = useMemo(() => new Map(employees.map(employee => [employee.employeeCode, employee.departmentId])), [employees]);
+    const directoryRows = useMemo(() => {
+        const normalize = (value: string) => value.toLocaleLowerCase(language === "vi" ? "vi-VN" : "en-US");
+        const query = normalize(deferredSearch.trim());
+        return rows.filter(row =>
+            (!departmentId || String(employeeDepartment.get(row.employee_code) ?? "") === departmentId)
+            && (!query || normalize(`${row.employee_code} ${row.full_name}`).includes(query)),
+        );
+    }, [rows, deferredSearch, departmentId, employeeDepartment, language]);
+    const filteredRows = useMemo(() => directoryRows.filter(row => matchesEvent(row, eventFilter)), [directoryRows, eventFilter]);
+    const eventCounts = useMemo(() => eventFilters.map(event => directoryRows.filter(row => matchesEvent(row, event)).length), [directoryRows]);
+    const filteredRowCount = filteredRows.length;
+    const pageCount = Math.max(1, Math.ceil(filteredRowCount / pageSize));
+    const currentPage = Math.min(Math.floor(offset / pageSize) + 1, pageCount);
+    const pageOffset = (currentPage - 1) * pageSize;
+    const visibleRows = useMemo(() => filteredRows.slice(pageOffset, pageOffset + pageSize), [filteredRows, pageOffset, pageSize]);
+    const hasNextPage = currentPage < pageCount;
+    const filteredPeriodRows = useMemo(() => rows.filter(row =>
+        row.record_status === "ACTIVE" && (!departmentId || String(employeeDepartment.get(row.employee_code) ?? "") === departmentId)
+    ), [rows, departmentId, employeeDepartment]);
+    const punctuality = useMemo(() => {
+        const completed = filteredPeriodRows.filter(row => row.check_in && row.check_out);
+        return completed.length ? completed.filter(row => matchesEvent(row, "ON_TIME")).length / completed.length * 100 : null;
+    }, [filteredPeriodRows]);
+    const officeMetrics = useMemo(() => filteredPeriodRows.reduce((metrics, row) => ({
+        worked: metrics.worked + (Number(row.working_minutes) || 0),
+        overtime: metrics.overtime + (Number(row.overtime_minutes) || 0),
+        review: metrics.review + Number(Boolean(row.late_mins || row.early_mins || matchesEvent(row, "INCOMPLETE"))),
+    }), { worked: 0, overtime: 0, review: 0 }), [filteredPeriodRows]);
     const filteredPreviousRows = departmentId
         ? previousPeriodRows.filter((row) => String(employeeDepartment.get(row.employee_code) || "") ===
             departmentId)
         : previousPeriodRows;
-    const scopedEmployeeTotal = departmentId
-        ? employees.filter((employee) => String(employee.departmentId) === departmentId).length
-        : employees.length;
-    const recordedEmployees = new Set(filteredPeriodRows.map((row) => row.employee_code)).size;
-    const coverageRate = scopedEmployeeTotal
-        ? Math.min(100, (recordedEmployees / scopedEmployeeTotal) * 100)
-        : 0;
     const previousOnTimeRate = filteredPreviousRows.length
         ? (filteredPreviousRows.filter((row) => !row.late_mins && !row.early_mins)
             .length /
             filteredPreviousRows.length) *
             100
         : null;
-    const pageStart = visibleRows.length ? offset + 1 : 0;
-    const pageEnd = offset + visibleRows.length;
+    const pageStart = visibleRows.length ? pageOffset + 1 : 0;
+    const pageEnd = pageOffset + visibleRows.length;
     const attendanceState = (row: ImportedAttendance) => {
         if (row.record_status === "CANCEL")
             return {
@@ -461,97 +460,15 @@ export default function AttendanceWorkspace({ own = false, }: {
           </Button>)}
       </SectionHeader>
       {!own && (<section aria-label={tr("Chỉ số chấm công", "Attendance metrics")} className="mb-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          <Card className="p-4 sm:p-5">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <p className="text-xs font-bold uppercase tracking-[0.08em] text-slate-600">
-                  {tr("Tổng nhân sự", "Total workforce")}
-                </p>
-                <p className="mt-2 text-2xl font-bold tabular-nums text-slate-950">
-                  {scopedEmployeeTotal || "—"}
-                </p>
-                <p className="mt-1 text-sm text-slate-600">
-                  {tr("Nhân sự đang hoạt động trong phạm vi", "Active employees in scope")}
-                </p>
-              </div>
-              <span className="flex size-10 shrink-0 items-center justify-center rounded-md bg-blue-50 text-blue-700">
-                <Users size={19} aria-hidden="true"/>
-              </span>
-            </div>
-          </Card>
-          <Card className="p-4 sm:p-5">
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0 flex-1">
-                <p className="text-xs font-bold uppercase tracking-[0.08em] text-slate-600">
-                  {tr("Độ phủ dữ liệu", "Data coverage")}
-                </p>
-                <div className="mt-2 flex flex-wrap items-center gap-2">
-                  <p className="text-2xl font-bold tabular-nums text-slate-950">
-                    {recordedEmployees} / {scopedEmployeeTotal || "—"}
-                  </p>
-                  <span className={`rounded-full px-2 py-1 text-xs font-bold ${coverageRate >= 90
-                ? "bg-emerald-50 text-emerald-700"
-                : "bg-amber-50 text-amber-700"}`}>
-                    {coverageRate.toFixed(0)}%
-                  </span>
-                </div>
-                <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-slate-100" role="progressbar" aria-label={tr("Tiến độ ghi nhận chấm công", "Attendance ingestion progress")} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(coverageRate)}>
-                  <div className={`h-full rounded-full transition-[width] duration-300 ${coverageRate >= 90 ? "bg-emerald-500" : "bg-amber-500"}`} style={{ width: `${coverageRate}%` }}/>
-                </div>
-              </div>
-              <span className={`flex size-10 shrink-0 items-center justify-center rounded-md ${coverageRate >= 90
-                ? "bg-emerald-50 text-emerald-700"
-                : "bg-amber-50 text-amber-700"}`}>
-                <CalendarCheck2 size={19} aria-hidden="true"/>
-              </span>
-            </div>
-          </Card>
-          <Card className="p-4 sm:p-5">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <p className="text-xs font-bold uppercase tracking-[0.08em] text-slate-600">
-                  {tr("Tỷ lệ đúng giờ", "Punctuality rate")}
-                </p>
-                <p className="mt-2 text-2xl font-bold tabular-nums text-slate-950">
-                  {previousOnTimeRate === null
-                ? "—"
-                : `${previousOnTimeRate.toFixed(1)}%`}
-                </p>
-                <p className="mt-1 text-sm text-slate-600">
-                  {tr("So với kỳ liền trước", "Previous period performance")}
-                </p>
-              </div>
-              <span className="flex size-10 shrink-0 items-center justify-center rounded-md bg-teal-50 text-teal-700">
-                <Clock3 size={19} aria-hidden="true"/>
-              </span>
-            </div>
-          </Card>
-          <Card className="p-4 sm:p-5">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <p className="text-xs font-bold uppercase tracking-[0.08em] text-slate-600">
-                  {tr("Giờ làm & tăng ca", "Working hours & overtime")}
-                </p>
-                <p className="mt-2 text-xl font-bold tabular-nums text-slate-950">
-                  {summary
-                ? tr(`${(Number(summary.working_minutes) / 60).toFixed(1)} giờ`, `${(Number(summary.working_minutes) / 60).toFixed(1)}h`)
-                : "—"}
-                  <span className="font-medium text-slate-400"> · </span>
-                  <span className="text-violet-700">
-                    {tr(`${(monthOvertime / 60).toFixed(1)} giờ`, `${(monthOvertime / 60).toFixed(1)}h`)}{" "}
-                    OT
-                  </span>
-                </p>
-                <p className="mt-1 text-sm text-slate-600">
-                  {tr("Giờ công kỳ này · OT trong tháng", "Current period work · monthly OT")}
-                </p>
-              </div>
-              <span className="flex size-10 shrink-0 items-center justify-center rounded-md bg-violet-50 text-violet-700">
-                <BarChart3 size={19} aria-hidden="true"/>
-              </span>
-            </div>
-          </Card>
-        </section>)}
+        {[
+            { label: tr("Tỷ lệ đúng giờ", "Punctuality rate"), value: punctuality === null ? "—" : `${punctuality.toFixed(1)}%`, detail: previousOnTimeRate === null ? tr("Chưa có đối chiếu kỳ trước", "No previous period comparison") : tr(`Kỳ trước: ${previousOnTimeRate.toFixed(1)}%`, `Previous period: ${previousOnTimeRate.toFixed(1)}%`), tone: "from-orange-50 to-white", Icon: Clock3 },
+            { label: tr("Tổng giờ làm việc", "Total working hours"), value: tr(`${(officeMetrics.worked / 60).toLocaleString("vi-VN", { maximumFractionDigits: 1 })} giờ`, `${(officeMetrics.worked / 60).toLocaleString("en-US", { maximumFractionDigits: 1 })} h`), detail: tr("Giờ làm & tăng ca được ghi riêng", "Working hours and overtime are tracked separately"), tone: "from-emerald-50 to-white", Icon: CalendarCheck2 },
+            { label: tr("Quỹ giờ tăng ca", "Overtime"), value: `${(officeMetrics.overtime / 60).toFixed(1)}h OT`, detail: tr("Theo giờ tăng ca đã ghi nhận", "Based on recorded overtime"), tone: "from-violet-50 to-white", Icon: BarChart3 },
+            { label: tr("Trường hợp cần rà soát", "Records to review"), value: officeMetrics.review, detail: tr("Đi trễ, về sớm hoặc thiếu lượt quẹt", "Late, early or missing punch"), tone: "from-amber-50 to-white", Icon: AlertTriangle },
+        ].map(({ label, value, detail, tone, Icon }) => <Card key={label} className={`bg-gradient-to-br ${tone} p-4 shadow-sm sm:p-5`}>
+          <div className="flex items-start justify-between gap-3"><div><p className="text-xs font-semibold text-slate-600">{label}</p><p className="mt-2 text-2xl font-bold tabular-nums text-slate-950">{loading ? "—" : value}</p><p className="mt-1 text-xs text-slate-600">{detail}</p></div><Icon className="size-5 shrink-0 text-slate-500" aria-hidden="true" /></div>
+        </Card>)}
+      </section>)}
       {error && (<p role="alert" className="mb-4 rounded-md bg-red-50 p-4 text-red-800">
           {error}
         </p>)}
@@ -593,11 +510,21 @@ export default function AttendanceWorkspace({ own = false, }: {
             <AttendanceImport activeShiftTypes={activeShiftTypes} onBusyChange={setImportBusy} onStageChange={setImportStage} onCancel={() => {
                 setImportOpen(false);
                 setImportStage("idle");
-            }} onImported={(result) => {
+            }} onImported={(result, dates) => {
                 setImportOpen(false);
                 setImportStage("complete");
+                if (dates) {
+                    const importedScope: RecordFilters = { ...dates, record_status: "ACTIVE" };
+                    setPeriodPreset("CUSTOM");
+                    setDraft(importedScope);
+                    setFilters(importedScope);
+                    setDepartmentId("");
+                    setTableSearch("");
+                    setEventFilter("ALL");
+                }
                 setOffset(0);
                 setRevision((v) => v + 1);
+                requestAnimationFrame(() => recordsHeading.current?.scrollIntoView({ block: "start" }));
                 setNotice(tr(`Nhập chấm công thành công: đã lưu ${result.inserted} bản ghi, bỏ qua ${result.skipped}, loại ${result.excluded}.`, `Attendance imported successfully: saved ${result.inserted}, skipped ${result.skipped}, excluded ${result.excluded}.`));
             }}/>
           </Card>
@@ -836,11 +763,15 @@ export default function AttendanceWorkspace({ own = false, }: {
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-12 xl:items-end">
             <label className="text-sm font-semibold text-slate-700 xl:col-span-2">
               {tr("Kỳ làm việc", "Work period")}
-              <select className={control} value={periodPreset} onChange={(event) => {
+              <SelectControl className={control} value={periodPreset} onChange={(event) => {
             const preset = event.target.value as PeriodPreset;
             setPeriodPreset(preset);
             if (preset === "CURRENT_WEEK")
                 setDraft((current) => ({ ...current, ...defaultPeriod }));
+            if (preset === "CURRENT_MONTH") {
+                const now = new Date();
+                setDraft(current => ({ ...current, from: isoDate(new Date(now.getFullYear(), now.getMonth(), 1)), to: isoDate(new Date(now.getFullYear(), now.getMonth() + 1, 0)) }));
+            }
             if (preset === "PREVIOUS_WEEK")
                 setDraft((current) => ({ ...current, ...previousPeriod }));
         }}>
@@ -850,10 +781,11 @@ export default function AttendanceWorkspace({ own = false, }: {
                 <option value="PREVIOUS_WEEK">
                   {tr("Tuần trước", "Previous week")}
                 </option>
+                <option value="CURRENT_MONTH">{tr("Tháng này", "This month")}</option>
                 <option value="CUSTOM">
                   {tr("Khoảng tùy chỉnh", "Custom range")}
                 </option>
-              </select>
+              </SelectControl>
             </label>
             {periodPreset === "CUSTOM" && (<>
                 <label className="text-sm font-semibold text-slate-700 xl:col-span-2">
@@ -873,7 +805,7 @@ export default function AttendanceWorkspace({ own = false, }: {
               </>)}
             {!own && (<label className="text-sm font-semibold text-slate-700 xl:col-span-2">
                 {tr("Phòng ban", "Department")}
-                <select className={control} value={departmentId} onChange={(event) => {
+                <SelectControl className={control} value={departmentId} onChange={(event) => {
                 setDepartmentId(event.target.value);
                 setOffset(0);
             }}>
@@ -883,11 +815,11 @@ export default function AttendanceWorkspace({ own = false, }: {
                   {departments.map((department) => (<option key={department.id} value={department.id}>
                       {department.name}
                     </option>))}
-                </select>
+                </SelectControl>
               </label>)}
             <label className="text-sm font-semibold text-slate-700 xl:col-span-2">
               {tr("Trạng thái", "Status")}
-              <select className={control} value={draft.record_status} onChange={(event) => setDraft((current) => ({
+              <SelectControl className={control} value={draft.record_status} onChange={(event) => setDraft((current) => ({
             ...current,
             record_status: event.target
                 .value as RecordFilters["record_status"],
@@ -895,7 +827,7 @@ export default function AttendanceWorkspace({ own = false, }: {
                 <option value="ACTIVE">{tr("Đang sử dụng", "Active")}</option>
                 <option value="CANCEL">{tr("Đã hủy", "Cancelled")}</option>
                 <option value="ALL">{tr("Tất cả", "All")}</option>
-              </select>
+              </SelectControl>
             </label>
             <label className={`text-sm font-semibold text-slate-700 ${periodPreset === "CUSTOM" ? "xl:col-span-4" : "xl:col-span-3"}`}>
               {tr("Tìm nhân viên", "Search employee")}
@@ -923,6 +855,7 @@ export default function AttendanceWorkspace({ own = false, }: {
             setFilters(initial);
             setDepartmentId("");
             setTableSearch("");
+            setEventFilter("ALL");
             setOffset(0);
             setSelected(null);
         }}>
@@ -937,7 +870,7 @@ export default function AttendanceWorkspace({ own = false, }: {
         </form>
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h2 className="text-base font-semibold text-slate-950">
+            <h2 ref={recordsHeading} className="scroll-mt-24 text-base font-semibold text-slate-950">
               {tr("Dữ liệu chấm công", "Attendance records")}
             </h2>
             <p className="mt-1 text-sm font-medium text-slate-600">
@@ -953,9 +886,14 @@ export default function AttendanceWorkspace({ own = false, }: {
             </span>
           </div>
         </div>
+        <div className="mb-3 flex flex-wrap gap-2">
+          {eventFilters.map((event, i) => <button key={event} type="button" aria-pressed={eventFilter === event} onClick={() => { setEventFilter(event); setOffset(0); }} className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${eventFilter === event ? "border-slate-900 bg-slate-900 text-white" : ["border-slate-200 bg-slate-50 text-slate-700", "border-amber-200 bg-amber-50 text-amber-900", "border-orange-200 bg-orange-50 text-orange-900", "border-violet-200 bg-violet-50 text-violet-900", "border-emerald-200 bg-emerald-50 text-emerald-900", "border-rose-200 bg-rose-50 text-rose-900"][i]}`}>
+            {[tr("Tất cả", "All"), tr("Đi trễ", "Late"), tr("Về sớm", "Early"), tr("Tăng ca", "Overtime"), tr("Đúng giờ", "On time"), tr("Thiếu quẹt thẻ", "Missing punch")][i]} ({eventCounts[i]})
+          </button>)}
+        </div>
         {loading ? (<p role="status">{tr("Đang tải…", "Loading…")}</p>) : (<>
-            <div className={hasAnyRecords ? "overflow-x-auto" : "hidden"}>
-              <table className="w-full whitespace-nowrap text-left text-sm">
+            <div className={hasAnyRecords ? "max-h-[65vh] overflow-auto" : "hidden"}>
+              <table className="w-full min-w-[1080px] table-fixed text-left text-sm">
                 <thead className="sticky top-0 z-10 bg-slate-50 shadow-[0_1px_0_0_#e2e8f0]">
                   <tr>
                     {[
@@ -976,19 +914,20 @@ export default function AttendanceWorkspace({ own = false, }: {
                   {visibleRows.map((r) => {
                 const state = attendanceState(r);
                 return (<tr key={String(r.id)} className="border-b border-slate-100 hover:bg-slate-50/60">
-                        <td className="p-3">{r.work_date}</td>
-                        <td className="p-3">
+                        <td className="p-3 whitespace-nowrap text-slate-700">{workDayFormat[language === "vi" ? "vi" : "en"].format(new Date(r.work_date + "T00:00:00Z"))}</td>
+                        <td className="p-3"><div className="flex items-center gap-2"><span aria-hidden="true" className="grid size-8 shrink-0 place-items-center rounded-full bg-slate-100 text-xs font-semibold text-slate-700">{r.full_name?.trim().split(/\s+/).slice(-2).map(part => part[0]).join("").toUpperCase()}</span><div className="min-w-0">
                           <strong className="block font-mono text-xs text-slate-700">
                             {r.employee_code}
                           </strong>
                           <p className="mt-0.5 font-semibold text-slate-950">
                             {r.full_name}
-                          </p>
+                          </p></div></div>
                         </td>
                         <td className="p-3 font-mono text-sm font-semibold text-slate-700">
                           {displayTime(r.check_in)}{" "}
                           <span className="text-slate-400">→</span>{" "}
                           {displayTime(r.check_out)}
+                          {matchesEvent(r, "INCOMPLETE") && <span className="mt-1 block w-fit rounded-full bg-rose-50 px-2 py-0.5 font-sans text-xs text-rose-800">{r.check_in ? tr("Thiếu quẹt ra", "Missing check-out") : tr("Thiếu quẹt vào", "Missing check-in")}</span>}
                         </td>
                         <td className="p-3 font-semibold tabular-nums text-slate-800">
                           {durationLabel(r.working_minutes)}
@@ -1006,7 +945,7 @@ export default function AttendanceWorkspace({ own = false, }: {
                         </td>
                         <td className="p-3 font-semibold tabular-nums text-violet-700">
                           {r.overtime_minutes
-                        ? durationLabel(r.overtime_minutes)
+                        ? `+${(r.overtime_minutes / 60).toFixed(1)}h OT`
                         : "—"}
                         </td>
                         <td className="p-3">
@@ -1088,30 +1027,38 @@ export default function AttendanceWorkspace({ own = false, }: {
             <div className="flex flex-wrap items-center gap-3 text-sm font-medium text-slate-600">
               <p>
                 {tr("Hiển thị", "Showing")} {pageStart} - {pageEnd}{" "}
-                {tr("bản ghi", "records")}
+                {tr("bản ghi", "records")} / {filteredRowCount}
               </p>
               <label className="flex items-center gap-2">
                 {tr("Số dòng", "Rows")}
-                <select value={pageSize} onChange={(event) => {
+                <SelectControl value={pageSize} onChange={(event) => {
                 setPageSize(Number(event.target.value));
                 setOffset(0);
             }} className="h-9 rounded-md border border-slate-300 bg-white px-2 text-sm font-semibold text-slate-700">
-                  {[20, 50, 100].map((size) => (<option key={size} value={size}>
+                  {[25, 50, 100].map((size) => (<option key={size} value={size}>
                       {size}
                     </option>))}
-                </select>
+                </SelectControl>
               </label>
             </div>
-            <div className="flex gap-2">
-              <Button variant="secondary" disabled={loading || offset === 0} onClick={() => setOffset(Math.max(0, offset - pageSize))}>
+            <div className="flex flex-wrap gap-2">
+              <Button variant="secondary" disabled={loading || currentPage === 1} onClick={() => setOffset(0)}>{tr("Đầu", "First")}</Button>
+              <Button variant="secondary" disabled={loading || currentPage === 1} onClick={() => setOffset(pageOffset - pageSize)}>
                 {tr("Trước", "Previous")}
               </Button>
-              <span className="flex min-w-10 items-center justify-center rounded-md bg-slate-100 px-3 text-sm font-semibold text-slate-700">
-                {offset / pageSize + 1}
-              </span>
-              <Button variant="secondary" disabled={loading || !hasNextPage} onClick={() => setOffset(offset + pageSize)}>
+              <label className="flex items-center gap-1 text-xs text-slate-700">
+                {tr("Trang", "Page")}
+                <input key={currentPage} type="number" aria-label={tr("Nhảy tới trang", "Jump to page")} min={1} max={pageCount} defaultValue={currentPage} onBlur={(event) => {
+                    const next = Math.max(1, Math.min(pageCount, Math.trunc(event.currentTarget.valueAsNumber || currentPage)));
+                    event.currentTarget.value = String(next);
+                    setOffset((next - 1) * pageSize);
+                }} onKeyDown={(event) => { if (event.key === "Enter") event.currentTarget.blur(); }} className="w-16 rounded-md border border-slate-300 px-2 py-1 text-center" />
+                / {pageCount}
+              </label>
+              <Button variant="secondary" disabled={loading || !hasNextPage} onClick={() => setOffset(pageOffset + pageSize)}>
                 {tr("Trang sau", "Next page")}
               </Button>
+              <Button variant="secondary" disabled={loading || !hasNextPage} onClick={() => setOffset((pageCount - 1) * pageSize)}>{tr("Cuối", "Last")}</Button>
             </div>
           </div>)}
       </Card>

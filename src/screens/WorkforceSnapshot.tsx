@@ -1,3 +1,4 @@
+import { SelectControl } from "../components/ui/select-control"
 import { useLanguage } from '../context/LanguageContext';
 import { useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -28,7 +29,7 @@ export default function WorkforceSnapshot() {
     <Card className="mb-5 p-6"><form className="grid items-end gap-4 sm:grid-cols-2 lg:grid-cols-4" onSubmit={event => { event.preventDefault(); try { generateSnapshot(period); setError(''); } catch (cause) { setError((cause as Error).message); } }}>
       <label className="text-sm text-slate-600">{t("Từ ngày")}<input required type="date" className={control} value={period.start} onChange={event => setPeriod({ ...period, start: event.target.value })} /></label>
       <label className="text-sm text-slate-600">{t("Đến ngày")}<input required type="date" className={control} value={period.end} min={period.start} onChange={event => setPeriod({ ...period, end: event.target.value })} /></label>
-      <label className="text-sm text-slate-600">{t("Phạm vi")}<select className={control} value={period.scope} onChange={event => setPeriod({ ...period, scope: event.target.value })}><option value="">{t("Tất cả phòng ban")}</option>{[...new Set(employees.map(employee => employee.department))].map(department => <option key={department} value={department}>{t(department)}</option>)}</select></label>
+      <label className="text-sm text-slate-600">{t("Phạm vi")}<SelectControl className={control} value={period.scope} onChange={event => setPeriod({ ...period, scope: event.target.value })}><option value="">{t("Tất cả phòng ban")}</option>{[...new Set(employees.map(employee => employee.department))].map(department => <option key={department} value={department}>{t(department)}</option>)}</SelectControl></label>
       <Button type="submit">{t(snapshot ? 'Tạo lại và kiểm tra' : 'Tạo snapshot')}</Button>
     </form><p className="mt-4 text-xs leading-5 text-slate-500">{t("Nguồn đầu vào: hồ sơ, vị trí, học vấn, lịch sử công tác và câu trả lời khảo sát theo thời điểm kết thúc kỳ. Các đặc trưng chưa có nguồn đầy đủ cần nhập bản nháp; chỉ lưu AI_INPUT khi kiểm tra hợp lệ, không tự điền số giả.")}</p>{error && <p role="alert" className="mt-3 text-sm text-red-700">{t(error)}</p>}</Card>
     {!snapshot ? <Card className="p-10 text-center text-slate-500">{t("Chưa tạo snapshot. Chọn kỳ và phạm vi phía trên.")}</Card> : <>

@@ -6,7 +6,6 @@ import {
   normalizedTopicName,
   progressTone,
   surveyAverageScore,
-  surveyInvitedCount,
   surveyResponseCount,
   surveyResponseRate,
   topicIcon,
@@ -61,20 +60,19 @@ test("survey topic icons stay stable for common HR categories", () => {
   assert.equal(topicIcon("Unknown"), "📝")
 })
 
-test("response counters prefer result data and fall back to the employee directory", () => {
+test("response rate uses active employees, ignoring invited counts and API completion rate", () => {
   const item = survey({ responseCount: 4, invitedCount: 8 })
   assert.equal(surveyResponseCount(item), 4)
-  assert.equal(surveyInvitedCount(item, undefined, 25), 8)
-  assert.equal(surveyResponseRate(item, undefined, 25), 50)
+  assert.equal(surveyResponseRate(item, undefined, 25), 16)
 
   const withoutAudience = survey({ responseCount: 5 })
-  assert.equal(surveyInvitedCount(withoutAudience, undefined, 25), 25)
   assert.equal(surveyResponseRate(withoutAudience, undefined, 25), 20)
 
   const apiResult = results({ responseCount: 7, invitedCount: 10, completionRate: 73 })
   assert.equal(surveyResponseCount(item, apiResult), 7)
-  assert.equal(surveyInvitedCount(item, apiResult, 25), 10)
-  assert.equal(surveyResponseRate(item, apiResult, 25), 73)
+  assert.equal(surveyResponseRate(survey({ responseCount: 1, invitedCount: 1 }), undefined, 25).toFixed(1), "4.0")
+  assert.equal(surveyResponseRate(item, apiResult, 0), 0)
+  assert.equal(surveyResponseRate(item, apiResult, 25).toFixed(1), "28.0")
 })
 
 test("average satisfaction score is weighted by category response count", () => {
@@ -110,11 +108,9 @@ test("average satisfaction score is weighted by category response count", () => 
 })
 
 test("progress tones cover all response-rate thresholds", () => {
-  assert.equal(progressTone(0).hintEn, "Reminder recommended")
-  assert.equal(progressTone(24).text, "text-rose-600")
-  assert.equal(progressTone(25).hintEn, "Collecting responses")
-  assert.equal(progressTone(60).hintEn, "Good progress")
-  assert.equal(progressTone(85).hintEn, "Statistically reliable")
-  assert.equal(progressTone(100).text, "text-emerald-600")
+  assert.match(progressTone(4).hintVi, /60%/)
+  assert.equal(progressTone(59.9).text, "text-amber-800")
+  assert.equal(progressTone(60).hintEn, "Statistically reliable")
+  assert.equal(progressTone(70).fill, "from-teal-400 to-emerald-500")
 })
 

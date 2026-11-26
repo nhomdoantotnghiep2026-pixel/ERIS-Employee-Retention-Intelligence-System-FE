@@ -1,3 +1,4 @@
+import { SelectControl } from "./ui/select-control"
 import { Building2, UserCheck, UserMinus, Users } from 'lucide-react';
 import { useEffect, useId, useState } from 'react';
 
@@ -85,17 +86,17 @@ export function EmployeeDirectoryOverview({ revision, departments, onDepartment 
                 <input type="search" className={control} value={query} onChange={event => setQuery(event.target.value)} placeholder={copy('Tên, mã hoặc email', 'Name, code or email')} />
               </label>
               <label className="text-sm font-medium text-slate-700">{copy('Phòng ban', 'Department')}
-                <select className={control} value={department} onChange={event => setDepartment(event.target.value)}>
+                <SelectControl className={control} value={department} onChange={event => setDepartment(event.target.value)}>
                   <option value="">{copy('Tất cả phòng ban', 'All departments')}</option>
                   {departments.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
-                </select>
+                </SelectControl>
               </label>
               <label className="text-sm font-medium text-slate-700">{copy('Trạng thái', 'Status')}
-                <select className={control} value={status} onChange={event => setStatus(event.target.value)}>
+                <SelectControl className={control} value={status} onChange={event => setStatus(event.target.value)}>
                   <option value="">{copy('Tất cả trạng thái', 'All statuses')}</option>
                   <option value="ACTIVE">{copy('Đang hoạt động', 'Active')}</option>
                   <option value="INACTIVE">{copy('Ngừng hoạt động', 'Inactive')}</option>
-                </select>
+                </SelectControl>
               </label>
               <Button className="h-10 justify-self-start rounded-md text-slate-700" variant="ghost" disabled={!department && !status && !query} onClick={() => { setDepartment(''); setStatus(''); setQuery(''); }}>{copy('Đặt lại bộ lọc', 'Reset filters')}</Button>
             </div>

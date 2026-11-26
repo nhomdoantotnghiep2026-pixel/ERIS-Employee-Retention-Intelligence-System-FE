@@ -1,3 +1,4 @@
+import { SelectControl } from "./ui/select-control"
 import { useAutoDismissState } from '../hooks/useAutoDismissState';
 import { useEffect, useMemo, useState, type FormEvent } from "react"
 import { Button } from "./ui"
@@ -162,7 +163,7 @@ export default function AttendanceReconcile({ onSaved, onBusyChange }: Attendanc
           </div>
           <div className="mt-2 grid gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(220px,0.45fr)_auto_auto]">
             <input className="h-11 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none focus:border-orange-400 focus:ring-4 focus:ring-orange-100" placeholder={tr("Tìm theo tên hoặc mã nhân viên", "Search by name or employee code")} value={employeeSearch} onChange={(event) => setEmployeeSearch(event.target.value)} />
-            <select className="h-11 rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none focus:border-orange-400 focus:ring-4 focus:ring-orange-100" value={departmentId} onChange={(event) => setDepartmentId(event.target.value)}><option value="">{tr("Tất cả phòng ban", "All departments")}</option>{departments.map(department => <option key={department.id} value={department.id}>{department.name}</option>)}</select>
+            <SelectControl className="h-11 rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none focus:border-orange-400 focus:ring-4 focus:ring-orange-100" value={departmentId} onChange={(event) => setDepartmentId(event.target.value)}><option value="">{tr("Tất cả phòng ban", "All departments")}</option>{departments.map(department => <option key={department.id} value={department.id}>{department.name}</option>)}</SelectControl>
             <Button type="button" variant="secondary" onClick={() => { setSelectedEmployeeIds(current => Array.from(new Set([...current, ...filteredEmployees.map(employee => employee.id)]))); setPreview(null) }}>{tr("Chọn tất cả", "Select all")}</Button>
             <Button type="button" variant="secondary" disabled={!selectedEmployeeIds.length} onClick={() => { setSelectedEmployeeIds([]); setPreview(null) }}>{tr("Bỏ chọn", "Clear")}</Button>
           </div>

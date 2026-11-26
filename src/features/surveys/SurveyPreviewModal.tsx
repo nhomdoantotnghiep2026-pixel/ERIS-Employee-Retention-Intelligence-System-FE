@@ -17,6 +17,9 @@ type SurveyPreviewModalProps = {
   categories: SurveyCategory[]
   totalEmployees: number
   onClose: () => void
+  onBack?: () => void
+  pending?: boolean
+  error?: string
   onPublish?: () => void
 }
 
@@ -25,26 +28,35 @@ export function SurveyPreviewModal({
   categories,
   totalEmployees,
   onClose,
+  onBack,
+  pending = false,
+  error,
   onPublish,
 }: SurveyPreviewModalProps) {
   const { language } = useLanguage()
   const tr = (vi: string, en: string) => (language === "vi" ? vi : en)
   const groupedQuestions = useMemo(() => {
     const groups = new Map<number, SurveyQuestion[]>()
-    survey.questions.forEach((question) =>
-      groups.set(
-        question.categoryId,
-        [...(groups.get(question.categoryId) || []), question],
-      ),
-    )
-    return [...groups.entries()].map(([categoryId, questions]) => {
+    const bankKeys = new Set(categories.flatMap(category => category.questionBank.map(question =>
+      `${category.id}|${question.questionText.trim().toLocaleLowerCase()}`,
+    )))
+    for (const question of survey.questions) {
+      const key = `${question.categoryId}|${question.questionText.trim().toLocaleLowerCase()}`
+      const categoryId = categories.length === 0 || question.isSatisfactionCore || bankKeys.has(key) ? question.categoryId : 0
+      const group = groups.get(categoryId) ?? []
+      group.push(question)
+      groups.set(categoryId, group)
+    }
+    return [...groups.entries()].sort(([a], [b]) => Number(a === 0) - Number(b === 0)).map(([categoryId, questions]) => {
       const rawName =
         categories.find((category) => category.id === categoryId)?.name ||
         `Chủ đề #${categoryId}`
       return {
         categoryId,
         rawName,
-        name: topicLabel(rawName, language),
+        name: categoryId === 0
+          ? tr("Câu hỏi bổ sung tự tạo", "Custom questions")
+          : topicLabel(rawName, language),
         questions,
       }
     })
@@ -71,7 +83,7 @@ export function SurveyPreviewModal({
     )
   }
 
-  useDialogBehavior(true, onClose)
+  useDialogBehavior(true, () => { if (!pending) onClose() })
 
   return (
     <div
@@ -80,7 +92,7 @@ export function SurveyPreviewModal({
       aria-modal="true"
       aria-labelledby="survey-preview-title"
       onMouseDown={(event) => {
-        if (event.target === event.currentTarget) onClose()
+        if (event.target === event.currentTarget && !pending) onClose()
       }}
     >
       <section
@@ -114,6 +126,7 @@ export function SurveyPreviewModal({
             type="button"
             aria-label={tr("Đóng", "Close")}
             className="grid size-9 shrink-0 place-items-center rounded-md text-slate-500 transition-colors hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-orange-500"
+            disabled={pending}
             onClick={onClose}
           >
             <X size={19} />
@@ -142,7 +155,8 @@ export function SurveyPreviewModal({
           </nav>
         )}
 
-        <div className="overflow-y-auto scroll-smooth bg-slate-50/70 p-5 sm:p-6">
+        <div className="min-h-0 overflow-y-auto scroll-smooth bg-slate-50/70 p-5 sm:p-6">
+          {error && <p role="alert" className="mb-3 rounded-lg bg-rose-50 p-3 text-sm text-rose-800">{error}</p>}
           <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200/60 bg-slate-100/80 px-4 py-2.5 text-xs text-slate-600">
             <div className="flex flex-wrap items-center gap-2">
               <span className="inline-flex items-center gap-1 rounded-md bg-orange-100/80 px-2 py-0.5 font-semibold text-orange-700">
@@ -172,7 +186,7 @@ export function SurveyPreviewModal({
                 className="scroll-mt-4"
               >
                 <h3 className="mb-3 flex items-center gap-2 pb-2 pt-4 text-xs font-bold uppercase tracking-wider text-slate-600">
-                  <span>{topicIcon(group.rawName)}</span>
+                  <span aria-hidden="true">{group.categoryId === 0 ? "⭐" : topicIcon(group.rawName)}</span>
                   <span>{group.name}</span>
                   <span className="rounded-full bg-slate-200 px-2 py-0.5 text-[11px] font-semibold text-slate-600">
                     {group.questions.length} {tr("câu", "items")}
@@ -268,13 +282,13 @@ export function SurveyPreviewModal({
             )}
           </p>
           <div className="flex flex-wrap gap-2">
-            <Button type="button" variant="secondary" onClick={onClose}>
-              {tr("Quay lại chỉnh sửa", "Back to editing")}
+            <Button type="button" variant="secondary" disabled={pending} onClick={onBack ?? onClose}>
+              {onBack ? tr("Quay lại chỉnh sửa", "Back to editing") : tr("Đóng", "Close")}
             </Button>
             {onPublish && (
-              <Button type="button" onClick={onPublish}>
+              <Button type="button" disabled={pending} onClick={onPublish}>
                 <Send size={15} />
-                {tr("Tiếp tục xuất bản", "Continue to publish")}
+                {pending ? tr("Đang xuất bản…", "Publishing…") : tr("Xác nhận xuất bản khảo sát", "Confirm survey publishing")}
               </Button>
             )}
           </div>

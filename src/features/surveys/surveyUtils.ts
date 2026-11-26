@@ -64,61 +64,21 @@ export const surveyResponseCount = (
   result?: SurveyResults,
 ) => result?.responseCount ?? survey.responseCount ?? 0
 
-export const surveyInvitedCount = (
-  survey: SurveySummary,
-  result?: SurveyResults,
-  totalEmployees = 0,
-) => {
-  const explicitCount =
-    survey.targetAudienceCount ??
-    result?.invitedCount ??
-    survey.invitedCount ??
-    survey.participantCount
-  return explicitCount != null && explicitCount > 0
-    ? explicitCount
-    : totalEmployees
-}
-
 export const surveyResponseRate = (
   survey: SurveySummary,
   result?: SurveyResults,
   totalEmployees = 0,
-) => {
-  if (result?.completionRate != null) return result.completionRate
-  const invited = surveyInvitedCount(survey, result, totalEmployees)
-  return invited > 0
-    ? Math.round((surveyResponseCount(survey, result) / invited) * 100)
-    : 0
-}
+) => totalEmployees > 0 ? (surveyResponseCount(survey, result) / totalEmployees) * 100 : 0
 
-export const progressTone = (rate: number) =>
-  rate < 25
-    ? {
-        fill: "from-rose-500 to-amber-500",
-        text: "text-rose-600",
-        hintVi: "Cần gửi nhắc nhở",
-        hintEn: "Reminder recommended",
-      }
-    : rate < 60
-      ? {
-          fill: "from-amber-400 to-amber-500",
-          text: "text-amber-600",
-          hintVi: "Đang thu thập phản hồi",
-          hintEn: "Collecting responses",
-        }
-      : rate < 85
-        ? {
-            fill: "from-blue-500 to-teal-400",
-            text: "text-teal-600",
-            hintVi: "Tiến độ tốt",
-            hintEn: "Good progress",
-          }
-        : {
-            fill: "from-teal-400 to-emerald-500",
-            text: "text-emerald-600",
-            hintVi: "Đủ tin cậy thống kê",
-            hintEn: "Statistically reliable",
-          }
+export const progressTone = (rate: number) => {
+  const reliable = rate >= 60
+  return {
+    fill: rate >= 70 ? "from-teal-400 to-emerald-500" : rate < 50 ? "from-blue-300 to-blue-500" : "from-amber-400 to-amber-500",
+    text: reliable ? "text-emerald-700" : "text-amber-800",
+    hintVi: reliable ? "Đủ tin cậy thống kê" : "Đang thu thập dữ liệu (Cần tối thiểu 60% để đủ tin cậy)",
+    hintEn: reliable ? "Statistically reliable" : "Collecting data (60% minimum for reliability)",
+  }
+}
 
 export const topicIcon = (name: string) => {
   const value = name.toLocaleLowerCase()

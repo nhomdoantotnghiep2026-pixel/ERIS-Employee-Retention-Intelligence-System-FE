@@ -1,3 +1,4 @@
+import { SelectControl } from "../components/ui/select-control"
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react"
 
 import {
@@ -56,6 +57,7 @@ import { SurveyQuestionWizard } from "../features/surveys/SurveyQuestionWizards"
 import {
   surveyAreaClass as area,
   surveyControlClass as control,
+  surveyStudioBody, surveyStudioFooter, surveyStudioQuestions, surveyStudioSettings, surveyStudioShell,
 } from "../features/surveys/surveyStyles"
 
 import {
@@ -76,7 +78,6 @@ import {
   remainingLabel,
   statusLabel,
   surveyAverageScore,
-  surveyInvitedCount,
   surveyResponseCount,
   surveyResponseRate,
   topicIcon,
@@ -132,6 +133,12 @@ export default function ErdSurveys() {
   const [surveys, setSurveys] = useState<SurveySummary[]>([])
 
   const [categories, setCategories] = useState<SurveyCategory[]>([])
+  const [catalogState, setCatalogState] = useState<"loading" | "ready" | "unavailable" | "inconsistent">("loading")
+  const [catalogRetry, setCatalogRetry] = useState(0)
+  const [previewMode, setPreviewMode] = useState<"create" | "edit" | "saved">("saved")
+  const [authoringError, setAuthoringError] = useState("")
+  const [editingCustomIndex, setEditingCustomIndex] = useState<number | null>(null)
+  const savedDraftQuestionIds = useRef(new Map<number, number>())
 
   const [employeeDirectory, setEmployeeDirectory] = useState<EmployeeProfile[]>([])
 
@@ -215,7 +222,7 @@ export default function ErdSurveys() {
 
   const { error, message, setError, setMessage } = useAutoDismissFeedback()
 
-  useDialogBehavior(surveyFormOpen, () => setSurveyFormOpen(false))
+  useDialogBehavior(surveyFormOpen && !previewSurvey, () => { if (!pending && !publishTarget) setSurveyFormOpen(false) })
 
   useEffect(() => {
     const controller = new AbortController()
@@ -254,42 +261,39 @@ export default function ErdSurveys() {
   }, [isHr, reload, setError, user.email])
 
   useEffect(() => {
-    if (!isHr || editSurvey) return
-
+    if (!isHr) return
     const controller = new AbortController()
-
+    setCatalogState("loading")
     void listSurveyCategories(controller.signal)
-      .then((result) => {
-        if (!controller.signal.aborted) {
-          setCategories(result.data)
-          setDraft((current) => ({ ...current, categoryIds: [] }))
-        }
+      .then(({ data }) => {
+        if (controller.signal.aborted) return
+        setCategories(data)
+        setCatalogState(data.length ? "ready" : "unavailable")
       })
       .catch((cause) => {
         if (!controller.signal.aborted)
-          setError(getApiErrorMessage(cause, "Không thể tải chủ đề khảo sát."))
+          setCatalogState(cause instanceof ApiError && cause.status === 409 ? "inconsistent" : "unavailable")
       })
-
     return () => controller.abort()
-  }, [editSurvey, isHr, setError])
+  }, [isHr, catalogRetry])
 
   useEffect(() => {
     if (!isHr) return
     const controller = new AbortController()
     setDirectoryLoading(true)
 
-    void Promise.all([
-      listEmployeeProfiles({ page: 1, limit: 10_000 }, controller.signal),
+    void Promise.allSettled([
+      listEmployeeProfiles({ page: 1, limit: 10_000, employmentStatus: "ACTIVE" }, controller.signal),
       listDepartments(controller.signal, { page: 1, limit: 1_000 }),
     ])
       .then(([employeesResult, departmentsResult]) => {
         if (controller.signal.aborted) return
-        setEmployeeDirectory(
-          employeesResult.data.filter(
-            (employee) => employee.employmentStatus !== "INACTIVE",
+        if (employeesResult.status === "fulfilled") setEmployeeDirectory(
+          employeesResult.value.data.filter(
+            (employee) => employee.employmentStatus === "ACTIVE",
           ),
         )
-        setDepartments(departmentsResult.data)
+        if (departmentsResult.status === "fulfilled") setDepartments(departmentsResult.value.data)
       })
       .catch((cause) => {
         if (!controller.signal.aborted)
@@ -360,7 +364,7 @@ export default function ErdSurveys() {
 
   const totalEmployees = employeeDirectory.length
   const totalQuestionCount =
-    defaultCount + stagedQuestions.length + customQuestions.length
+    defaultCount + stagedQuestions.length + customQuestions.length + Number(editingCustomIndex === null && Boolean(customDraft.questionText.trim()))
 
   const questionKey = (question: SurveyQuestionInput) =>
     `${question.categoryId}|${question.questionText}`
@@ -398,124 +402,118 @@ export default function ErdSurveys() {
     )
   }
 
-  function addCustomQuestion() {
-    if (!customDraft.questionText.trim() || !customDraft.categoryId) {
-      setError(tr("Chọn chủ đề và nhập nội dung câu hỏi tự tạo.", "Choose a topic and enter the custom question."))
-      return
+  function collectCustomQuestions(): SurveyQuestionInput[] | null {
+    const merged = [...customQuestions]
+    if (!customDraft.questionText.trim()) return merged
+    if (editingCustomIndex === null && merged.length > 0) {
+      setAuthoringError(tr("Chỉ được thêm một câu hỏi tự tạo. Hãy sửa hoặc xóa câu hiện có.", "You can add one custom question. Edit or remove the existing question first."))
+      return null
     }
-    if (!draft.categoryIds.includes(customDraft.categoryId)) {
-      setError(tr("Câu hỏi tự tạo phải thuộc một chủ đề đã chọn.", "A custom question must belong to a selected topic."))
-      return
+    const input = questionInput(customDraft)
+    if (isChoiceConfig(input.answerConfig) && input.answerConfig.options.length < 2) {
+      setAuthoringError(tr("Câu hỏi lựa chọn cần ít nhất 2 phương án.", "Choice questions require at least two options."))
+      return null
     }
-    const needsOptions =
-      customDraft.questionType === "SINGLE_CHOICE" ||
-      customDraft.questionType === "MULTIPLE_CHOICE"
-    const options = customDraft.options
-      .split("\n")
-      .map((option) => option.trim())
-      .filter(Boolean)
-    if (needsOptions && options.length < 2) {
-      setError(tr("Câu hỏi lựa chọn cần ít nhất 2 phương án.", "Choice questions require at least two options."))
-      return
-    }
+    if (editingCustomIndex === null) merged.push(input)
+    else merged[editingCustomIndex] = input
+    return merged
+  }
 
-    setCustomQuestions((current) => [
-      ...current,
-      questionInput({
-        ...customDraft,
-        displayOrder: 100 + current.length,
-      }),
-    ])
-    setCustomDraft({
-      ...emptyQuestion(),
-      categoryId: draft.categoryIds[0] || 0,
-    })
-    setError("")
+  function commitCustomQuestions(questions: SurveyQuestionInput[]) {
+    setCustomQuestions(questions)
+    setCustomDraft(emptyQuestion())
+    setEditingCustomIndex(null)
+  }
+
+  function addCustomQuestion() {
+    if (!customDraft.questionText.trim()) return
+    const questions = collectCustomQuestions()
+    if (questions) {
+      commitCustomQuestions(questions)
+      setAuthoringError("")
+    }
+  }
+
+  function surveyMetadata() {
+    return {
+      title: draft.title.trim(),
+      description: draft.description.trim() || null,
+      startDate: dateWithZone(draft.startDate),
+      endDate: dateWithZone(draft.endDate, true),
+    }
   }
 
   async function openPreview(survey: SurveySummary) {
     setError("")
+    setAuthoringError("")
     try {
       const detail = await getSurveyForEmployee(survey.id)
-      if (isHr && survey.status === "DRAFT" && !managedSurvey) {
-        setManagedSurvey(detail.data)
-        setDraft({
-          title: survey.title,
-          description: survey.description || "",
-          startDate: employeeDate(survey.startDate),
-          endDate: employeeDate(survey.endDate),
-          categoryIds: [...new Set(detail.data.questions.map((question) => question.categoryId))],
-        })
-      }
+      setPreviewMode("saved")
       setPreviewSurvey(detail.data)
     } catch (cause) {
       setError(getApiErrorMessage(cause, tr("Không thể mở bản xem trước.", "Could not open preview.")))
     }
   }
 
-  async function create(event: FormEvent) {
-    event.preventDefault()
-    if (pending || draft.categoryIds.length === 0) return
-    const submitter = (event.nativeEvent as SubmitEvent)
-      .submitter as HTMLButtonElement | null
-    const publishNow = submitter?.value === "publish"
-    const mergedCustomQuestions = [...customQuestions]
-    if (customDraft.questionText.trim()) {
-      const needsOptions =
-        customDraft.questionType === "SINGLE_CHOICE" ||
-        customDraft.questionType === "MULTIPLE_CHOICE"
-      const optionCount = customDraft.options
-        .split("\n")
-        .map((option) => option.trim())
-        .filter(Boolean).length
-      if (!customDraft.categoryId || (needsOptions && optionCount < 2)) {
-        setError(
-          tr(
-            "Câu hỏi đang nhập chưa đủ chủ đề hoặc ít nhất 2 phương án trả lời.",
-            "The pending question needs a topic and at least two answer options.",
-          ),
-        )
-        return
-      }
-      mergedCustomQuestions.push(questionInput(customDraft))
-    }
-
+  async function persistNewSurvey(questions: SurveyQuestionInput[], publishNow: boolean) {
+    if (pending) return
     setPending(true)
-    setError("")
-    setMessage("")
-
+    setAuthoringError("")
     try {
       const created = await createSurvey({
-        title: draft.title.trim(),
-        description: draft.description.trim() || null,
-
+        ...surveyMetadata(),
         categoryIds: draft.categoryIds,
-        questions: [...stagedQuestions, ...mergedCustomQuestions],
-        startDate: dateWithZone(draft.startDate),
-        endDate: dateWithZone(draft.endDate, true),
+        questions: [...stagedQuestions, ...questions.map(question => ({ ...question, categoryId: draft.categoryIds[0] }))],
       })
-
-      if (publishNow) {
-        const preview = await getSurveyForEmployee(created.data.id)
-        setPreviewSurvey(preview.data)
-      }
-
+      setSurveyFormOpen(false)
       setDraft(emptyDraft())
       setStagedQuestions([])
-      setCustomQuestions([])
-      setCustomDraft(emptyQuestion())
-      setSurveyFormOpen(false)
-      setMessage(
-        publishNow
-          ? "Đã tạo bản nháp. Hãy kiểm tra bản xem trước trước khi xác nhận xuất bản."
-          : "Đã tạo bản nháp khảo sát cùng bộ câu hỏi hài lòng mặc định.",
-      )
-      setReload((value) => value + 1)
+      commitCustomQuestions([])
+      setReload(value => value + 1)
+      if (publishNow) {
+        setPreviewMode("saved")
+        setPreviewSurvey(current => current ? { ...current, ...created.data, questions: current.questions } : null)
+        await publishSurvey(created.data.id)
+        setPreviewSurvey(null)
+        setReload(value => value + 1)
+        setMessage(tr("Đã xuất bản khảo sát.", "Survey published."))
+      } else {
+        setMessage(tr("Đã tạo bản nháp khảo sát.", "Survey draft created."))
+      }
     } catch (cause) {
-      setError(getApiErrorMessage(cause, "Không thể tạo khảo sát."))
+      setAuthoringError(getApiErrorMessage(cause, tr("Không thể hoàn tất thao tác khảo sát.", "Could not complete the survey action.")))
     } finally {
       setPending(false)
     }
+  }
+
+  function create(event: FormEvent) {
+    event.preventDefault()
+    if (pending || catalogState !== "ready" || !selectedCategories.length) return
+    const submitter = (event.nativeEvent as SubmitEvent).submitter as HTMLButtonElement | null
+    setAuthoringError("")
+    const custom = collectCustomQuestions()
+    if (!custom) return
+    const standard = selectedCategories.flatMap(category => category.defaultQuestions)
+    if (standard.length + stagedQuestions.length + custom.length > 200) {
+      setAuthoringError(tr("Khảo sát được phép có tối đa 200 câu hỏi.", "A survey can have at most 200 questions."))
+      return
+    }
+    commitCustomQuestions(custom)
+    if (submitter?.value !== "publish") {
+      void persistNewSurvey(custom, false)
+      return
+    }
+    const questions: SurveyQuestion[] = [...standard, ...stagedQuestions, ...custom].map((question, index) => ({
+      ...question,
+      id: -(index + 1),
+      categoryId: index >= standard.length + stagedQuestions.length ? 0 : question.categoryId,
+      displayOrder: index + 1,
+      isRequired: true,
+      isSatisfactionCore: index < standard.length,
+    }))
+    setPreviewMode("create")
+    setPreviewSurvey({ ...surveyMetadata(), id: 0, status: "DRAFT", questions })
   }
 
   async function saveSurvey(event: FormEvent) {
@@ -548,41 +546,32 @@ export default function ErdSurveys() {
 
   async function loadSurveyContent(survey: SurveySummary) {
     setError("")
+    setAuthoringError("")
 
     try {
-      const detail = await getSurveyForEmployee(survey.id)
-
-      setManagedSurvey(detail.data)
-      setDraft({
-        title: survey.title,
-        description: survey.description || "",
-        startDate: employeeDate(survey.startDate),
-        endDate: employeeDate(survey.endDate),
-        categoryIds: [],
-      })
-
-      const topicResult = await listSurveyCategories()
-
-      const selectedIds = new Set(
-        detail.data.questions.map((question) => question.categoryId),
-      )
-
-      const allowedTopics = topicResult.data.filter((category) =>
-        selectedIds.has(category.id),
-      )
-
+      const [detail, topicResult] = await Promise.all([
+        getSurveyForEmployee(survey.id),
+        listSurveyCategories(),
+      ])
+      if (!topicResult.data.length) throw new Error(tr("Danh mục chủ đề khảo sát đang trống.", "The survey topic catalog is empty."))
       setCategories(topicResult.data)
-      setDraft((current) => ({
-        ...current,
-        categoryIds: [...selectedIds],
-      }))
-
-      setQuestionDraft((current) => ({
-        ...current,
-        categoryId: allowedTopics[0]?.id || 0,
-      }))
+      setCatalogState("ready")
+      setDraft({
+        title: detail.data.title,
+        description: detail.data.description || "",
+        startDate: employeeDate(detail.data.startDate),
+        endDate: employeeDate(detail.data.endDate),
+        categoryIds: [...new Set(detail.data.questions.map((question) => question.categoryId))],
+      })
+      savedDraftQuestionIds.current.clear()
+      setManagedSurvey(detail.data)
+      setPreviewSurvey(null)
     } catch (cause) {
-      setError(getApiErrorMessage(cause, "Không thể tải nội dung khảo sát."))
+      const message = cause instanceof ApiError && cause.status === 409
+        ? tr("Danh mục câu hỏi không nhất quán. Cần kiểm tra danh mục trước khi chỉnh sửa bản nháp.", "The question catalog is inconsistent. Check it before editing drafts.")
+        : getApiErrorMessage(cause, tr("Không thể tải nội dung khảo sát.", "Could not load the survey."))
+      if (previewSurvey) setAuthoringError(message)
+      else setError(message)
     }
   }
 
@@ -592,7 +581,7 @@ export default function ErdSurveys() {
   ) {
     if (!managedSurvey || pending) return
     setPending(true)
-    setError("")
+    setAuthoringError("")
     try {
       await updateSurvey(managedSurvey.id, {
         title: draft.title.trim(),
@@ -601,14 +590,11 @@ export default function ErdSurveys() {
         endDate: dateWithZone(draft.endDate, true),
       })
 
-      const originalCustom = managedSurvey.questions.filter(
-        (question) => !question.isSatisfactionCore,
-      )
-      const currentIds = new Set(
-        questions.filter((question) => question.id > 0).map((question) => question.id),
-      )
-      for (const question of originalCustom)
-        if (!currentIds.has(question.id))
+      const { data: latest } = await getSurveyForEmployee(managedSurvey.id)
+      const currentIds = new Set(questions.map(question => savedDraftQuestionIds.current.get(question.id) ?? question.id))
+      const knownIds = new Set([...managedSurvey.questions.map(question => question.id), ...savedDraftQuestionIds.current.values()])
+      for (const question of latest.questions)
+        if (!question.isSatisfactionCore && knownIds.has(question.id) && !currentIds.has(question.id))
           await deleteSurveyQuestion(managedSurvey.id, question.id)
 
       for (const question of questions.filter((item) => !item.isSatisfactionCore)) {
@@ -619,23 +605,35 @@ export default function ErdSurveys() {
           answerConfig: question.answerConfig,
           displayOrder: question.displayOrder,
         }
-        if (question.id > 0)
-          await updateSurveyQuestion(managedSurvey.id, question.id, input)
-        else await addSurveyQuestion(managedSurvey.id, input)
+        const persistedId = savedDraftQuestionIds.current.get(question.id) ?? question.id
+        if (persistedId > 0) {
+          const original = latest.questions.find(item => item.id === persistedId)
+          if (original && Object.entries(input).every(([key, value]) => JSON.stringify(value) === JSON.stringify(original[key as keyof SurveyQuestion]))) continue
+          await updateSurveyQuestion(managedSurvey.id, persistedId, input)
+        } else {
+          const saved = await addSurveyQuestion(managedSurvey.id, input)
+          savedDraftQuestionIds.current.set(question.id, saved.data.id)
+        }
       }
 
       const refreshed = await getSurveyForEmployee(managedSurvey.id)
       setManagedSurvey(null)
       setDraft(emptyDraft())
       setReload((value) => value + 1)
-      if (publishAfterSave) setPreviewSurvey(refreshed.data)
+      if (publishAfterSave) {
+        setPreviewMode("saved")
+        setPreviewSurvey(refreshed.data)
+        await publishSurvey(refreshed.data.id)
+        setPreviewSurvey(null)
+        setReload(value => value + 1)
+      }
       setMessage(
         publishAfterSave
-          ? "Đã lưu bản nháp. Hãy kiểm tra bản xem trước trước khi xuất bản."
+          ? "Đã xuất bản khảo sát."
           : "Đã lưu thay đổi bản nháp.",
       )
     } catch (cause) {
-      setError(getApiErrorMessage(cause, "Không thể lưu thay đổi bản nháp."))
+      setAuthoringError(getApiErrorMessage(cause, "Không thể hoàn tất lưu hoặc xuất bản bản nháp."))
     } finally {
       setPending(false)
     }
@@ -754,11 +752,12 @@ export default function ErdSurveys() {
 
     try {
       await publishSurvey(id)
+      setPreviewSurvey(null)
       setManagedSurvey(null)
       setMessage("Đã xuất bản khảo sát.")
       setReload((value) => value + 1)
     } catch (cause) {
-      setError(getApiErrorMessage(cause, "Không thể xuất bản khảo sát."))
+      setAuthoringError(getApiErrorMessage(cause, "Không thể xuất bản khảo sát."))
     } finally {
       setPending(false)
     }
@@ -955,11 +954,7 @@ export default function ErdSurveys() {
       (sum, survey) => sum + surveyResponseCount(survey, results[survey.id]),
       0,
     )
-    const totalInvited = surveys.reduce(
-      (sum, survey) =>
-        sum + surveyInvitedCount(survey, results[survey.id], totalEmployees),
-      0,
-    )
+    const totalInvited = surveys.filter(survey => survey.status !== "DRAFT").length * totalEmployees
     const scores = surveys.flatMap((survey) => {
       const score = surveyAverageScore(results[survey.id])
       return score == null
@@ -982,8 +977,8 @@ export default function ErdSurveys() {
   const exportSurveyCsv = (survey: SurveySummary, result?: SurveyResults) => {
     if (!result) return
     const rows = [
-      ["survey_id", "title", "invited", "submitted", "completion_rate"],
-      [survey.id, survey.title, result.invitedCount, result.responseCount, result.completionRate ?? 0],
+      ["survey_id", "title", "active_employees", "submitted", "completion_rate"],
+      [survey.id, survey.title, totalEmployees, result.responseCount, surveyResponseRate(survey, result, totalEmployees)],
       [],
       ["category", "valid_responses", "engagement_score"],
       ...result.categoryScores.map((category) => [
@@ -1005,7 +1000,7 @@ export default function ErdSurveys() {
 
   const renderSurveyCard = (survey: SurveySummary) => {
     const result = results[survey.id]
-    const invited = surveyInvitedCount(survey, result, totalEmployees)
+    const invited = totalEmployees
     const responses = surveyResponseCount(survey, result)
     const responseRate = surveyResponseRate(survey, result, totalEmployees)
     const responseTone = progressTone(responseRate)
@@ -1073,11 +1068,11 @@ export default function ErdSurveys() {
                 </div>
                 <strong className={`text-sm font-bold tabular-nums ${responseTone.text}`}>{responseRate.toFixed(1)}%</strong>
               </div>
-              <div className="mt-3 h-2.5 overflow-hidden rounded-full bg-slate-100" role="progressbar" aria-label={`Tiến độ phản hồi ${survey.title}`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(responseRate)}>
+              <div className="mt-3 h-2.5 overflow-hidden rounded-full bg-slate-100" role="progressbar" aria-label={`Tiến độ phản hồi ${survey.title}`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.min(100, Math.round(responseRate))}>
                 <span className={`block h-full rounded-full bg-gradient-to-r transition-all duration-500 ease-out ${responseTone.fill}`} style={{ width: `${Math.min(100, Math.max(0, responseRate))}%` }} />
               </div>
               <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs">
-                <span className={`font-semibold ${responseTone.text}`}>{language === "vi" ? responseTone.hintVi : responseTone.hintEn}</span>
+                <span className={`rounded-full px-2 py-1 font-semibold ${responseRate >= 60 ? "bg-emerald-50" : "bg-amber-50"} ${responseTone.text}`}>{language === "vi" ? responseTone.hintVi : responseTone.hintEn}</span>
                 {isClosed && <span className="font-semibold text-slate-600">{tr("Điểm gắn kết", "Engagement")}: {averageScore?.toFixed(2) ?? "—"} / 5</span>}
               </div>
             </div>
@@ -1087,7 +1082,7 @@ export default function ErdSurveys() {
             <div className="flex flex-wrap gap-2 lg:flex-col lg:items-stretch">
               {isDraft ? (
                 <>
-                  <Button size="sm" variant="secondary" onClick={() => void loadSurveyContent(survey)}><Pencil size={15} />{tr("Chỉnh sửa", "Edit")}</Button>
+                  <Button size="sm" variant="secondary" disabled={pending} onClick={() => void loadSurveyContent(survey)}><Pencil size={15} />{tr("Chỉnh sửa", "Edit")}</Button>
                   <Button size="sm" disabled={pending} onClick={() => void openPreview(survey)}><PlayCircle size={15} />{tr("Xem trước & xuất bản", "Preview & publish")}</Button>
                 </>
               ) : isClosed ? (
@@ -1110,6 +1105,9 @@ export default function ErdSurveys() {
         {isHr && openResults === survey.id && result && (
           <ResultOverview
             result={result}
+            totalEmployees={totalEmployees}
+            employeeDirectory={employeeDirectory}
+            departments={departments}
             participants={participantsBySurvey[survey.id] || []}
           />
         )}
@@ -1149,6 +1147,8 @@ export default function ErdSurveys() {
               setStagedQuestions([])
               setCustomQuestions([])
               setCustomDraft(emptyQuestion())
+              setEditingCustomIndex(null)
+              setAuthoringError("")
               setSurveyFormOpen(true)
             }}
           >
@@ -1234,18 +1234,21 @@ export default function ErdSurveys() {
             <div
               className="fixed inset-0 z-[75] flex items-center justify-center bg-slate-950/45 p-3 backdrop-blur-[1px] sm:p-5"
               role="dialog"
-              aria-modal="true"
+              aria-modal={!previewSurvey}
+              hidden={Boolean(previewSurvey)}
+              style={previewSurvey ? { display: "none" } : undefined}
               aria-labelledby="create-survey-title"
             >
-            <section className="flex max-h-[calc(100vh-2rem)] w-full max-w-6xl flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl shadow-slate-950/20">
-              <header className="flex items-start justify-between gap-4 border-b border-slate-200 px-5 py-4">
+            <section className={surveyStudioShell}>
+              <header className="flex min-h-16 shrink-0 items-start justify-between gap-4 border-b border-slate-200 px-4 py-3 sm:px-6">
                 <div className="flex min-w-0 items-start gap-3">
                   <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-orange-50 text-orange-600">
                     <FilePlus2 size={18} />
                   </span>
-                  <div>
+                  <div className="min-w-0">
                     <h2 id="create-survey-title" className="text-lg font-semibold text-slate-950">
                       {t("Create a new survey")}
+                      <span className="ml-2 inline-flex rounded-full bg-amber-50 px-2 py-0.5 align-middle text-xs font-semibold text-amber-800">{tr("Bản nháp", "Draft")}</span>
                     </h2>
                     <p className="mt-0.5 text-sm font-medium text-slate-600">
                       {t(
@@ -1258,6 +1261,7 @@ export default function ErdSurveys() {
                   type="button"
                   variant="secondary"
                   className="shrink-0"
+                  disabled={pending}
                   onClick={() => {
                     setSurveyFormOpen(false)
                     setDraft(emptyDraft())
@@ -1271,9 +1275,12 @@ export default function ErdSurveys() {
               </header>
               <form
                 onSubmit={(event) => void create(event)}
-                className="grid min-h-0 gap-5 overflow-y-auto p-5 sm:grid-cols-2 sm:p-6"
+                className="flex min-h-0 flex-1 flex-col"
               >
-                <label className="text-sm font-semibold text-slate-700">
+                <div className={surveyStudioBody}>
+                  <div className={surveyStudioSettings} aria-label={tr("Thiết lập & chủ đề", "Settings and topics")}>
+                {authoringError && <p role="alert" className="rounded-lg bg-rose-50 p-3 text-sm text-rose-800 sm:col-span-2">{authoringError}</p>}
+                <label className="block min-w-0 text-sm font-semibold text-slate-700">
                   {t("Title")}
                   <input
                     required
@@ -1288,11 +1295,12 @@ export default function ErdSurveys() {
                     }
                   />
                 </label>
-                <label className="text-sm font-semibold text-slate-700">
+                <label className="block min-w-0 text-sm font-semibold text-slate-700">
                   {t("Survey purpose")}
-                  <input
+                  <textarea
+                    rows={2}
                     maxLength={4000}
-                    className={control}
+                    className={`${area} min-h-16 resize-y`}
                     value={draft.description}
                     onChange={(event) =>
                       setDraft((value) => ({
@@ -1302,7 +1310,8 @@ export default function ErdSurveys() {
                     }
                   />
                 </label>
-                <label className="text-sm font-semibold text-slate-700">
+                <div className="grid grid-cols-2 gap-2">
+                <label className="block min-w-0 text-sm font-semibold text-slate-700">
                   {t("Start date")}
                   <input
                     required
@@ -1317,7 +1326,7 @@ export default function ErdSurveys() {
                     }
                   />
                 </label>
-                <label className="text-sm font-semibold text-slate-700">
+                <label className="block min-w-0 text-sm font-semibold text-slate-700">
                   {t("End date")}
                   <input
                     required
@@ -1338,8 +1347,7 @@ export default function ErdSurveys() {
                     </span>
                   )}
                 </label>
-                {!editSurvey && (
-                  <>
+                </div>
                     <div className="flex items-center gap-2 rounded-lg border border-blue-100 bg-blue-50/60 px-3 py-2 text-sm font-medium text-blue-800 sm:col-span-2">
                       <Users size={17} className="shrink-0" />
                       {directoryLoading
@@ -1354,9 +1362,17 @@ export default function ErdSurveys() {
                         {t("Survey topics")}
                       </legend>
                       <p className="mt-1 text-sm font-medium text-slate-600">
-                        {tr("Chọn chủ đề cần đo lường; câu hỏi chuẩn sẽ được thêm tự động.", "Select topics to measure; standard questions are added automatically.")}
+                        {tr("Mỗi chủ đề tự động thêm các câu chuẩn từ danh mục. Các câu này được khóa để tính điểm.", "Each selected topic adds its standard questions from the catalog. Those questions are locked for scoring.")}
                       </p>
-                      <div className="mt-2 grid grid-cols-2 gap-2 md:grid-cols-3 lg:grid-cols-4">
+                      {catalogState !== "ready" && <div role={catalogState === "loading" ? "status" : "alert"} className="mt-3 flex flex-wrap items-center gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
+                        {catalogState === "loading"
+                          ? tr("Đang tải danh mục chủ đề…", "Loading the topic catalog…")
+                          : catalogState === "inconsistent"
+                            ? tr("Danh mục câu hỏi không nhất quán. Cần kiểm tra danh mục trên máy chủ để tiếp tục tạo khảo sát.", "The question catalog is inconsistent. It needs to be checked on the server before you can create a survey.")
+                            : tr("Danh mục chủ đề chưa khả dụng. Hãy tải lại để tiếp tục tạo khảo sát.", "The topic catalog is unavailable. Retry to continue creating the survey.")}
+                        {catalogState !== "loading" && <Button type="button" variant="secondary" onClick={() => setCatalogRetry(value => value + 1)}>{tr("Tải lại chủ đề", "Retry topics")}</Button>}
+                      </div>}
+                      <div className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-1">
                         {categories.map((category) => {
                           const selected = draft.categoryIds.includes(
                             category.id,
@@ -1377,7 +1393,7 @@ export default function ErdSurveys() {
                                 {topicLabel(category.name, language)}
                               </span>
                               <span className={`shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${selected ? "bg-orange-100 text-orange-800" : "bg-slate-100 text-slate-500"}`}>
-                                {category.defaultQuestions.length} {tr("câu", "items")}
+                                {category.defaultQuestions.length} {tr("câu chuẩn", "standard")}
                               </span>
                               <input
                                 type="checkbox"
@@ -1390,19 +1406,32 @@ export default function ErdSurveys() {
                         })}
                       </div>
                     </fieldset>
-                    {draft.categoryIds.length > 0 && (
+                  </div>
+                  <div className={surveyStudioQuestions} aria-label={tr("Quản lý câu hỏi", "Question management")}>
+                    {selectedCategories.length > 0 ? (
                       <SurveyQuestionWizard
                         categories={selectedCategories}
                         stagedQuestions={stagedQuestions}
                         customQuestions={customQuestions}
                         customDraft={customDraft}
+                        editingCustom={editingCustomIndex !== null}
                         onToggleBank={toggleBankQuestion}
+                        onSetBank={(category, selected) => setStagedQuestions(current => [
+                          ...current.filter(question => question.categoryId !== category.id),
+                          ...(selected ? category.questionBank.map(({ questionText, categoryId, questionType, answerConfig, displayOrder }) => ({ questionText, categoryId, questionType, answerConfig, displayOrder })) : []),
+                        ])}
                         onCustomDraft={setCustomDraft}
                         onAddCustom={addCustomQuestion}
                         onRemoveCustom={(index) =>
-                          setCustomQuestions((current) =>
-                            current.filter((_, itemIndex) => itemIndex !== index),
-                          )
+                          {
+                            setCustomQuestions(current => current.filter((_, itemIndex) => itemIndex !== index))
+                            if (editingCustomIndex === index) {
+                              setCustomDraft(emptyQuestion())
+                              setEditingCustomIndex(null)
+                            } else if (editingCustomIndex !== null && editingCustomIndex > index) {
+                              setEditingCustomIndex(editingCustomIndex - 1)
+                            }
+                          }
                         }
                         onEditCustom={(index) => {
                           const question = customQuestions[index]
@@ -1415,166 +1444,22 @@ export default function ErdSurveys() {
                               : "",
                             displayOrder: question.displayOrder,
                           })
-                          setCustomQuestions((current) => current.filter((_, itemIndex) => itemIndex !== index))
+                          setEditingCustomIndex(index)
                         }}
                       />
-                    )}
-                    {false && draft.categoryIds.length > 0 && (
-                      <div className="grid gap-3 sm:col-span-2 xl:grid-cols-3">
-                        <details className="h-fit rounded-xl border border-slate-200 bg-white p-4">
-                          <summary className="cursor-pointer text-[15px] font-semibold text-slate-900 marker:text-orange-500">
-                            {defaultCount} câu hỏi hài lòng mặc định
-                          </summary>
-                          <ol className="mt-3 space-y-2 text-sm font-medium leading-5 text-slate-700">
-                            {selectedCategories.flatMap((category) =>
-                              category.defaultQuestions.map((question) => (
-                                <li
-                                  key={
-                                    question.templateCode ||
-                                    question.catalogQuestionId
-                                  }
-                                  className="rounded-lg bg-slate-50 px-3 py-2"
-                                >
-                                  <span className="font-semibold text-orange-700">
-                                    {topicLabel(category.name, language)}:
-                                  </span>{" "}
-                                  {question.questionText}
-                                </li>
-                              )),
-                            )}
-                          </ol>
-                        </details>
-                        <details className="h-fit rounded-xl border border-slate-200 bg-white p-4">
-                          <summary className="cursor-pointer text-[15px] font-semibold text-slate-900 marker:text-blue-600">
-                            Câu hỏi bổ sung{" "}
-                            <span className="ml-1 text-sm font-semibold text-blue-700">
-                              ({stagedQuestions.length} đã chọn)
-                            </span>
-                          </summary>
-                          <div className="mt-4 space-y-4">
-                            {selectedCategories.map((category) => (
-                              <section key={category.id}>
-                                <h4 className="text-sm font-semibold text-slate-800">
-                                  {topicLabel(category.name, language)}
-                                </h4>
-                                <div className="mt-2 grid gap-2">
-                                  {category.questionBank.map((question) => {
-                                    const selected = stagedQuestions.some(
-                                      (item) =>
-                                        questionKey(item) ===
-                                        questionKey(question),
-                                    )
-                                    return (
-                                      <button
-                                        key={
-                                          question.bankCode ||
-                                          question.catalogQuestionId
-                                        }
-                                        type="button"
-                                        aria-pressed={selected}
-                                        onClick={() =>
-                                          toggleBankQuestion(question)
-                                        }
-                                        className={`rounded-lg border px-3 py-2.5 text-left text-sm font-medium leading-5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 ${
-                                          selected
-                                            ? "border-blue-500 bg-blue-50 text-blue-950"
-                                            : "border-slate-200 bg-white text-slate-700 hover:border-blue-300 hover:bg-blue-50/40"
-                                        }`}
-                                      >
-                                        <span className="mr-2 font-bold text-blue-700">
-                                          {selected ? "✓" : "+"}
-                                        </span>
-                                        {question.questionText}
-                                      </button>
-                                    )
-                                  })}
-                                </div>
-                              </section>
-                            ))}
-                          </div>
-                        </details>
-                        <details className="h-fit rounded-xl border border-slate-200 bg-white p-4">
-                          <summary className="cursor-pointer text-[15px] font-semibold text-slate-900 marker:text-emerald-600">
-                            + {tr("Câu hỏi tự tạo", "Custom questions")} ({customQuestions.length})
-                          </summary>
-                          <div className="mt-4 space-y-3">
-                            <label className="block text-xs font-semibold text-slate-600">
-                              {tr("Chủ đề", "Topic")}
-                              <select
-                                className={`${control} mt-1`}
-                                value={customDraft.categoryId}
-                                onChange={(event) => setCustomDraft((current) => ({ ...current, categoryId: Number(event.target.value) }))}
-                              >
-                                <option value={0}>{tr("Chọn chủ đề", "Choose a topic")}</option>
-                                {selectedCategories.map((category) => (
-                                  <option key={category.id} value={category.id}>{topicLabel(category.name, language)}</option>
-                                ))}
-                              </select>
-                            </label>
-                            <label className="block text-xs font-semibold text-slate-600">
-                              {tr("Dạng trả lời", "Answer type")}
-                              <select
-                                className={`${control} mt-1`}
-                                value={customDraft.questionType}
-                                onChange={(event) => setCustomDraft((current) => ({ ...current, questionType: event.target.value as SurveyQuestionType }))}
-                              >
-                                <option value="SINGLE_CHOICE">{tr("Chọn một", "Single choice")}</option>
-                                <option value="MULTIPLE_CHOICE">{tr("Chọn nhiều", "Multiple choice")}</option>
-                                <option value="RATING">{tr("Thang điểm 1–5", "Rating 1–5")}</option>
-                                <option value="TEXT">{tr("Văn bản", "Free text")}</option>
-                              </select>
-                            </label>
-                            <label className="block text-xs font-semibold text-slate-600">
-                              {tr("Nội dung câu hỏi", "Question text")}
-                              <textarea
-                                rows={3}
-                                maxLength={1000}
-                                className={`${area} mt-1 min-h-20`}
-                                value={customDraft.questionText}
-                                onChange={(event) => setCustomDraft((current) => ({ ...current, questionText: event.target.value }))}
-                              />
-                            </label>
-                            {(customDraft.questionType === "SINGLE_CHOICE" || customDraft.questionType === "MULTIPLE_CHOICE") && (
-                              <label className="block text-xs font-semibold text-slate-600">
-                                {tr("Phương án trả lời · mỗi dòng một phương án", "Answer options · one per line")}
-                                <textarea
-                                  rows={3}
-                                  className={`${area} mt-1 min-h-20`}
-                                  value={customDraft.options}
-                                  onChange={(event) => setCustomDraft((current) => ({ ...current, options: event.target.value }))}
-                                />
-                              </label>
-                            )}
-                            <div className="flex items-center justify-between gap-2">
-                              <span className="text-xs font-medium text-slate-500">✓ {tr("Bắt buộc trả lời", "Required")}</span>
-                              <Button type="button" size="sm" variant="secondary" onClick={addCustomQuestion}>
-                                <Plus size={14} /> {tr("Thêm câu hỏi", "Add question")}
-                              </Button>
-                            </div>
-                            {customQuestions.length > 0 && (
-                              <div className="space-y-2 border-t border-slate-100 pt-3">
-                                {customQuestions.map((question, index) => (
-                                  <div key={`${question.questionText}-${index}`} className="flex gap-2 rounded-lg bg-slate-50 p-2.5 text-xs text-slate-700">
-                                    <span className="min-w-0 flex-1"><strong>{questionTypeLabels[question.questionType]}</strong><br />{question.questionText}</span>
-                                    <button type="button" aria-label={tr("Xóa câu hỏi", "Remove question")} className="text-slate-400 hover:text-rose-600" onClick={() => setCustomQuestions((current) => current.filter((_, itemIndex) => itemIndex !== index))}>
-                                      <X size={15} />
-                                    </button>
-                                  </div>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                        </details>
+                    ) : (
+                      <div className="grid min-h-40 flex-1 place-items-center px-6 py-10 text-center text-sm text-slate-600">
+                        {tr("Chọn chủ đề để xem câu hỏi chuẩn và ngân hàng bổ sung.", "Select a topic to view its standard questions and question bank.")}
                       </div>
                     )}
-                  </>
-                )}
-                <div className="sticky -bottom-5 z-10 -mx-5 -mb-5 flex flex-col gap-3 border-t border-slate-200 bg-white/95 px-5 py-4 backdrop-blur sm:col-span-2 sm:-mx-6 sm:-mb-6 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+                  </div>
+                </div>
+                <div className={surveyStudioFooter}>
                   <p className="flex items-center gap-2 text-sm font-medium text-slate-700">
                     <Sparkles size={17} className="shrink-0 text-orange-500" />
                     {tr(
-                      `Đã chọn: ${draft.categoryIds.length} chủ đề · ${totalQuestionCount} câu hỏi · Gửi tới ${totalEmployees} nhân sự`,
-                      `Selected: ${draft.categoryIds.length} topics · ${totalQuestionCount} questions · ${totalEmployees} recipients`,
+                      `Đã chọn: ${draft.categoryIds.length} chủ đề · ${totalQuestionCount} câu hỏi (${defaultCount} câu chuẩn · ${stagedQuestions.length} bổ sung · ${totalQuestionCount - defaultCount - stagedQuestions.length} tự tạo) · Gửi tới ${totalEmployees} nhân sự`,
+                      `Selected: ${draft.categoryIds.length} topics · ${totalQuestionCount} questions (${defaultCount} standard · ${stagedQuestions.length} bank · ${totalQuestionCount - defaultCount - stagedQuestions.length} custom) · ${totalEmployees} recipients`,
                     )}
                   </p>
                   <div className="flex flex-wrap justify-end gap-2">
@@ -1596,7 +1481,7 @@ export default function ErdSurveys() {
                       name="createAction"
                       value="draft"
                       variant="secondary"
-                      disabled={pending || draft.categoryIds.length === 0}
+                      disabled={pending || catalogState !== "ready" || selectedCategories.length === 0}
                     >
                       {t(pending ? "Saving..." : "Create draft")}
                     </Button>
@@ -1604,7 +1489,8 @@ export default function ErdSurveys() {
                       type="submit"
                       name="createAction"
                       value="publish"
-                      disabled={pending || draft.categoryIds.length === 0}
+                      className="bg-gradient-to-r from-orange-600 to-red-600 text-white hover:from-orange-700 hover:to-red-700"
+                      disabled={pending || catalogState !== "ready" || selectedCategories.length === 0}
                     >
                       <Send size={15} />
                       {tr("Xem trước & phát hành", "Preview & publish")}
@@ -1618,7 +1504,7 @@ export default function ErdSurveys() {
         </>
       )}
 
-      {managedSurvey && !previewSurvey && !publishTarget && (
+      {managedSurvey && (
         <SurveyDraftEditor
           survey={managedSurvey}
           categories={categories}
@@ -1626,8 +1512,22 @@ export default function ErdSurveys() {
           totalEmployees={totalEmployees}
           pending={pending}
           onMetadata={setDraft}
-          onSave={(questions, publishAfterSave) => void saveStudio(questions, publishAfterSave)}
-          onPreview={(questions) => setPreviewSurvey({ ...managedSurvey, ...draft, questions })}
+          hidden={Boolean(previewSurvey || publishTarget)}
+          error={authoringError}
+          onSave={(questions, publishAfterSave) => {
+            if (!publishAfterSave) {
+              void saveStudio(questions, false)
+              return
+            }
+            setPreviewMode("edit")
+            setAuthoringError("")
+            setPreviewSurvey({ ...managedSurvey, ...surveyMetadata(), questions })
+          }}
+          onPreview={(questions) => {
+            setPreviewMode("edit")
+            setAuthoringError("")
+            setPreviewSurvey({ ...managedSurvey, ...surveyMetadata(), questions })
+          }}
           onClose={() => {
             setManagedSurvey(null)
             setQuestionDraft(emptyQuestion())
@@ -1647,16 +1547,19 @@ export default function ErdSurveys() {
           onSubmit={() => void submit(activeSurvey.id)}
         />
       )}
-      {previewSurvey && (
+      {previewSurvey && !publishTarget && (
         <SurveyPreviewModal
           survey={previewSurvey}
           categories={categories}
           totalEmployees={totalEmployees}
-          onClose={() => setPreviewSurvey(null)}
-          onPublish={previewSurvey.status === "DRAFT" ? () => {
-            setPublishTarget(previewSurvey)
-            setPreviewSurvey(null)
+          pending={pending}
+          error={authoringError}
+          onClose={() => { if (!pending) setPreviewSurvey(null) }}
+          onBack={previewSurvey.status === "DRAFT" ? () => {
+            if (previewMode === "saved") void loadSurveyContent(previewSurvey)
+            else setPreviewSurvey(null)
           } : undefined}
+          onPublish={previewSurvey.status === "DRAFT" ? () => setPublishTarget(previewSurvey) : undefined}
         />
       )}
 
@@ -1725,7 +1628,7 @@ export default function ErdSurveys() {
                 </label>
                 <label>
                   <span className="sr-only">{tr("Sắp xếp khảo sát", "Sort surveys")}</span>
-                  <select
+                  <SelectControl
                     className="h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 outline-none focus:border-orange-400 focus:ring-4 focus:ring-orange-100"
                     value={sortBy}
                     onChange={(event) => setSortBy(event.target.value as typeof sortBy)}
@@ -1733,7 +1636,7 @@ export default function ErdSurveys() {
                     <option value="NEWEST">{tr("Mới nhất", "Newest")}</option>
                     <option value="END_SOON">{tr("Hạn chót gần nhất", "Nearest deadline")}</option>
                     <option value="RESPONSE_DESC">{tr("Tỷ lệ tham gia cao nhất", "Highest response rate")}</option>
-                  </select>
+                  </SelectControl>
                 </label>
               </div>
             </Card>
@@ -1802,7 +1705,7 @@ export default function ErdSurveys() {
                   : group.status === "ACTIVE"
                     ? "bg-emerald-100 text-emerald-800"
                     : "bg-slate-200 text-slate-700"
-                const opened = openGroups[group.status]
+                const opened = openGroups[group.status] && (group.status !== "DRAFT" || group.items.length > 0)
                 return (
                   <section key={group.status} className="overflow-hidden rounded-xl border border-slate-200 bg-slate-50/50">
                     <button
@@ -1821,7 +1724,7 @@ export default function ErdSurveys() {
                 )
               }) : visibleSurveys.map((survey) => {
                 const result = results[survey.id]
-                const invited = surveyInvitedCount(survey, result, totalEmployees)
+                const invited = totalEmployees
                 const responses = surveyResponseCount(survey, result)
                 const responseRate = surveyResponseRate(
                   survey,
@@ -1867,7 +1770,7 @@ export default function ErdSurveys() {
                           </div>
                           <strong className={`text-sm font-bold tabular-nums ${responseTone.text}`}>{responseRate.toFixed(1)}%</strong>
                         </div>
-                        <div className="mt-3 h-2.5 overflow-hidden rounded-full bg-slate-100" role="progressbar" aria-label={`Tiến độ phản hồi ${survey.title}`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(responseRate)}>
+                        <div className="mt-3 h-2.5 overflow-hidden rounded-full bg-slate-100" role="progressbar" aria-label={`Tiến độ phản hồi ${survey.title}`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.min(100, Math.round(responseRate))}>
                           <span className={`block h-full rounded-full bg-gradient-to-r transition-all duration-500 ease-out ${responseTone.fill}`} style={{ width: `${Math.min(100, Math.max(0, responseRate))}%` }} />
                         </div>
                         <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
@@ -1963,6 +1866,9 @@ export default function ErdSurveys() {
                     {isHr && openResults === survey.id && result && (
                       <ResultOverview
                         result={result}
+                        totalEmployees={totalEmployees}
+                        employeeDirectory={employeeDirectory}
+                        departments={departments}
                         participants={participantsBySurvey[survey.id] || []}
                       />
                     )}
@@ -1980,6 +1886,7 @@ export default function ErdSurveys() {
       {detailResult && (
         <SurveyResultDetails
           result={detailResult.result}
+          totalEmployees={totalEmployees}
           participants={detailResult.participants}
           onClose={() => setDetailResult(null)}
         />
@@ -1996,7 +1903,10 @@ export default function ErdSurveys() {
         onConfirm={() => {
           const target = publishTarget
           setPublishTarget(null)
-          if (target) void publish(target.id)
+          if (!target) return
+          if (previewMode === "create") void persistNewSurvey(customQuestions, true)
+          else if (previewMode === "edit" && previewSurvey) void saveStudio(previewSurvey.questions, true)
+          else void publish(target.id)
         }}
       />
     </AppShell>
@@ -2279,7 +2189,7 @@ function SurveyContentEditor({
             </h3>
             <label className="mt-4 block text-sm font-semibold text-slate-700">
               Chủ đề
-              <select
+              <SelectControl
                 required
                 className={control}
                 value={draft.categoryId}
@@ -2293,11 +2203,11 @@ function SurveyContentEditor({
                     {topicLabel(category.name)}
                   </option>
                 ))}
-              </select>
+              </SelectControl>
             </label>
             <label className="mt-4 block text-sm font-semibold text-slate-700">
               Loại câu hỏi
-              <select
+              <SelectControl
                 className={control}
                 value={draft.questionType}
                 onChange={(event) =>
@@ -2312,7 +2222,7 @@ function SurveyContentEditor({
                     {label}
                   </option>
                 ))}
-              </select>
+              </SelectControl>
             </label>
             <label className="mt-4 block text-sm font-semibold text-slate-700">
               Nội dung
@@ -2624,29 +2534,32 @@ function EmployeeSurveyForm({
 
 function ResultOverview({
   result,
+  totalEmployees,
+  employeeDirectory,
+  departments,
   participants,
 }: {
   result: SurveyResults
+  totalEmployees: number
+  employeeDirectory: EmployeeProfile[]
+  departments: ApiDepartment[]
   participants: SurveyParticipant[]
 }) {
   const { language } = useLanguage()
   const tr = (vi: string, en: string) => (language === "vi" ? vi : en)
-  const invitedCount = result.invitedCount
+  const invitedCount = totalEmployees
   const submittedCount = result.responseCount
-  const pendingCount = Math.max(0, invitedCount - submittedCount)
-  const completionRate =
-    result.completionRate ??
-    (invitedCount > 0
-      ? Math.round((submittedCount / invitedCount) * 1_000) / 10
-      : 0)
+  const completionRate = surveyResponseRate(result.survey, result, totalEmployees)
   const tone = progressTone(completionRate)
   const departmentProgress = useMemo(() => {
     const groups = new Map<string, { invited: number; submitted: number }>()
-    participants.forEach((participant) => {
-      const name = participant.departmentName || tr("Chưa xác định", "Unassigned")
+    const departmentNames = new Map(departments.map(department => [department.id, department.name]))
+    const submittedIds = new Set(participants.filter(participant => participant.status === "SUBMITTED").map(participant => participant.employeeId))
+    employeeDirectory.forEach(employee => {
+      const name = departmentNames.get(employee.departmentId) ?? tr("Chưa xác định", "Unassigned")
       const current = groups.get(name) || { invited: 0, submitted: 0 }
       current.invited += 1
-      if (participant.status === "SUBMITTED") current.submitted += 1
+      if (submittedIds.has(employee.id)) current.submitted += 1
       groups.set(name, current)
     })
     return [...groups.entries()]
@@ -2656,7 +2569,7 @@ function ResultOverview({
         rate: counts.invited > 0 ? (counts.submitted / counts.invited) * 100 : 0,
       }))
       .sort((left, right) => left.rate - right.rate)
-  }, [participants, language])
+  }, [participants, employeeDirectory, departments, language])
 
   return (
     <div className="border-t border-slate-200 bg-slate-50/70 p-5 sm:p-6">
@@ -2667,17 +2580,18 @@ function ResultOverview({
             {tr("Tiến độ tham gia", "Participation progress")}
           </p>
           <strong className={`mt-1 block text-3xl font-bold tracking-tight ${tone.text}`}>{completionRate.toFixed(1)}%</strong>
+          <p className="mt-1 text-sm font-semibold text-slate-700">{submittedCount} / {invitedCount} {tr("nhân sự", "employees")}</p>
         </div>
         <div className="min-w-0 flex-1 lg:max-w-xl">
           <div className="flex items-center justify-between gap-3 text-sm">
-            <span className={`font-semibold ${tone.text}`}>{language === "vi" ? tone.hintVi : tone.hintEn}</span>
+            <span className={`rounded-full px-2 py-1 font-semibold ${completionRate >= 60 ? "bg-emerald-50" : "bg-amber-50"} ${tone.text}`}>{language === "vi" ? tone.hintVi : tone.hintEn}</span>
           </div>
           <div
             className="mt-2 h-2.5 overflow-hidden rounded-full bg-slate-100"
             role="progressbar"
             aria-valuemin={0}
             aria-valuemax={100}
-            aria-valuenow={Math.round(completionRate)}
+            aria-valuenow={Math.min(100, Math.round(completionRate))}
           >
             <span
               className={`block h-full rounded-full bg-gradient-to-r transition-all duration-500 ease-out ${tone.fill}`}
@@ -2687,9 +2601,8 @@ function ResultOverview({
         </div>
         </div>
         <div className="mt-4 flex flex-wrap gap-x-6 gap-y-2 border-t border-slate-100 pt-4 text-sm">
-          <span className="text-slate-500">{tr("Tổng mời", "Invited")}: <strong className="text-slate-900">{invitedCount}</strong></span>
+          <span className="text-slate-500">{tr("Nhân sự đang làm việc", "Active employees")}: <strong className="text-slate-900">{invitedCount}</strong></span>
           <span className="text-slate-500">{tr("Đã nộp", "Submitted")}: <strong className="text-emerald-700">{submittedCount}</strong></span>
-          <span className="text-slate-500">{tr("Chưa nộp", "Pending")}: <strong className="text-amber-700">{pendingCount}</strong></span>
         </div>
       </div>
       {departmentProgress.length > 0 && (

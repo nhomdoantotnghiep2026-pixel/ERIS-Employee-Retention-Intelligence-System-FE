@@ -19,16 +19,16 @@ const dashboardPath = new URL(
 )
 test("attendance preview exposes validation filters and safe partial-import actions", async () => {
   const source = await readFile(componentPath, "utf8")
-  assert.match(source, /type PreviewFilter = "ALL" \| "VALID" \| "ERROR"/)
-  assert.match(source, /Phát hiện \$\{errorCount\} dòng có lỗi kỹ thuật/)
-  assert.match(source, /tr\("Tất cả", "All"\)/)
-  assert.match(source, /tr\("✓ Hợp lệ", "✓ Valid"\)/)
-  assert.match(source, /tr\("⚠ Lỗi dữ liệu", "⚠ Data errors"\)/)
+  const tabs = ["Tất cả", "Đi trễ", "Về sớm", "Tăng ca / OT", "Đúng giờ", "Lỗi dữ liệu"]
+  for (const tab of tabs) assert.ok(source.includes(`vi: "${tab}"`), tab)
+  assert.match(source, /Phát hiện .*dòng có lỗi dữ liệu/)
+  assert.match(source, /const rowsByFilter = useMemo/)
   assert.match(source, /errorCount > 0/)
-  assert.match(source, /dòng lỗi kỹ thuật sẽ tự động bị bỏ qua/)
+  assert.match(source, /Bỏ qua dòng lỗi & Chỉ nhập/)
+  assert.match(source, /confirmAttendance\(file, preview.preview_token, choiceList, ack, errorCount > 0\)/)
   assert.match(source, /Xuất báo cáo lỗi \(Excel\)/)
 })
-test("attendance rows use readable dates, semantic time pills, timelines and cell errors", async () => {
+test("attendance rows use readable dates, semantic time pills and cell errors", async () => {
   const source = await readFile(componentPath, "utf8")
   assert.match(source, /const workDateLabel/)
   assert.match(source, /weekday: "short"/)
@@ -36,8 +36,10 @@ test("attendance rows use readable dates, semantic time pills, timelines and cel
   assert.match(source, /tr\("Trễ", "Late"\)/)
   assert.match(source, /tr\("Về sớm", "Early"\)/)
   assert.match(source, /minutesLabel\(overtime\).*OT/)
-  assert.match(source, /attendanceEventCodes/)
-  assert.match(source, /border-rose-300 bg-rose-50/)
+  assert.match(source, /row\.overtime_minutes/)
+  assert.match(source, /border-rose-400 bg-rose-50/)
+  assert.match(source, /Tổng giờ/)
+  assert.doesNotMatch(source, /Tiến độ ca|Shift progress/)
   assert.match(source, /issueTitle\(.*Issues, row\)/)
   assert.match(source, /Trạng thái ghi nhận/)
   assert.doesNotMatch(source, /Kiểm tra tệp/)
@@ -48,21 +50,25 @@ test("attendance footer reports the reviewed scope and confirms only saveable ro
   const source = await readFile(componentPath, "utf8")
   assert.match(
     source,
-    /Sẵn sàng lưu \$\{saveableRows\.length\}\/\$\{preview\.rows\.length\} bản ghi/,
+    /Sẵn sàng lưu \$\{formatCount\.format\(saveableRows\.length\)\}\/\$\{formatCount\.format\(preview\.rows\.length\)\} bản ghi/,
   )
   assert.match(
     source,
-    /\$\{uniqueEmployees\} nhân sự · \$\{dateRangeLabel\(\)\}/,
+    /\$\{formatCount\.format\(uniqueEmployees\)\} nhân sự · \$\{dateRangeLabel\(\)\}/,
   )
   assert.match(source, /Đổi tệp khác/)
-  assert.match(source, /Xác nhận nhập \$\{saveableRows\.length\} dòng hợp lệ/)
+  assert.match(source, /visibleRows\.map/)
+  assert.doesNotMatch(source, /filteredRows\.map/)
+  assert.match(source, /row\.issues\.some\(issue => issue\.severity === "WARNING"\)/)
+  assert.match(source, /saved\.rows\.filter\(row => row\.action === "INSERT"\)/)
+  assert.match(source, /Xác nhận nhập \$\{formatCount\.format\(saveableRows\.length\)\} dòng hợp lệ/)
 })
 test("attendance workspace exposes unified filters, operational KPIs and import empty state", async () => {
   const source = await readFile(workspacePath, "utf8")
-  assert.match(source, /Tổng nhân sự/)
-  assert.match(source, /Độ phủ dữ liệu/)
+  assert.match(source, /Quỹ giờ tăng ca/)
+  assert.match(source, /Trường hợp cần rà soát/)
   assert.match(source, /Tỷ lệ đúng giờ/)
-  assert.match(source, /Giờ làm & tăng ca/)
+  assert.match(source, /Tổng giờ làm việc/)
   assert.match(source, /Khoảng tùy chỉnh/)
   assert.match(source, /Tên hoặc mã nhân viên \(EMP\.\.\.\)/)
   assert.doesNotMatch(source, /Quy trình nhập dữ liệu chấm công/)
@@ -70,10 +76,12 @@ test("attendance workspace exposes unified filters, operational KPIs and import 
   assert.doesNotMatch(source, /<pre/)
   assert.match(source, /Chưa có bản ghi chấm công cho kỳ/)
   assert.match(source, /Nhập tệp chấm công ngay/)
-  assert.match(source, /\[20, 50, 100\]/)
+  assert.match(source, /\[25, 50, 100\]/)
   assert.match(source, /Chờ giải trình \/ bù công/)
   assert.match(source, /Lịch sử thay đổi/)
   assert.match(source, /auditFieldKeys/)
+  assert.match(source, /setFilters\(importedScope\)/)
+  assert.match(source, /filteredRows\.slice\(pageOffset, pageOffset \+ pageSize\)/)
 })
 test("attendance reconciliation supports department filtering and bulk selection", async () => {
   const source = await readFile(reconcilePath, "utf8")

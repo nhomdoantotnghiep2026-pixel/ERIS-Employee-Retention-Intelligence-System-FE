@@ -1,3 +1,4 @@
+import { SelectControl } from "../components/ui/select-control"
 import {
   useEffect,
   useLayoutEffect,
@@ -891,7 +892,7 @@ export default function LeaveRecords({ own = false }: { own?: boolean }) {
             </label>
             <label className="min-w-0 text-sm font-medium text-slate-700">
               {tr("Trạng thái", "Status")}
-              <select
+              <SelectControl
                 className={control}
                 value={draft.record_status}
                 onChange={(event) =>
@@ -905,11 +906,11 @@ export default function LeaveRecords({ own = false }: { own?: boolean }) {
                 <option value="ACTIVE">{tr("Đang sử dụng", "Active")}</option>
                 <option value="CANCEL">{tr("Đã hủy", "Cancelled")}</option>
                 <option value="ALL">{tr("Tất cả", "All")}</option>
-              </select>
+              </SelectControl>
             </label>
             <label className="min-w-0 text-sm font-medium text-slate-700">
               {tr("Loại nghỉ", "Leave type")}
-              <select
+              <SelectControl
                 className={control}
                 value={leaveTypeId}
                 onChange={(event) => {
@@ -923,7 +924,7 @@ export default function LeaveRecords({ own = false }: { own?: boolean }) {
                     {type.code} · {type.name}
                   </option>
                 ))}
-              </select>
+              </SelectControl>
             </label>
             <Button
               type="button"
