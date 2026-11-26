@@ -72,14 +72,15 @@ test("unified request validates evidence dates before analysis", async () => {
   assert.equal(validEvidencePeriod("2026-02-30","2026-03-01","2026-11-22"),false)
 })
 
-test("assessment separates the fast prediction endpoint from unified deep analysis", async () => {
+test("assessment uses a single unified request from the primary action", async () => {
  const source=await readFile(new URL("../src/components/ai-workspace/IndividualAnalysis.tsx",import.meta.url),"utf8")
  const workspace=await readFile(new URL("../src/components/ai-workspace/UnifiedWorkspace.tsx",import.meta.url),"utf8")
  assert.doesNotMatch(source+workspace,/policy-recommendations|policy-agent\//)
- assert.match(workspace,/async function runPrediction/)
- assert.match(workspace,/predictAiEmployee\(employee\.id, profile\.snapshotId, false\)/)
- assert.match(workspace,/async function openDetails/)
- assert.match(workspace,/analyzeAiEmployee/)
+ assert.match(workspace,/async function handleRunFullAnalysis/)
+ assert.doesNotMatch(workspace,/predictAiEmployee|async function openDetails/)
+ assert.match(workspace,/analyzeAiEmployee\(employee\.id, body\)/)
+ assert.match(workspace,/confirmExternalData: true, save, evidencePeriod:/)
+ assert.match(workspace,/getAiResult\(data\.predictionId\)/)
 })
 
 test("employee assessment resolves a ready profile in the background without exposing data-version controls", async () => {
@@ -100,18 +101,19 @@ test("saved and preview assessments compare with the immediately previous saved 
   assert.match(workspace, /Phiên đánh giá đầu tiên/)
 })
 
-test("assessment UI gates the detailed signals and action dossier behind stage two", async () => {
+test("assessment shows business signals and read-only recommendations after one action", async () => {
   const workspace = await readFile(new URL("../src/components/ai-workspace/UnifiedWorkspace.tsx", import.meta.url), "utf8")
   const dossier = await readFile(new URL("../src/components/ai-workspace/ActionDossier.tsx", import.meta.url), "utf8")
-  assert.match(workspace, /Dự báo % rủi ro/)
-  assert.match(workspace, /detailsUnlocked/)
-  assert.match(workspace, /Khởi chạy phân tích chuyên sâu \(~12s\)/)
-  assert.match(workspace, /Quá trình mất khoảng 10 – 15 giây/)
-  assert.match(workspace, /eris-progress-shimmer/)
-  assert.match(workspace, /Trích xuất lịch sử chấm công & phản hồi khảo sát/)
+  assert.match(workspace, /Phân tích toàn diện & Đề xuất hành động/)
+  assert.match(workspace, /assessment-data-notice/)
+  assert.match(workspace, /Tín hiệu rủi ro cần lưu ý/)
+  assert.match(workspace, /Điểm tựa giữ chân/)
+  assert.doesNotMatch(workspace, /Dự báo % rủi ro|detailsUnlocked|Khởi chạy phân tích chuyên sâu|Mức đóng góp của các yếu tố|type="checkbox"/)
+  assert.doesNotMatch(dossier, /type="checkbox"|hoàn tất/)
+  assert.match(dossier, /Căn cứ ghi nhận/)
   assert.doesNotMatch(workspace, /RiskSpectrum|An toàn \(0 - 10%\)/)
   assert.match(workspace, /Ngưỡng cảnh báo:/)
-  assert.match(workspace, /Điểm số đã vượt ngưỡng cảnh báo của mô hình/)
+  assert.match(workspace, /Điểm rủi ro đã vượt ngưỡng cảnh báo/)
   assert.match(workspace, /Mức độ hài lòng công việc/)
   assert.match(workspace, /TrendSparkline/)
   assert.match(workspace, /Xem chi tiết phiên/)

@@ -3,6 +3,23 @@ import { useLanguage } from "../../context/LanguageContext"
 
 // Translate UI copy only. Employee names, survey answers, policy text and API data stay as supplied.
 const english: Record<string, string> = {
+  "Phân tích toàn diện & Đề xuất hành động": "Run assessment and suggest actions",
+  "Đang phân tích dữ liệu…": "Running assessment…",
+  "Khoảng thời gian đối soát": "Review period",
+  "Khi bấm nút, bạn đồng ý gửi dữ liệu chấm công và khảo sát trong kỳ đã chọn tới dịch vụ phân tích để tạo đề xuất.": "By continuing, you agree to send attendance and survey data for the selected period to the analysis service to generate recommendations.",
+  "Kết quả phân tích · Chưa lưu": "Assessment result · Not saved",
+  "Đã lưu kết quả. Một phần thông tin lịch sử chưa tải lại được.": "The result was saved. Some history information could not be refreshed.",
+  "Tín hiệu rủi ro cần lưu ý": "Risk signals to review",
+  "Chưa có kết quả đánh giá": "No assessment result",
+  "Hồ sơ của {name} đã sẵn sàng. Chọn “Phân tích toàn diện & Đề xuất hành động” để xem kết quả.": "{name}'s profile is ready. Select ‘Run assessment and suggest actions’ to see the result.",
+  "Hồ sơ cần được bổ sung trước khi thực hiện đánh giá.": "Complete the employee profile before running an assessment.",
+  "Điểm rủi ro đã vượt ngưỡng cảnh báo. Khuyến nghị HR rà soát dữ liệu làm thêm giờ và các phản hồi khảo sát gần nhất.": "The risk score exceeds the warning threshold. Review overtime records and recent survey feedback.",
+  "Căn cứ ghi nhận": "Supporting information",
+  "Xem dẫn chứng": "View evidence",
+  "Đầu mối phối hợp": "Coordination",
+  "Chưa chỉ định": "Not assigned",
+  "Mốc đánh giá lại": "Follow-up date",
+  "Chưa có mốc riêng": "Not specified",
   "Không gian đánh giá nhân sự": "Employee assessment workspace",
   "Bắt đầu đánh giá gắn kết nhân sự": "Start an employee engagement assessment",
   "Chọn đúng nhân sự, đọc tín hiệu có căn cứ và xây dựng kế hoạch giữ chân từ dữ liệu hiện có.": "Choose an employee, review evidence-backed signals, and build a retention plan from available data.",

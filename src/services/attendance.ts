@@ -32,7 +32,7 @@ export interface ImportedAttendance {
   record_status: "ACTIVE" | "CANCEL"
   attendance_status?: string
   work_schedule_id?: Id
-  record_fingerprint?: string
+  cancelled_by_name?: string | null
   cancellation_reason?: string | null
   cancelled_at?: string | null
   cancelled_by?: Id | null
@@ -121,15 +121,16 @@ export const fetchAttendanceAudit = (id: Id, offset = 0) =>
     root + "/" + id + "/audit-logs?limit=20&offset=" + offset,
     { cache: "no-store" },
   )
-export const cancelAttendance = (row: ImportedAttendance, reason: string) =>
+export const fetchCancelledAttendance = (filters: RecordFilters, signal?: AbortSignal) =>
+  request<{ data: ImportedAttendance[]; limit: number; offset: number }>(root + "/cancellations" + query(filters), { signal, cache: "no-store" })
+export const fetchCancelledAttendanceDetail = (id: Id) =>
+  request<{ data: ImportedAttendance }>(root + "/cancellations/" + id, { cache: "no-store" })
+export const cancelAttendance = (row: Pick<ImportedAttendance, "id">, reason: string) =>
   request<{ data: ImportedAttendance }>(
     root + "/" + row.id + "/cancel",
     {
       method: "PATCH",
-      body: JSON.stringify({
-        expected_fingerprint: row.record_fingerprint,
-        reason: reason.trim(),
-      }),
+      body: JSON.stringify({ reason: reason.trim() }),
     },
   )
 const importBody = (file: File, options: object) => {

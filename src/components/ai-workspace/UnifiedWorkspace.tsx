@@ -4,7 +4,7 @@ import { AlertTriangle, ArrowLeft, Building2, CalendarDays, Check, ChevronRight,
 import { AnimatePresence, motion, useReducedMotion } from "motion/react"
 import { Button } from "../ui/button"
 import { SelectControl } from "../ui/select-control"
-import { ApiError, analyzeAiEmployee, getAiResult, listAiEmployeeResults, listAiSnapshots, predictAiEmployee, previewAiEmployee, type AiEmployee, type AiPolicyEvidence, type AiPrediction, type AiResultHistoryItem, type AiSnapshot } from "../../services/api"
+import { ApiError, analyzeAiEmployee, getAiResult, listAiEmployeeResults, listAiSnapshots, previewAiEmployee, type AiEmployee, type AiPolicyEvidence, type AiPrediction, type AiResultHistoryItem, type AiSnapshot } from "../../services/api"
 import { featureLabel } from "./analysis"
 import { ActionDossier } from "./ActionDossier"
 import { validEvidencePeriod, type UnifiedAnalyzeRequest, type UnifiedAnalyzeResponse } from "./unifiedContract"
@@ -28,22 +28,21 @@ export function UnifiedWorkspace({ employee, employees, onChoose, onBack, onResu
   const [previous, setPrevious] = useState<AnalysisResult | null>(null)
   const [reviewing, setReviewing] = useState<AnalysisResult | null>(null)
   const [from, setFrom] = useState(yearAgo()), [to, setTo] = useState(today())
-  const [consent, setConsent] = useState(false), [save, setSave] = useState(false)
+  const [save, setSave] = useState(false)
   const [busy, setBusy] = useState(true), [analyzing, setAnalyzing] = useState(false)
-  const [detailsUnlocked, setDetailsUnlocked] = useState(false), [openingDetails, setOpeningDetails] = useState(false)
-  const [error, setError] = useState(""), [errorStatus, setErrorStatus] = useState<number | null>(null)
+  const [error, setError] = useState(""), [notice, setNotice] = useState("")
   const [tab, setTab] = useState(0)
   const lock = useRef(false)
   const gradient = useId().replace(/:/g, "")
   const reduceMotion = useReducedMotion()
 
-  const fail = (cause: unknown) => { const status = cause instanceof ApiError ? cause.status : null; setErrorStatus(status); setError(status ? errors[status] ?? "Không thể hoàn thành yêu cầu. Vui lòng thử lại." : "Không thể tải dữ liệu hồ sơ. Vui lòng thử lại.") }
+  const fail = (cause: unknown) => { const status = cause instanceof ApiError ? cause.status : null; setError(status ? errors[status] ?? "Không thể hoàn thành yêu cầu. Vui lòng thử lại." : "Không thể tải dữ liệu hồ sơ. Vui lòng thử lại.") }
   const hydrateTrend = async (items: AiResultHistoryItem[]) => { const settled = await Promise.allSettled(items.slice(0, 5).map(item => getAiResult(item.predictionId))); setTrend(settled.filter((item): item is PromiseFulfilledResult<{ data: AiPrediction }> => item.status === "fulfilled").map(item => item.value.data as AnalysisResult).filter(item => item.preview.employee.id === employee.id)) }
-  const getHistory = async () => { const items = sortHistory((await listAiEmployeeResults(employee.id)).data); setHistory(items); await hydrateTrend(items); return items }
+  const getHistory = async () => { const items = sortHistory((await listAiEmployeeResults(employee.id)).data); setHistory(items); void hydrateTrend(items); return items }
 
   useEffect(() => {
     let active = true
-    setBusy(true); setProfile(null); setResult(null); setPrevious(null); setReviewing(null); setDetailsUnlocked(false); setConsent(false); setError(""); setErrorStatus(null)
+    setBusy(true); setProfile(null); setResult(null); setPrevious(null); setReviewing(null); setError(""); setNotice("")
     Promise.all([listAiSnapshots(employee.id), listAiEmployeeResults(employee.id)]).then(async ([snapshots, results]) => {
       if (!active) return
       const ready = [...snapshots.data].sort((a, b) => Date.parse(b.capturedAt) - Date.parse(a.capturedAt)).find(item => item.ready && item.snapshotId)
@@ -62,92 +61,69 @@ export function UnifiedWorkspace({ employee, employees, onChoose, onBack, onResu
     if (!candidate || candidate.predictionId === current.predictionId) return setPrevious(null)
     try { setPrevious((await getAiResult(candidate.predictionId)).data as AnalysisResult) } catch { setPrevious(null) }
   }
-  async function runPrediction() {
-    if (lock.current) return
-    if (!profile?.ready || !profile.snapshotId) { setError(errors[422]); setErrorStatus(422); return }
-    lock.current = true; setBusy(true); setAnalyzing(true); setDetailsUnlocked(false); setError(""); setErrorStatus(null)
-    try {
-      const current = (await predictAiEmployee(employee.id, profile.snapshotId, false)).data as AnalysisResult
-      setResult(current); setTab(0); await findPrevious(current, history)
-    } catch (cause) { fail(cause) } finally { lock.current = false; setBusy(false); setAnalyzing(false) }
-  }
   async function openHistory(id: number) {
     if (lock.current) return
-    lock.current = true; setBusy(true); setError(""); setErrorStatus(null)
+    lock.current = true; setBusy(true); setError(""); setNotice("")
     try {
       const current = (await getAiResult(id)).data as AnalysisResult
       if (current.preview.employee.id !== employee.id) throw new Error("Employee mismatch")
-      setResult(current); setProfile(current.preview); setConsent(false); setDetailsUnlocked(true); setTab(0)
+      setResult(current); setTab(0)
       const period = current.policyAnalysis?.selection
       if (period) { setFrom(period.from.slice(0, 10)); setTo(period.to.slice(0, 10)) }
       await findPrevious(current, history)
     } catch (cause) { fail(cause) } finally { lock.current = false; setBusy(false) }
   }
-  async function openDetails() {
-    if (!result || openingDetails || lock.current || !profile?.snapshotId) return
-    if (!consent) { setError("Vui lòng xác nhận cho phép phân tích chuyên sâu dữ liệu nhân sự."); return }
-    if (!validEvidencePeriod(from, to, today())) { setError(errors[400]); setErrorStatus(400); return }
-    lock.current = true; setBusy(true); setOpeningDetails(true); setError(""); setErrorStatus(null)
+  async function handleRunFullAnalysis() {
+    if (lock.current || busy) return
+    if (!profile?.ready || !profile.snapshotId) { setError(errors[422]); return }
+    if (!validEvidencePeriod(from, to, today())) { setError(errors[400]); return }
+    lock.current = true; setBusy(true); setAnalyzing(true); setError(""); setNotice("")
     try {
       const body: UnifiedAnalyzeRequest = { snapshotId: profile.snapshotId, confirmExternalData: true, save, evidencePeriod: { from, to } }
-      const response = await analyzeAiEmployee(employee.id, body)
-      let current: AnalysisResult = { ...response.data, warning: "", preview: { ...response.data.preview, employee: { ...employee, ...response.data.preview.employee }, provenance: {}, missingFeatures: [], issues: [], ready: true }, policyAnalysis: response.data.policyAnalysis as AnalysisResult["policyAnalysis"] }
+      const { data } = await analyzeAiEmployee(employee.id, body)
+      const current: AnalysisResult = {
+        ...data,
+        preview: { ...profile, ...data.preview, employee: { ...employee, ...data.preview.employee } },
+      }
+      setResult(current); setPrevious(null); setTab(0)
       let items = history
-      if (response.data.saved && response.data.predictionId) { current = (await getAiResult(response.data.predictionId)).data as AnalysisResult; items = await getHistory() }
-      setResult(current); setDetailsUnlocked(true); setTab(1); await findPrevious(current, items)
-    } catch (cause) { fail(cause) } finally { lock.current = false; setBusy(false); setOpeningDetails(false) }
+      if (data.saved && data.predictionId) {
+        const [detail, refreshed] = await Promise.allSettled([getAiResult(data.predictionId), getHistory()])
+        if (detail.status === "fulfilled" && detail.value.data.preview.employee.id === employee.id) {
+          const saved = detail.value.data as AnalysisResult
+          setResult({ ...current, createdAt: saved.createdAt ?? current.createdAt, policyAnalysis: saved.policyAnalysis ?? current.policyAnalysis })
+        }
+        const savedItem = { predictionId: data.predictionId, snapshotId: data.snapshotId ?? data.preview.snapshotId, createdAt: (detail.status === "fulfilled" ? detail.value.data.createdAt : undefined) ?? current.createdAt ?? "" }
+        items = refreshed.status === "fulfilled" ? refreshed.value : history
+        if (!items.some(item => item.predictionId === savedItem.predictionId)) {
+          items = [savedItem, ...items]; setHistory(items)
+        }
+        if (detail.status === "rejected" || refreshed.status === "rejected") setNotice("Đã lưu kết quả. Một phần thông tin lịch sử chưa tải lại được.")
+      }
+      await findPrevious(current, items)
+    } catch (cause) { fail(cause) } finally { lock.current = false; setBusy(false); setAnalyzing(false) }
   }
 
   return <div className="space-y-5 text-slate-900">
     <section className={`${card} overflow-hidden`}>
 <div className="flex flex-wrap items-center gap-3 p-5"><Button variant="outline" disabled={busy} onClick={onBack}><ArrowLeft />{tr("Đổi nhân sự")}</Button><span className="grid size-11 place-items-center rounded-full bg-indigo-50 font-bold text-indigo-700">{initials(employee.fullName)}</span><div className="min-w-0"><h2 className="text-lg font-semibold tracking-tight">{employee.fullName}</h2><div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-500"><span className="font-mono">{employee.employeeCode}</span><span className="rounded-full border border-indigo-200 bg-indigo-50 px-2 py-0.5 text-indigo-700">{employee.departmentName || tr("Chưa cập nhật phòng ban")}</span><span>{employee.positionName || tr("Chưa cập nhật chức danh")}</span></div></div><label className="ml-auto min-w-[250px] text-xs font-medium text-slate-500">{tr("Chuyển nhanh nhân viên")}<SelectControl aria-label={tr("Chuyển nhanh nhân viên")} className="field mt-1 h-10" disabled={busy} value={employee.id} onChange={event => onChoose(Number(event.target.value))}>{employees.map(item => <option key={item.id} value={item.id}>{item.employeeCode} · {item.fullName}</option>)}</SelectControl></label></div>
-      <div className="grid gap-3 border-t border-slate-100 bg-slate-50/60 p-4 xl:grid-cols-[minmax(330px,1fr)_auto_auto_auto] xl:items-end"><div><p className="text-xs font-semibold text-slate-500">{tr("Khoảng thời gian đối soát chuyên sâu")}</p><div className="mt-1 flex items-center gap-2"><input aria-label={tr("Từ ngày")} type="date" max={today()} className="field h-10 px-3" disabled={busy} value={from} onChange={event => setFrom(event.target.value)} /><ChevronRight className="size-4 shrink-0 text-slate-400" /><input aria-label={tr("Đến ngày")} type="date" max={today()} className="field h-10 px-3" disabled={busy} value={to} onChange={event => setTo(event.target.value)} /></div></div><button type="button" role="switch" aria-checked={save} disabled={busy} onClick={() => setSave(value => !value)} className="flex h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-sm font-medium"><span className={`relative h-5 w-9 rounded-full transition ${save ? "bg-orange-500" : "bg-slate-300"}`}><span className={`absolute top-0.5 size-4 rounded-full bg-white transition ${save ? "left-[18px]" : "left-0.5"}`} /></span>{save ? tr("Sẽ lưu kết quả đầy đủ") : tr("Chỉ xem kết quả")}</button><label className="flex h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-sm"><input type="checkbox" checked={consent} disabled={busy} onChange={event => setConsent(event.target.checked)} />{tr("Cho phép phân tích chuyên sâu")}</label><Button disabled={busy || !profile?.ready} onClick={runPrediction} className="h-10 bg-gradient-to-r from-orange-500 to-amber-500 px-5 text-white shadow-sm shadow-orange-500/20"><Sparkles />{tr("Dự báo % rủi ro")}</Button></div>
+      <div className="grid gap-3 border-t border-slate-100 bg-slate-50/60 p-4 xl:grid-cols-[minmax(260px,1fr)_auto_auto] xl:items-end"><div><p className="text-xs font-semibold text-slate-500">{tr("Khoảng thời gian đối soát")}</p><div className="mt-1 flex items-center gap-2"><input aria-label={tr("Từ ngày")} type="date" max={today()} className="field h-10 px-3" disabled={busy} value={from} onChange={event => setFrom(event.target.value)} /><ChevronRight className="size-4 shrink-0 text-slate-400" /><input aria-label={tr("Đến ngày")} type="date" max={today()} className="field h-10 px-3" disabled={busy} value={to} onChange={event => setTo(event.target.value)} /></div></div><button type="button" role="switch" aria-checked={save} disabled={busy} onClick={() => setSave(value => !value)} className="flex h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-sm font-medium"><span className={`relative h-5 w-9 rounded-full transition ${save ? "bg-orange-500" : "bg-slate-300"}`}><span className={`absolute top-0.5 size-4 rounded-full bg-white transition ${save ? "left-[18px]" : "left-0.5"}`} /></span>{save ? tr("Sẽ lưu kết quả đầy đủ") : tr("Chỉ xem kết quả")}</button><div className="space-y-2"><Button type="button" disabled={busy || !profile?.ready} onClick={handleRunFullAnalysis} aria-describedby="assessment-data-notice" className="h-auto min-h-10 whitespace-normal bg-gradient-to-r from-orange-600 to-amber-600 px-4 py-2 text-white shadow-md shadow-orange-500/25">{analyzing ? <Loader2 className="motion-safe:animate-spin" /> : <Sparkles />}{analyzing ? tr("Đang phân tích dữ liệu…") : tr("Phân tích toàn diện & Đề xuất hành động")}</Button><p id="assessment-data-notice" className="max-w-sm text-xs leading-5 text-slate-600">{tr("Khi bấm nút, bạn đồng ý gửi dữ liệu chấm công và khảo sát trong kỳ đã chọn tới dịch vụ phân tích để tạo đề xuất.")}</p></div></div>
       {!busy && profile && !profile.ready && <div className="border-t border-amber-200 bg-amber-50 px-5 py-3 text-sm text-amber-900"><strong>{tr("Hồ sơ chưa đủ điều kiện đánh giá.")}</strong> {tr("Cần bổ sung:")} {[...(profile.missingFeatures ?? []), ...(profile.invalidFeatures ?? [])].map(key => tr(featureLabel(key))).join(", ") || tr("thông tin hồ sơ bắt buộc")}.</div>}
     </section>
-    {error && <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900"><span>{tr(error)}</span>{(errorStatus === 409 || errorStatus === 504) && <Button variant="outline" disabled={busy || !profile?.ready} onClick={detailsUnlocked ? openDetails : runPrediction}>{tr("Thử lại")}</Button>}</div>}
-    {busy && <LoadingOverlay analyzing={analyzing} deep={openingDetails} />}
-    <div className="grid items-start gap-5 lg:grid-cols-12"><section className={`${card} min-w-0 p-5 lg:col-span-8`}>
-      {result && <div className="mb-4 flex flex-wrap items-center gap-2 text-sm"><span className={`rounded-full px-3 py-1 font-medium ${result.saved ? "bg-emerald-50 text-emerald-700" : "bg-blue-50 text-blue-700"}`}>{result.saved ? tr("Đã lưu hồ sơ · Phiên #{id}", { id: result.predictionId ?? "—" }) : detailsUnlocked ? tr("Phân tích chuyên sâu · Chưa lưu") : tr("Kết quả dự báo nhanh · Chưa lưu")}</span>{result.saved && <span className="text-slate-500">{tr(dateTime(result.createdAt))}</span>}<span className="rounded-full bg-slate-100 px-3 py-1 text-slate-700">{tr("Cần Nhân sự xác minh")}</span></div>}
+    {error && <p role="alert" className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">{tr(error)}</p>}
+    {busy && !analyzing && <p role="status" className="text-sm text-slate-600">{tr("Đang tải hồ sơ nhân sự…")}</p>}
+    {notice && <p role="status" className="rounded-xl bg-slate-100 p-3 text-sm text-slate-700">{tr(notice)}</p>}
+    <div className="grid items-start gap-5 lg:grid-cols-12"><section className={`${card} min-w-0 p-5 ${tab === 2 ? "lg:col-span-12" : "lg:col-span-8"}`}>
+      {result && <div className="mb-4 flex flex-wrap items-center gap-2 text-sm"><span className={`rounded-full px-3 py-1 font-medium ${result.saved ? "bg-emerald-50 text-emerald-700" : "bg-blue-50 text-blue-700"}`}>{result.saved ? tr("Đã lưu hồ sơ · Phiên #{id}", { id: result.predictionId ?? "—" }) : tr("Kết quả phân tích · Chưa lưu")}</span>{result.saved && <span className="text-slate-500">{tr(dateTime(result.createdAt))}</span>}<span className="rounded-full bg-slate-100 px-3 py-1 text-slate-700">{tr("Cần Nhân sự xác minh")}</span></div>}
       <div role="tablist" aria-label={tr("Các phần đánh giá gắn kết")} className="mb-5 flex flex-wrap gap-1 rounded-xl border border-slate-200 bg-slate-100 p-1" onKeyDown={event => { if (event.key !== "ArrowRight" && event.key !== "ArrowLeft") return; event.preventDefault(); const next = (tab + (event.key === "ArrowRight" ? 1 : 2)) % 3; setTab(next); (event.currentTarget.querySelectorAll('[role="tab"]')[next] as HTMLButtonElement)?.focus() }}>{[tr("Tình trạng gắn kết"), tr("Nguyên nhân & Tín hiệu"), tr("Kế hoạch hành động")].map((label, index) => <button type="button" role="tab" aria-controls="engagement-tab-panel" aria-selected={tab === index} tabIndex={tab === index ? 0 : -1} key={label} onClick={() => setTab(index)} className={`relative min-h-10 rounded-lg px-3 py-2 text-sm font-semibold transition-colors duration-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-500 ${tab === index ? "text-slate-900" : "text-slate-600 hover:text-orange-700"}`}>{tab === index && <motion.span layoutId="activeTabBadge" className="absolute inset-0 rounded-lg border border-slate-200 bg-white shadow-sm" transition={reduceMotion ? { duration: 0 } : { type: "spring", stiffness: 400, damping: 30 }} />}<span className="relative z-10">{index + 1}. {label}</span></button>)}</div>
-      <AnimatePresence mode="wait" initial={false}><motion.div id="engagement-tab-panel" role="tabpanel" key={`${tab}-${result?.predictionId ?? "empty"}-${detailsUnlocked}`} initial={reduceMotion ? false : { opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={reduceMotion ? undefined : { opacity: 0, y: -8 }} transition={{ duration: reduceMotion ? 0 : .2 }}>{!result ? <EmptyResult employee={employee} ready={Boolean(profile?.ready)} /> : tab === 0 ? <EngagementStatus result={result} previous={previous} trend={trend} gradient={gradient} opening={openingDetails} onOpen={openDetails} onReview={() => setReviewing(previous)} /> : !detailsUnlocked ? <DeepDiveTeaser score={scoreOf(result)} loading={openingDetails} onOpen={openDetails} /> : tab === 1 ? <BusinessSignals result={result} /> : result.policyAnalysis ? <ActionDossier analysis={result.policyAnalysis} /> : <div className="rounded-xl border border-dashed border-slate-300 p-10 text-center text-sm text-slate-600">{tr("Phiên này chưa có kế hoạch hành động được lưu.")}</div>}</motion.div></AnimatePresence>
-    </section><aside className="space-y-5 lg:col-span-4"><ProfileContext snapshot={result?.preview ?? profile} /><section className={`${card} p-5`}><h3 className="font-semibold">{tr("Lịch sử đánh giá")}</h3><p className="mt-1 text-xs text-slate-500">{tr("Chọn một phiên để xem lại đúng dữ liệu đã lưu.")}</p><div className="mt-3 max-h-72 space-y-2 overflow-auto">{history.map(item => <button type="button" disabled={busy} onClick={() => openHistory(item.predictionId)} key={item.predictionId} className={`block w-full rounded-xl border p-3 text-left text-sm transition hover:border-orange-200 hover:bg-orange-50/50 ${result?.predictionId === item.predictionId ? "border-orange-300 bg-orange-50" : "border-slate-200"}`}><strong>{tr("Phiên #")}{item.predictionId}</strong><span className="mt-0.5 block text-xs text-slate-500">{dateTime(item.createdAt)}</span></button>)}{!history.length && <p className="rounded-lg bg-slate-50 p-4 text-sm text-slate-500">{tr("Chưa có lịch sử đánh giá.")}</p>}</div></section></aside></div>
+      <AnimatePresence mode="wait" initial={false}><motion.div id="engagement-tab-panel" role="tabpanel" key={`${tab}-${result?.predictionId ?? "empty"}`} initial={reduceMotion ? false : { opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={reduceMotion ? undefined : { opacity: 0, y: -8 }} transition={{ duration: reduceMotion ? 0 : .2 }}>{!result ? <EmptyResult employee={employee} ready={Boolean(profile?.ready)} /> : tab === 0 ? <EngagementStatus result={result} previous={previous} trend={trend} gradient={gradient} onReview={() => setReviewing(previous)} /> : tab === 1 ? <BusinessSignals result={result} /> : result.policyAnalysis ? <ActionDossier analysis={result.policyAnalysis} /> : <div className="rounded-xl border border-dashed border-slate-300 p-10 text-center text-sm text-slate-600">{tr("Phiên này chưa có kế hoạch hành động được lưu.")}</div>}</motion.div></AnimatePresence>
+    </section><aside className={tab === 2 ? "grid items-start gap-5 lg:col-span-12 lg:grid-cols-2" : "space-y-5 lg:col-span-4"}><ProfileContext snapshot={result?.preview ?? profile} /><section className={`${card} p-5`}><h3 className="font-semibold">{tr("Lịch sử đánh giá")}</h3><p className="mt-1 text-xs text-slate-500">{tr("Chọn một phiên để xem lại đúng dữ liệu đã lưu.")}</p><div className="mt-3 max-h-72 space-y-2 overflow-auto">{history.map(item => <button type="button" disabled={busy} onClick={() => openHistory(item.predictionId)} key={item.predictionId} className={`block w-full rounded-xl border p-3 text-left text-sm transition hover:border-orange-200 hover:bg-orange-50/50 ${result?.predictionId === item.predictionId ? "border-orange-300 bg-orange-50" : "border-slate-200"}`}><strong>{tr("Phiên #")}{item.predictionId}</strong><span className="mt-0.5 block text-xs text-slate-500">{dateTime(item.createdAt)}</span></button>)}{!history.length && <p className="rounded-lg bg-slate-50 p-4 text-sm text-slate-500">{tr("Chưa có lịch sử đánh giá.")}</p>}</div></section></aside></div>
     <AnimatePresence>{reviewing && <PreviousSessionModal result={reviewing} onClose={() => setReviewing(null)} />}</AnimatePresence>
   </div>
 }
 
-function LoadingOverlay({ analyzing, deep }: { analyzing: boolean; deep: boolean }) {
-  const tr = useAiTr()
-  const [elapsed, setElapsed] = useState(0)
-  useEffect(() => {
-    if (!deep) return
-    const startedAt = Date.now()
-    const timer = window.setInterval(() => setElapsed(Date.now() - startedAt), 250)
-    return () => window.clearInterval(timer)
-  }, [deep])
-  if (deep) {
-    const progress = Math.min(94, 6 + elapsed / 15000 * 88)
-    const activeStep = elapsed < 2500 ? 0 : elapsed < 7000 ? 1 : elapsed < 10500 ? 2 : 3
-    const remaining = Math.max(1, Math.ceil((12000 - elapsed) / 1000))
-    const steps = [
-      tr("Trích xuất lịch sử chấm công & phản hồi khảo sát"),
-      tr("Mô hình AI đang bóc tách nguyên nhân & dẫn chứng"),
-      tr("Đối chiếu danh mục chính sách giữ chân phù hợp"),
-      tr("Hoàn tất hồ sơ hành động cho Nhân sự"),
-    ]
-    return <aside role="status" aria-live="polite" className="fixed bottom-5 right-5 z-50 w-[min(460px,calc(100vw-2rem))] rounded-2xl border border-orange-200/80 bg-white/95 p-5 shadow-[0_24px_64px_rgba(15,23,42,.18)] backdrop-blur-xl">
-      <div className="flex items-start justify-between gap-4"><div><p className="text-xs font-bold uppercase tracking-[.16em] text-orange-600">{tr("Phân tích chuyên sâu đang chạy")}</p><h3 className="mt-1 text-base font-semibold text-slate-950">{tr("Đang chuẩn bị đề xuất cho Nhân sự")}</h3></div><span className="shrink-0 rounded-full bg-orange-50 px-2.5 py-1 text-xs font-bold tabular-nums text-orange-700">~{remaining}{tr("s còn lại")}</span></div>
-      <div className="mt-4 h-2 w-full overflow-hidden rounded-full bg-slate-100"><span className="eris-progress-shimmer block h-full rounded-full transition-[width] duration-500 ease-out" style={{ width: `${progress}%` }} /></div>
-      <ol className="mt-4 space-y-3">{steps.map((label, index) => { const complete = index < activeStep, active = index === activeStep; return <li key={label} className={`flex items-start gap-3 text-sm ${complete ? "text-emerald-700" : active ? "font-medium text-slate-900" : "text-slate-400"}`}><span className={`mt-0.5 grid size-5 shrink-0 place-items-center rounded-full border ${complete ? "border-emerald-200 bg-emerald-50" : active ? "border-orange-300 bg-orange-50 text-orange-600" : "border-slate-200 bg-white"}`}>{complete ? <Check className="size-3.5" /> : active ? <Clock3 className="size-3.5 animate-pulse" /> : <span className="size-1.5 rounded-full bg-slate-300" />}</span><span><span className="font-semibold">{tr("Bước")} {index + 1}:</span> {label}{active && index === 1 ? `... (~${remaining}${tr("s còn lại")})` : complete ? tr(" (Đã xong)") : ""}</span></li> })}</ol>
-      <p className="mt-4 rounded-xl bg-slate-50 px-3 py-2.5 text-xs leading-5 text-slate-600">{tr("Hệ thống đang phân tích chuyên sâu hàng chục bản ghi dữ liệu. Bạn có thể đợi trong giây lát hoặc tiếp tục xem các thông tin khác.")}</p>
-    </aside>
-  }
-  return <div role="status" className="fixed inset-0 z-50 grid place-items-center bg-slate-950/25 p-4 backdrop-blur-[2px]"><div className="w-full max-w-md rounded-2xl border border-white/70 bg-white p-6 text-center shadow-2xl"><span className="mx-auto grid size-14 place-items-center rounded-full bg-orange-50"><Loader2 className="size-7 animate-spin text-orange-500" /></span><h3 className="mt-4 text-lg font-semibold">{analyzing ? tr("Đang dự báo phần trăm rủi ro") : tr("Đang tải hồ sơ nhân sự")}</h3><p className="mt-2 text-sm text-slate-500">{analyzing ? tr("Model dự báo đang xử lý hồ sơ hiện tại.") : tr("Vui lòng chờ trong giây lát.")}</p></div></div>
-}
 function EmptyResult({ employee, ready }: { employee: AiEmployee; ready: boolean }) {
-  const tr = useAiTr(); return <div className="grid min-h-[430px] place-items-center text-center"><div className="max-w-md"><span className="mx-auto grid size-14 place-items-center rounded-full bg-slate-100"><UserRound className="size-6 text-slate-500" /></span><h3 className="mt-4 font-semibold">{tr("Chưa có kết quả dự báo")}</h3><p className="mt-2 text-sm leading-6 text-slate-600">{ready ? tr("Hồ sơ của {name} đã được nạp. Bấm “Dự báo % rủi ro” để chạy model dự báo nhanh.", { name: employee.fullName }) : tr("Hồ sơ cần được bổ sung trước khi có thể thực hiện dự báo.")}</p></div></div> }
-function DeepDiveTeaser({ score, loading, onOpen }: { score: number; loading: boolean; onOpen: () => void }) {
-  const tr = useAiTr(); return <div className="grid min-h-[430px] place-items-center overflow-hidden rounded-2xl border border-orange-100 bg-[radial-gradient(circle_at_top_right,rgba(251,146,60,.16),transparent_42%),linear-gradient(to_bottom_right,#fff,#fff7ed)] p-8 text-center"><div className="max-w-xl"><span className="mx-auto grid size-16 place-items-center rounded-2xl border border-orange-200 bg-white text-orange-600 shadow-lg shadow-orange-500/10"><Sparkles className="size-7" /></span><p className="mt-5 text-xs font-bold uppercase tracking-[.18em] text-orange-600">{tr("Sẵn sàng phân tích chuyên sâu")}</p><h3 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">{tr("Đã xác định mức độ rủi ro")} {score.toFixed(2)}%</h3><p className="mt-3 text-sm leading-7 text-slate-600">{tr("Mở phần chuyên sâu để bóc tách nguyên nhân, phản hồi nhân viên và kế hoạch can thiệp phù hợp. Nội dung luôn cần Nhân sự xác minh trước khi áp dụng.")}</p><Button disabled={loading} onClick={onOpen} className="mt-6 h-11 bg-gradient-to-r from-orange-500 to-amber-500 px-5 font-medium text-white shadow-sm shadow-orange-500/20 hover:from-orange-600 hover:to-amber-600">{loading ? <Clock3 className="animate-pulse" /> : <Sparkles />}{tr("Khởi chạy phân tích chuyên sâu (~12s)")}</Button><p className="mx-auto mt-3 max-w-lg text-xs leading-5 text-slate-500">{tr("Mô hình AI sẽ đối chiếu dữ liệu khảo sát và lịch sử chấm công để đề xuất chính sách. Quá trình mất khoảng 10 – 15 giây.")}</p></div></div> }
-
+  const tr = useAiTr(); return <div className="grid min-h-[430px] place-items-center text-center"><div className="max-w-md"><span className="mx-auto grid size-14 place-items-center rounded-full bg-slate-100"><UserRound className="size-6 text-slate-500" /></span><h3 className="mt-4 font-semibold">{tr("Chưa có kết quả đánh giá")}</h3><p className="mt-2 text-sm leading-6 text-slate-600">{ready ? tr("Hồ sơ của {name} đã sẵn sàng. Chọn “Phân tích toàn diện & Đề xuất hành động” để xem kết quả.", { name: employee.fullName }) : tr("Hồ sơ cần được bổ sung trước khi thực hiện đánh giá.")}</p></div></div> }
 function useAnimatedScore(score: number, reduceMotion: boolean) {
   const [shown, setShown] = useState(reduceMotion ? score : 0)
   useEffect(() => {
@@ -162,7 +138,7 @@ function useAnimatedScore(score: number, reduceMotion: boolean) {
   return shown
 }
 
-function EngagementStatus({ result, previous, trend, gradient, opening, onOpen, onReview }: { result: AnalysisResult; previous: AnalysisResult | null; trend: AnalysisResult[]; gradient: string; opening: boolean; onOpen: () => void; onReview: () => void }) {
+function EngagementStatus({ result, previous, trend, gradient, onReview }: { result: AnalysisResult; previous: AnalysisResult | null; trend: AnalysisResult[]; gradient: string; onReview: () => void }) {
   const tr = useAiTr()
   const score = scoreOf(result), risk = riskPresentation(result.model.riskLevel, result.model.assessment?.status), before = previous ? scoreOf(previous) : null, delta = before == null ? null : score - before
   const reduceMotion = useReducedMotion()
@@ -188,13 +164,12 @@ function EngagementStatus({ result, previous, trend, gradient, opening, onOpen, 
         <div className="space-y-3 rounded-2xl border border-slate-200/60 bg-slate-50/70 p-5">
           <div><p className="text-xs font-semibold uppercase tracking-[.16em] text-slate-400">{tr("Nhận định & đối chiếu ngưỡng")}</p><span className={`mt-2 inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-bold ${risk.className}`}>{risk.icon}{tr(risk.label)}</span></div>
           <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-slate-200/50 bg-white/80 p-2.5 text-xs text-slate-600"><div><span className="text-slate-400">{tr("Ngưỡng cảnh báo:")}</span>{" "}<strong className="font-mono text-slate-800">{threshold.toFixed(2)}%</strong></div><div className="hidden h-3 w-px bg-slate-200 sm:block" /><div className={`font-medium ${thresholdDelta > 0 ? "text-amber-800" : "text-emerald-700"}`}>{thresholdDelta > 0 ? tr("Vượt ngưỡng") : tr("Dưới ngưỡng")}: <strong className={`font-mono ${thresholdDelta > 0 ? "text-amber-900" : "text-emerald-800"}`}>{thresholdDelta > 0 ? "+" : ""}{thresholdDelta.toFixed(2)}%</strong></div></div>
-          <p className="text-sm leading-7 text-slate-700">{thresholdDelta > 0 ? tr("Điểm số đã vượt ngưỡng cảnh báo của mô hình. Khuyến nghị HR rà soát dữ liệu làm thêm giờ và các phản hồi khảo sát gần nhất.") : tr("Điểm số hiện nằm dưới ngưỡng cảnh báo. HR nên tiếp tục theo dõi định kỳ và đối chiếu khi dữ liệu nhân sự thay đổi.")}</p>
+          <p className="text-sm leading-7 text-slate-700">{thresholdDelta > 0 ? tr("Điểm rủi ro đã vượt ngưỡng cảnh báo. Khuyến nghị HR rà soát dữ liệu làm thêm giờ và các phản hồi khảo sát gần nhất.") : tr("Điểm số hiện nằm dưới ngưỡng cảnh báo. HR nên tiếp tục theo dõi định kỳ và đối chiếu khi dữ liệu nhân sự thay đổi.")}</p>
           <p className="text-xs text-slate-500">{tr("Kết quả hỗ trợ tham khảo · Quyết định cuối cùng thuộc về Nhân sự.")}</p>
         </div>
       </div>
     </section>
     <Trajectory result={result} previous={previous} delta={delta} series={series} threshold={threshold} onReview={onReview} />
-    <section className="relative flex flex-col gap-4 overflow-hidden rounded-2xl border border-amber-500/30 bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 p-5 text-white shadow-lg shadow-slate-900/10 sm:flex-row sm:items-center sm:justify-between"><span aria-hidden="true" className="pointer-events-none absolute -right-14 -top-16 size-48 rounded-full bg-amber-500/10 blur-3xl" /><div className="relative"><p className="text-xs font-bold uppercase tracking-[.16em] text-orange-300">{tr("Bước tiếp theo")}</p><h3 className="mt-1 font-semibold">{tr("Bóc tách nguyên nhân và xây dựng kế hoạch hành động")}</h3><p className="mt-1 text-sm text-slate-200">{tr("Mô hình AI sẽ đối chiếu dữ liệu khảo sát và lịch sử chấm công để đề xuất chính sách.")}</p><p className="mt-1 text-xs text-slate-300">{tr("Quá trình mất khoảng 10 – 15 giây.")}</p></div><motion.div className="relative shrink-0" whileHover={reduceMotion ? undefined : { scale: 1.02 }} whileTap={reduceMotion ? undefined : { scale: .98 }}><Button disabled={opening} onClick={onOpen} className="h-11 bg-gradient-to-r from-orange-500 to-amber-500 px-5 font-medium text-white shadow-sm shadow-orange-500/20 hover:from-orange-600 hover:to-amber-600">{opening ? <Loader2 className="animate-spin motion-reduce:animate-none" /> : <Sparkles />}{opening ? tr("Đang phân tích…") : tr("Khởi chạy phân tích chuyên sâu (~12s)")}</Button></motion.div></section>
   </div>
 }
 function Trajectory({ result, previous, delta, series, threshold, onReview }: { result: AnalysisResult; previous: AnalysisResult | null; delta: number | null; series: AnalysisResult[]; threshold: number; onReview: () => void }) {
@@ -226,16 +201,16 @@ function TrendSparkline({ points, current, threshold }: { points: AnalysisResult
 
 function BusinessSignals({ result }: { result: AnalysisResult }) {
   const tr = useAiTr()
-  const ordered = Object.entries(result.model.contributions).filter(([key, value]) => !["Age", "Gender"].includes(key) && Number.isFinite(value)).sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]))
-  const risks = ordered.filter(([, value]) => value > 0).slice(0, 3), anchors = ordered.filter(([, value]) => value < 0).slice(0, 2)
+  const ordered = Object.entries(result.model.contributions ?? {}).filter(([key, value]) => !["Age", "Gender"].includes(key) && Number.isFinite(value) && result.preview.features[key] != null && result.preview.features[key] !== "").sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]))
+  const risks = ordered.filter(([, value]) => value > 0).slice(0, 3), anchors = ordered.filter(([, value]) => value < 0).slice(0, 3)
   const survey = result.policyAnalysis?.recommendations.flatMap(item => item.evidence).filter(item => String(item.source).toUpperCase() === "SURVEY").slice(0, 2) ?? []
-  const largest = Math.max(...ordered.map(([, value]) => Math.abs(value)), .001)
   return <div className="space-y-5">
     <div className="flex items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-600"><ShieldCheck className="mt-0.5 size-5 shrink-0 text-slate-600" />{tr("Các tín hiệu được diễn giải từ hồ sơ, dữ liệu làm việc và phản hồi khảo sát đang có. Nhân sự cần trao đổi trực tiếp trước khi đưa ra quyết định.")}</div>
-<section className="rounded-2xl border border-slate-200 bg-white p-5"><h3 className="font-semibold">{tr("Mức đóng góp của các yếu tố")}</h3><p className="mt-1 text-sm text-slate-600">{tr("Thanh cam làm tăng nguy cơ, thanh xanh là điểm tựa giữ chân. Giá trị là đóng góp của mô hình, không phải xác suất riêng từng yếu tố.")}</p><div className="mt-5 space-y-3">{ordered.length ? ordered.map(([key, value]) => <div key={key} className="grid gap-2 sm:grid-cols-[minmax(125px,1fr)_minmax(150px,2fr)_auto] sm:items-center"><div><span className="block text-sm font-medium text-slate-900">{tr(featureLabel(key))}</span><span className="text-xs text-slate-600">{displayFeature(key, result.preview.features[key], tr)}</span></div><div className="grid h-8 grid-cols-2 items-center gap-0.5" aria-label={tr("{feature}: {direction} nguy cơ {value}", { feature: tr(featureLabel(key)), direction: value > 0 ? tr("tăng") : tr("giảm"), value: Math.abs(value).toFixed(3) })}><div className="flex justify-end border-r border-slate-300 pr-0.5">{value < 0 && <span className="h-5 rounded-l-md bg-emerald-400/80" style={{ width: `${Math.max(4, Math.abs(value) / largest * 100)}%` }} />}</div><div>{value > 0 && <span className="block h-5 rounded-r-md bg-orange-400/80" style={{ width: `${Math.max(4, value / largest * 100)}%` }} />}</div></div><span className={`min-w-14 text-right font-mono text-xs font-semibold ${value > 0 ? "text-orange-700" : "text-emerald-700"}`}>{value > 0 ? "+" : ""}{value.toFixed(3)}</span></div>) : <p className="text-sm text-slate-600">{tr("Chưa có đóng góp mô hình để hiển thị.")}</p>}</div></section>
-    <SignalGroup title={tr("Tín hiệu cần lưu ý")} description={tr("Những thông tin nên được đối soát trong buổi trao đổi tiếp theo")} tone="risk" items={risks} features={result.preview.features} />
-    {survey.length > 0 && <section className="rounded-2xl border border-slate-200 bg-slate-50/50 p-5"><h3 className="font-semibold">{tr("Phản hồi gần đây của nhân viên")}</h3><div className="mt-3 grid gap-3">{survey.map((item, index) => <SurveyQuote key={String(item.id ?? `${item.survey_id}-${index}`)} evidence={item} />)}</div></section>}
-    <SignalGroup title={tr("Điểm tựa giữ chân")} description={tr("Những yếu tố tích cực nên tiếp tục duy trì")} tone="anchor" items={anchors} features={result.preview.features} />
+    <div className="grid gap-4 md:grid-cols-2">
+      <SignalGroup title={tr("Tín hiệu rủi ro cần lưu ý")} description={tr("Những thông tin nên được đối soát trong buổi trao đổi tiếp theo")} tone="risk" items={risks} features={result.preview.features} />
+      <SignalGroup title={tr("Điểm tựa giữ chân")} description={tr("Những yếu tố tích cực nên tiếp tục duy trì")} tone="anchor" items={anchors} features={result.preview.features} />
+    </div>
+    {survey.length > 0 && <section className="rounded-2xl border border-slate-200 bg-slate-50/50 p-5"><h3 className="font-semibold">{tr("Phản hồi gần đây của nhân viên")}</h3><div className="mt-3 grid gap-3">{survey.map((item, index) => <SurveyQuote key={String(item.id ?? index)} evidence={item} />)}</div></section>}
   </div>
 }
 function SignalGroup({ title, description, tone, items, features }: { title: string; description: string; tone: "risk" | "anchor"; items: Array<[string, number]>; features: Record<string, string | number> }) {
@@ -243,7 +218,7 @@ function SignalGroup({ title, description, tone, items, features }: { title: str
   const reduceMotion = useReducedMotion()
   return <section className={`rounded-2xl border p-5 ${tone === "risk" ? "border-amber-200/80 bg-amber-50/20" : "border-emerald-200/80 bg-emerald-50/25"}`}>
     <div className="flex items-start justify-between gap-3"><div className="flex items-start gap-3"><span className={`grid size-10 place-items-center rounded-xl ${tone === "risk" ? "bg-orange-100 text-orange-600" : "bg-emerald-100 text-emerald-700"}`}>{tone === "risk" ? <AlertTriangle className="size-5" /> : <ShieldCheck className="size-5" />}</span><div><h3 className="font-semibold">{title}</h3><p className="mt-1 text-sm text-slate-600">{description}</p></div></div><span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${tone === "risk" ? "bg-amber-100 text-amber-800" : "bg-emerald-100 text-emerald-800"}`}>{items.length} {tr("tín hiệu")}</span></div>
-    {items.length ? <motion.div className="mt-4 grid gap-3 sm:grid-cols-2" initial="hidden" animate="show" variants={{ hidden: {}, show: { transition: { staggerChildren: reduceMotion ? 0 : .06 } } }}>{items.map(([key]) => <motion.article key={key} variants={{ hidden: { opacity: reduceMotion ? 1 : 0, y: reduceMotion ? 0 : 12 }, show: { opacity: 1, y: 0 } }} transition={{ duration: reduceMotion ? 0 : .22 }} className={`rounded-xl border bg-white p-4 shadow-sm transition-all duration-150 hover:-translate-y-0.5 hover:shadow-md motion-reduce:hover:translate-y-0 ${tone === "risk" ? "border-orange-100" : "border-emerald-100"}`}><div className="flex items-center gap-3"><span className={`grid size-10 place-items-center rounded-xl ${tone === "risk" ? "bg-orange-100 text-orange-600" : "bg-emerald-100 text-emerald-700"}`}><SignalIcon feature={key} /></span><div><p className="font-semibold">{tr(featureLabel(key))}</p><p className="text-xs font-medium text-slate-600">{displayFeature(key, features[key], tr)}</p></div></div><p className="mt-3 text-sm leading-6 text-slate-600">{signalText(key, features[key], tone, tr)}</p></motion.article>)}</motion.div> : <p className="mt-4 rounded-xl bg-white p-4 text-sm text-slate-600">{tr("Chưa ghi nhận tín hiệu phù hợp trong nhóm này.")}</p>}
+    {items.length ? <motion.div className="mt-4 grid gap-3" initial="hidden" animate="show" variants={{ hidden: {}, show: { transition: { staggerChildren: reduceMotion ? 0 : .06 } } }}>{items.map(([key]) => <motion.article key={key} variants={{ hidden: { opacity: reduceMotion ? 1 : 0, y: reduceMotion ? 0 : 12 }, show: { opacity: 1, y: 0 } }} transition={{ duration: reduceMotion ? 0 : .22 }} className={`rounded-xl border p-4 shadow-sm transition-all duration-150 hover:-translate-y-0.5 hover:shadow-md motion-reduce:hover:translate-y-0 ${tone === "risk" ? "border-rose-200/70 border-l-4 border-l-rose-500 bg-rose-50/40" : "border-emerald-200/70 border-l-4 border-l-emerald-500 bg-emerald-50/40"}`}><div className="flex items-center gap-3"><span className={`grid size-10 place-items-center rounded-xl ${tone === "risk" ? "bg-orange-100 text-orange-600" : "bg-emerald-100 text-emerald-700"}`}><SignalIcon feature={key} /></span><div><p className="font-semibold">{tr(featureLabel(key))}</p><p className="text-xs font-medium text-slate-600">{displayFeature(key, features[key], tr)}</p></div></div><p className="mt-3 text-sm leading-6 text-slate-600">{signalText(key, features[key], tone, tr)}</p></motion.article>)}</motion.div> : <p className="mt-4 rounded-xl bg-white p-4 text-sm text-slate-600">{tr("Chưa ghi nhận tín hiệu phù hợp trong nhóm này.")}</p>}
   </section>
 }
 function SignalIcon({ feature }: { feature: string }) { if (/Overtime|Work_Hours/.test(feature)) return <Clock3 className="size-5" />; if (/Hire_Date|Years/.test(feature)) return <CalendarDays className="size-5" />; if (/Department/.test(feature)) return <Building2 className="size-5" />; if (/Satisfaction/.test(feature)) return <HeartHandshake className="size-5" />; return <Sparkles className="size-5" /> }

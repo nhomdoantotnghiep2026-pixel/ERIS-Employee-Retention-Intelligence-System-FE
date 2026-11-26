@@ -1,8 +1,5 @@
 import { useAiTr } from "./aiWorkspaceLanguage"
 import { useLanguage } from "../../context/LanguageContext"
-import { useId, useState } from "react"
-import { AnimatePresence, motion, useReducedMotion } from "motion/react"
-import { Check, ChevronDown, ClipboardCheck, Database, Target, Zap } from "lucide-react"
 import { featureLabel } from "./analysis"
 import type { AiPolicyEvidence, AiUnifiedPolicyAnalysis } from "../../services/api"
 
@@ -15,21 +12,34 @@ export function ActionDossier({ analysis }: { analysis: AiUnifiedPolicyAnalysis 
 
 function RecommendationCard({ item }: { item: AiUnifiedPolicyAnalysis["recommendations"][number] }) {
   const tr = useAiTr()
-  const [checked, setChecked] = useState([false, false])
-  const [evidenceOpen, setEvidenceOpen] = useState(false)
-  const reduceMotion = useReducedMotion()
-  const evidenceId = useId()
-  const tasks = [tr("Đã đối chiếu bối cảnh cùng Quản lý trực tiếp"), tr("Đã thống nhất mốc kiểm tra lại với nhân viên")]
-  const completed = checked.filter(Boolean).length
-  return <article className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_1px_2px_rgba(15,23,42,.04),0_16px_40px_rgba(15,23,42,.06)]">
-    <header className="flex flex-wrap items-start gap-3 border-b border-slate-100 bg-gradient-to-r from-white to-slate-50/70 px-5 py-4"><span className="rounded-md bg-slate-900 px-2.5 py-1 font-mono text-xs font-bold text-white">{item.policy.code || item.policy.id}</span><div className="min-w-0 flex-1"><h4 className="font-semibold tracking-tight text-slate-950">{item.policy.name}</h4><span className="mt-1.5 inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-800"><ClipboardCheck className="size-3.5" />{tr("Cần Nhân sự xác minh")}</span></div></header>
-    <div className="p-5"><section className="relative overflow-hidden rounded-2xl border border-orange-200 bg-gradient-to-br from-orange-50 to-amber-50/40 p-5"><Zap aria-hidden="true" className="absolute right-4 top-4 size-10 text-orange-100" /><p className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-orange-700"><Target className="size-4" />{tr("Hành động đề xuất")}</p><p className="relative mt-2 max-w-3xl text-sm font-medium leading-7 text-slate-800">{item.policy.description || item.policy.name}</p></section>
-      <div className="mt-4 grid gap-4 md:grid-cols-2"><section className="rounded-xl border border-slate-100 bg-slate-50/80 p-4"><h5 className="text-sm font-semibold text-slate-900">{tr("Lý do đề xuất")}</h5><p className="mt-2 text-sm leading-6 text-slate-700">{item.reason}</p></section><section className="rounded-xl border border-amber-200/70 bg-amber-50/60 p-4"><div className="flex flex-wrap items-center justify-between gap-2"><h5 className="flex items-center gap-2 text-sm font-semibold text-amber-950"><ClipboardCheck className="size-4" />{tr("Nhân sự cần xác minh")}</h5><span role="status" className={`rounded-full px-2.5 py-1 text-xs font-semibold ${completed === tasks.length ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-900"}`}>{completed}/{tasks.length} {completed === tasks.length ? tr("đã đối soát") : tr("hoàn tất")}</span></div><p className="mt-2 text-sm leading-6 text-amber-950">{item.hrVerification}</p><div className="mt-4 space-y-2 border-t border-amber-200/70 pt-3">{tasks.map((task, index) => <label key={task} className="flex min-h-11 cursor-pointer items-start gap-2 rounded-md bg-white/80 p-2.5 text-sm text-slate-700 transition-colors hover:bg-white focus-within:ring-2 focus-within:ring-orange-400"><input type="checkbox" checked={checked[index]} onChange={() => setChecked(values => values.map((value, i) => i === index ? !value : value))} className="mt-0.5 accent-orange-600" /><motion.span animate={{ opacity: checked[index] ? .65 : 1 }} transition={{ duration: reduceMotion ? 0 : .18 }} className={checked[index] ? "line-through" : ""}>{task}</motion.span>{checked[index] && <Check aria-hidden="true" className="ml-auto size-4 shrink-0 text-emerald-700" />}</label>)}</div>
-        {item.evidence.length > 0 && <div className="mt-4 border-t border-amber-200/70 pt-3"><button type="button" aria-expanded={evidenceOpen} aria-controls={evidenceId} onClick={() => setEvidenceOpen(value => !value)} className="flex min-h-10 w-full items-center gap-2 rounded-md text-left text-sm font-semibold text-amber-950 transition-colors hover:bg-amber-100/60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-500"><Database className="size-4" />{tr("Bằng chứng thực tế (")}{item.evidence.length})<ChevronDown className={`ml-auto size-4 transition-transform duration-200 ${evidenceOpen ? "rotate-180" : ""}`} /></button><AnimatePresence initial={false}>{evidenceOpen && <motion.div id={evidenceId} initial={reduceMotion ? false : { height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={reduceMotion ? undefined : { height: 0, opacity: 0 }} transition={{ duration: reduceMotion ? 0 : .22 }} className="overflow-hidden"><div className="grid gap-3 pt-3">{item.evidence.map((evidence, index) => <EvidenceCard key={evidence.id || index} evidence={evidence} />)}</div></motion.div>}</AnimatePresence></div>}
-      </section></div>
+  return <article className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-5 pt-6 shadow-sm transition-shadow hover:shadow-md">
+    <div aria-hidden="true" className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-orange-500 to-amber-400" />
+    <div className="grid gap-4 divide-y divide-slate-100 md:grid-cols-2 md:divide-y-0 xl:grid-cols-[2fr_2fr_1fr_1.4fr] xl:divide-x">
+      <section className="min-w-0 xl:pr-4">
+        <h4 className="break-words text-sm font-semibold text-slate-950">{item.policy.name}</h4>
+        {item.policy.description && <p className="mt-2 whitespace-pre-line break-words text-sm leading-6 text-slate-700">{item.policy.description}</p>}
+      </section>
+      <section className="min-w-0 pt-3 md:pt-0 xl:px-4">
+        <h5 className="text-xs font-semibold text-slate-600">{tr("Căn cứ ghi nhận")}</h5>
+        <p className="mt-2 whitespace-pre-line break-words rounded-lg border border-slate-100 bg-slate-50 p-3 text-sm leading-6 text-slate-700">{item.reason}</p>
+        {item.evidence.length > 0 && <details className="mt-2">
+          <summary className="cursor-pointer rounded-md py-1 text-xs font-semibold text-orange-800 focus-visible:outline-2 focus-visible:outline-orange-500">{tr("Xem dẫn chứng")} ({item.evidence.length})</summary>
+          <div className="mt-2 grid gap-2">{item.evidence.map((evidence, index) => <EvidenceCard key={evidence.id || index} evidence={evidence} />)}</div>
+        </details>}
+      </section>
+      <section className="min-w-0 pt-3 md:pt-0 xl:px-4">
+        <h5 className="text-xs font-semibold text-slate-600">{tr("Đầu mối phối hợp")}</h5>
+        <p className="mt-2 text-sm text-slate-600">{tr("Chưa chỉ định")}</p>
+      </section>
+      <section className="min-w-0 pt-3 md:pt-0 xl:pl-4">
+        <h5 className="text-xs font-semibold text-slate-600">{tr("Mốc đánh giá lại")}</h5>
+        <p className="mt-2 text-sm text-slate-600">{tr("Chưa có mốc riêng")}</p>
+        {item.hrVerification && <><h5 className="mt-3 text-xs font-semibold text-slate-700">{tr("Nhân sự cần xác minh")}</h5><p className="mt-1 whitespace-pre-line break-words text-sm leading-6 text-slate-700">{item.hrVerification}</p></>}
+      </section>
     </div>
   </article>
 }
+
 
 function EvidenceCard({ evidence }: { evidence: AiPolicyEvidence }) {
   const tr = useAiTr()

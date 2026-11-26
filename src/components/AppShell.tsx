@@ -1,6 +1,6 @@
 import { EnterpriseHeader } from './EnterpriseHeader';
 import { readSidebarGroups, saveSidebarGroups } from '../utils/sidebarGroups';
-import { type ReactNode, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { type CSSProperties, type ReactNode, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, Users, BarChart3,
@@ -255,7 +255,7 @@ function Sidebar({ onNavigate, collapsed, onToggle, quiet }: { quiet?: boolean; 
   );
 }
 
-export function AppShell({ children, breadcrumb, quiet = false }: { children: ReactNode; breadcrumb?: string[]; quiet?: boolean }) {
+export function AppShell({ children, breadcrumb, quiet = false, mainStyle }: { children: ReactNode; breadcrumb?: string[]; quiet?: boolean; mainStyle?: CSSProperties }) {
   const { t } = useLanguage();
   const pageTitle = t(breadcrumb?.[breadcrumb.length - 1] || 'Workspace');
   useEffect(() => { document.title = pageTitle + ' | ERIS'; }, [pageTitle]);
@@ -292,7 +292,7 @@ export function AppShell({ children, breadcrumb, quiet = false }: { children: Re
       <Sidebar quiet={quiet} key={user.role} onNavigate={closeMobileSidebar} collapsed={!sidebarOpen} onToggle={toggleSidebar} />
       <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
         <EnterpriseHeader breadcrumb={breadcrumb} sidebarOpen={sidebarOpen} toggleSidebar={toggleSidebar} links={NAV_BY_ROLE} />
-        <main id="main-content" tabIndex={-1} className={'min-h-0 flex-1 overflow-y-auto overscroll-contain outline-none ' + (quiet ? '' : 'bg-[radial-gradient(circle_at_top_right,rgba(249,115,22,0.07),transparent_28rem)]')}>
+        <main id="main-content" tabIndex={-1} style={mainStyle} className={'min-h-0 flex-1 overflow-y-auto overscroll-contain outline-none ' + (quiet ? '' : 'bg-[radial-gradient(circle_at_top_right,rgba(249,115,22,0.07),transparent_28rem)]')}>
           <div className={'eris-content mx-auto w-full p-4 sm:p-5 lg:p-6 ' + (quiet ? '2xl:px-8' : 'max-w-[1480px]')}>
             {children}
           </div>

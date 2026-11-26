@@ -21,6 +21,7 @@ import {
 } from "recharts"
 import { AppShell } from "../components/AppShell"
 import { Button, Card, SectionHeader } from "../components/ui"
+import { leaveTypeDisplay } from "../utils/leaveRecordDisplay"
 import { useLanguage } from "../context/LanguageContext"
 import {
   attendanceMessage,
@@ -127,7 +128,7 @@ export default function LeaveDataDashboard() {
       if (record.start_date <= today && record.end_date >= today) current++
       else if (record.start_date > today) upcoming++
       const type = typeGroups.get(record.leave_type_id) || {
-        name: record.leave_type_name || record.leave_type || `#${record.leave_type_id}`,
+        name: leaveTypeDisplay(record.leave_type, record.leave_type_name, tr).label,
         records: 0,
         days: 0,
       }
@@ -155,7 +156,7 @@ export default function LeaveDataDashboard() {
         .sort((a, b) => a.start_date.localeCompare(b.start_date))
         .slice(0, 8),
     }
-  }, [filtered, range, today])
+  }, [filtered, range, today, language])
 
   const number = new Intl.NumberFormat(language === "vi" ? "vi-VN" : "en-US")
   const formatDate = (value: string) =>
@@ -242,7 +243,7 @@ export default function LeaveDataDashboard() {
             <label className="text-sm font-semibold text-slate-700">{tr("Loại nghỉ", "Leave type")}
               <SelectControl value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)} className={control}>
                 <option value="">{tr("Tất cả loại nghỉ", "All leave types")}</option>
-                {types.map((type) => <option key={type.id} value={type.id}>{type.code} · {type.name}</option>)}
+                {types.map((type) => <option key={type.id} value={type.id}>{leaveTypeDisplay(type.code, type.name, tr).label}</option>)}
               </SelectControl>
             </label>
             <Button className="self-end" disabled={!draftFrom || !draftTo || draftFrom > draftTo}>{tr("Áp dụng", "Apply")}</Button>
@@ -306,7 +307,7 @@ export default function LeaveDataDashboard() {
               <Users size={20} className="text-orange-600" aria-hidden="true" />
             </div>
             {overview.timeline.length ? (
-              <div className="overflow-x-auto"><table className="w-full min-w-[720px] text-left text-sm"><thead className="bg-slate-50 text-xs font-bold uppercase tracking-wide text-slate-600"><tr><th className="px-5 py-3">{tr("Nhân viên", "Employee")}</th><th className="px-5 py-3">{tr("Loại nghỉ", "Leave type")}</th><th className="px-5 py-3">{tr("Khoảng ngày", "Date range")}</th><th className="px-5 py-3">{tr("Số ngày", "Days")}</th><th className="px-5 py-3">{tr("Tình trạng", "Timing")}</th></tr></thead><tbody>{overview.timeline.map((record) => { const current = record.start_date <= today && record.end_date >= today; return <tr key={record.id} className="border-t border-slate-100"><td className="px-5 py-3 font-bold text-slate-950">{record.employee_code || `#${record.employee_id}`}</td><td className="px-5 py-3 text-slate-700">{record.leave_type_name || record.leave_type || `#${record.leave_type_id}`}</td><td className="px-5 py-3 font-medium text-slate-700">{formatDate(record.start_date)} → {formatDate(record.end_date)}</td><td className="px-5 py-3 font-semibold tabular-nums text-slate-700">{inclusiveDays(record.start_date, record.end_date)}</td><td className="px-5 py-3"><span className={`inline-flex rounded-md border px-2 py-1 text-xs font-bold ${current ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-blue-200 bg-blue-50 text-blue-800"}`}>{current ? tr("Đang nghỉ", "Current") : tr("Sắp diễn ra", "Upcoming")}</span></td></tr> })}</tbody></table></div>
+              <div className="overflow-x-auto"><table className="w-full min-w-[720px] text-left text-sm"><thead className="bg-slate-50 text-xs font-bold uppercase tracking-wide text-slate-600"><tr><th className="px-5 py-3">{tr("Nhân viên", "Employee")}</th><th className="px-5 py-3">{tr("Loại nghỉ", "Leave type")}</th><th className="px-5 py-3">{tr("Khoảng ngày", "Date range")}</th><th className="px-5 py-3">{tr("Số ngày", "Days")}</th><th className="px-5 py-3">{tr("Tình trạng", "Timing")}</th></tr></thead><tbody>{overview.timeline.map((record) => { const current = record.start_date <= today && record.end_date >= today; return <tr key={record.id} className="border-t border-slate-100"><td className="px-5 py-3 font-bold text-slate-950">{record.employee_code || `#${record.employee_id}`}</td><td className="px-5 py-3 text-slate-700">{leaveTypeDisplay(record.leave_type, record.leave_type_name, tr).label}</td><td className="px-5 py-3 font-medium text-slate-700">{formatDate(record.start_date)} → {formatDate(record.end_date)}</td><td className="px-5 py-3 font-semibold tabular-nums text-slate-700">{inclusiveDays(record.start_date, record.end_date)}</td><td className="px-5 py-3"><span className={`inline-flex rounded-md border px-2 py-1 text-xs font-bold ${current ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-blue-200 bg-blue-50 text-blue-800"}`}>{current ? tr("Đang nghỉ", "Current") : tr("Sắp diễn ra", "Upcoming")}</span></td></tr> })}</tbody></table></div>
             ) : <p className="p-6 text-sm text-slate-600">{tr("Không có hồ sơ đang hoặc sắp diễn ra.", "No current or upcoming leave records.")}</p>}
           </Card>
         </div>

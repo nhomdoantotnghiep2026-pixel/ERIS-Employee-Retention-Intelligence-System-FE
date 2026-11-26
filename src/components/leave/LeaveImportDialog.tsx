@@ -1,6 +1,7 @@
 import { useRef, useState, type FormEvent } from "react"
 import { AlertTriangle, Check, FileSpreadsheet, Upload, X } from "lucide-react"
 import { Button, Card } from "../ui"
+import { leaveTypeDisplay } from "../../utils/leaveRecordDisplay"
 import { useLanguage } from "../../context/LanguageContext"
 import type {
   LeaveImportResult,
@@ -56,6 +57,7 @@ export default function LeaveImportDialog({
   if (!open) return null
 
   const rows = result?.rows || preview?.rows || []
+  const typeByCode = new Map(types.map(type => [type.code, type.name]))
   const activeStep = result ? 3 : preview ? 2 : file ? 1 : 0
   const visibleError = /unable to read file/i.test(error)
     ? tr(
@@ -200,7 +202,7 @@ export default function LeaveImportDialog({
                 <thead className="sticky top-0 bg-slate-50"><tr>{[tr("Dòng", "Row"), tr("Nhân viên / loại", "Employee / type"), tr("Khoảng nghỉ", "Leave dates"), tr("Kết quả", "Outcome")].map(label => <th key={label} className="px-3 py-2 text-xs font-bold uppercase tracking-wide text-slate-600">{label}</th>)}</tr></thead>
                 <tbody>{rows.map(row => {
                   const message = importMessage(row.code, row.message)
-                  return <tr key={row.row} className="border-t border-slate-100"><td className="px-3 py-2">{row.row}</td><td className="px-3 py-2 font-medium text-slate-900">{row.employee_code} · {row.leave_type}</td><td className="px-3 py-2">{row.start_date} → {row.end_date}</td><td className="px-3 py-2"><span className={`inline-flex rounded-full border px-2 py-1 text-xs font-semibold ${statusTone[row.status] || statusTone.ERROR}`}>{statusLabel(row.status)}</span>{message && <p className="mt-1 max-w-sm text-xs text-slate-600">{message}</p>}</td></tr>
+                  return <tr key={row.row} className="border-t border-slate-100"><td className="px-3 py-2">{row.row}</td><td className="px-3 py-2 font-medium text-slate-900">{row.employee_code} · {leaveTypeDisplay(row.leave_type, typeByCode.get(row.leave_type), tr).label}</td><td className="px-3 py-2">{row.start_date} → {row.end_date}</td><td className="px-3 py-2"><span className={`inline-flex rounded-full border px-2 py-1 text-xs font-semibold ${statusTone[row.status] || statusTone.ERROR}`}>{statusLabel(row.status)}</span>{message && <p className="mt-1 max-w-sm text-xs text-slate-600">{message}</p>}</td></tr>
                 })}</tbody>
               </table>
             </div>
