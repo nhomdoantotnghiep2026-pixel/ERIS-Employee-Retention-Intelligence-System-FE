@@ -1,7 +1,7 @@
 import { useAiTr } from "./aiWorkspaceLanguage"
 import { useEffect, useMemo, useState } from "react"
 
-import { ArrowRight, Search, SlidersHorizontal, Sparkles, X } from "lucide-react"
+import { ArrowRight, ArrowUpDown, Search, SlidersHorizontal, Sparkles, X } from "lucide-react"
 import { motion, useReducedMotion } from "motion/react"
 import { Button } from "../ui/button"
 import { SelectControl } from "../ui/select-control"
@@ -14,6 +14,21 @@ type Sel = {
   employeeId?: number
   resultId?: number
 }
+
+type SortConfig = {
+  key: "CODE" | "TENURE" | "NAME" | "DEPARTMENT"
+  direction: "ASC" | "DESC"
+}
+
+const sortOptions = [
+  { key: "NAME", direction: "ASC", label: "Tên A–Z" },
+  { key: "NAME", direction: "DESC", label: "Tên Z–A" },
+  { key: "CODE", direction: "ASC", label: "Mã nhân viên tăng dần" },
+  { key: "CODE", direction: "DESC", label: "Mã nhân viên giảm dần" },
+  { key: "TENURE", direction: "DESC", label: "Thâm niên cao nhất" },
+  { key: "TENURE", direction: "ASC", label: "Thâm niên thấp nhất" },
+  { key: "DEPARTMENT", direction: "ASC", label: "Phòng ban" },
+] as const satisfies ReadonlyArray<SortConfig & { label: string }>
 
 export function IndividualAnalysis({
   employees,
@@ -91,7 +106,7 @@ function WorkspaceHub({
 
   const [status, setStatus] = useState("ALL")
 
-  const [sort, setSort] = useState("NAME")
+  const [sortConfig, setSortConfig] = useState<SortConfig>({ key: "CODE", direction: "ASC" })
 
   const pageSize = 7
 
@@ -118,7 +133,7 @@ function WorkspaceHub({
     [departments, employees],
   )
 
-  useEffect(() => setPage(1), [department, query, sort, status])
+  useEffect(() => setPage(1), [department, query, status])
 
   const filtered = useMemo(() => {
     const needle = query.trim().toLocaleLowerCase("vi-VN")
@@ -138,22 +153,41 @@ function WorkspaceHub({
               .includes(needle)),
       )
 
-      .sort((a, b) =>
-        sort === "CODE"
-          ? a.employeeCode.localeCompare(b.employeeCode, "vi", {
-              numeric: true,
-            })
-          : sort === "DEPARTMENT"
-            ? `${a.departmentName ?? ""} ${a.fullName}`.localeCompare(
-                `${b.departmentName ?? ""} ${b.fullName}`,
-                "vi",
-              )
-            : sort === "TENURE"
-              ? Date.parse(a.hireDate ?? "9999-12-31") -
-                Date.parse(b.hireDate ?? "9999-12-31")
-            : a.fullName.localeCompare(b.fullName, "vi"),
-      )
-  }, [department, employees, query, sort, status])
+      .sort((a, b) => {
+        const ascending = sortConfig.direction === "ASC"
+        const direction = ascending ? 1 : -1
+        switch (sortConfig.key) {
+          case "CODE":
+            return direction * (a.employeeCode ?? "").localeCompare(b.employeeCode ?? "", "vi", { numeric: true })
+          case "TENURE":
+            return compareHireDates(a.hireDate, b.hireDate, ascending)
+          case "DEPARTMENT":
+            return `${a.departmentName ?? ""} ${a.fullName}`.localeCompare(
+              `${b.departmentName ?? ""} ${b.fullName}`, "vi",
+            )
+          case "NAME":
+            return direction * a.fullName.localeCompare(b.fullName, "vi")
+        }
+      })
+  }, [department, employees, query, sortConfig, status])
+
+  const sortOrder = (key: SortConfig["key"]) =>
+    sortConfig.key !== key ? "none" : sortConfig.direction === "ASC" ? "ascending" : "descending"
+  const codeOrder = sortOrder("CODE")
+  const tenureOrder = sortOrder("TENURE")
+  const selectedSort = sortOptions.findIndex(({ key, direction }) => key === sortConfig.key && direction === sortConfig.direction)
+  const toggleSort = (key: "CODE" | "TENURE") => {
+    setSortConfig((current) => ({
+      key,
+      direction: current.key === key && current.direction === "ASC" ? "DESC" : "ASC",
+    }))
+    setPage(1)
+  }
+  const sortArrow = (order: ReturnType<typeof sortOrder>) => {
+    return <ArrowUpDown aria-hidden="true" className={`size-3.5 shrink-0 motion-safe:transition-transform motion-safe:group-hover:scale-110 ${order === "none" ? "text-slate-400 group-hover:text-slate-600" : "text-orange-600"}`} />
+  }
+  const sortButtonClass = (order: ReturnType<typeof sortOrder>) =>
+    `group flex w-full cursor-pointer select-none items-center gap-2 rounded-md px-4 py-3 text-left uppercase transition-colors hover:text-slate-900 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-orange-600 motion-reduce:transition-none ${order === "none" ? "" : "font-extrabold text-slate-900"}`
 
   const pages = Math.max(1, Math.ceil(filtered.length / pageSize))
 
@@ -274,13 +308,15 @@ function WorkspaceHub({
             <span className="sr-only">{tr("Sắp xếp")}</span>
             <SelectControl
               prefixIcon={<SlidersHorizontal className="size-4" />}
-              value={sort}
-              onChange={(event) => setSort(event.target.value)}
+              value={String(selectedSort)}
+              onChange={(event) => {
+                const option = sortOptions[Number(event.target.value)]
+                if (!option) return
+                setSortConfig({ key: option.key, direction: option.direction })
+                setPage(1)
+              }}
             >
-              <option value="NAME">{tr("Tên A–Z")}</option>
-              <option value="CODE">{tr("Mã nhân viên")}</option>
-              <option value="TENURE">{tr("Thâm niên cao nhất")}</option>
-              <option value="DEPARTMENT">{tr("Phòng ban")}</option>
+              {sortOptions.map(({ label }, index) => <option key={label} value={String(index)}>{tr(label)}</option>)}
             </SelectControl>
           </label>
         </div>
@@ -326,9 +362,17 @@ function WorkspaceHub({
           <table className="w-full min-w-[780px] text-left">
             <thead className="bg-slate-50/80 text-[11px] font-bold uppercase tracking-wider text-slate-600">
               <tr>
-                <th className="px-4 py-3">{tr("Nhân viên")}</th>
+                <th scope="col" aria-sort={codeOrder} className="p-0">
+                  <motion.button type="button" whileTap={reduceMotion ? undefined : { scale: 0.99 }} className={sortButtonClass(codeOrder)} title={tr(codeOrder === "ascending" ? "Mã nhân viên giảm dần" : "Mã nhân viên tăng dần")} onClick={() => toggleSort("CODE")}>
+                    {tr("Nhân viên")}{sortArrow(codeOrder)}
+                  </motion.button>
+                </th>
                 <th className="px-4 py-3">{tr("Phòng ban & Chức danh")}</th>
-                <th className="px-4 py-3">{tr("Thâm niên & Trạng thái")}</th>
+                <th scope="col" aria-sort={tenureOrder} className="p-0">
+                  <motion.button type="button" whileTap={reduceMotion ? undefined : { scale: 0.99 }} className={sortButtonClass(tenureOrder)} title={tr(tenureOrder === "ascending" ? "Thâm niên cao nhất" : "Thâm niên thấp nhất")} onClick={() => toggleSort("TENURE")}>
+                    {tr("Thâm niên & Trạng thái")}{sortArrow(tenureOrder)}
+                  </motion.button>
+                </th>
                 <th className="px-4 py-3 text-right">{tr("Thao tác")}</th>
               </tr>
             </thead>
@@ -457,6 +501,14 @@ function getInitials(name?: string) {
   const parts = name.trim().split(/\s+/)
 
   return `${parts.at(-2)?.[0] ?? ""}${parts.at(-1)?.[0] ?? ""}`.toUpperCase()
+}
+
+function compareHireDates(a: string | null | undefined, b: string | null | undefined, shortestFirst: boolean) {
+  const first = Date.parse(a ?? "")
+  const second = Date.parse(b ?? "")
+  if (!Number.isFinite(first)) return Number.isFinite(second) ? 1 : 0
+  if (!Number.isFinite(second)) return -1
+  return shortestFirst ? second - first : first - second
 }
 
 function formatTenure(hireDate: string | null | undefined, tr: (copy: string) => string) {
