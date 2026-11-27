@@ -226,30 +226,101 @@ function TrendSparkline({ points, current, threshold }: { points: AnalysisResult
 
 function BusinessSignals({ result }: { result: AnalysisResult }) {
   const tr = useAiTr()
-  const ordered = Object.entries(result.model.contributions).filter(([key, value]) => !["Age", "Gender"].includes(key) && Number.isFinite(value)).sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]))
-  const risks = ordered.filter(([, value]) => value > 0).slice(0, 3), anchors = ordered.filter(([, value]) => value < 0).slice(0, 2)
-  const survey = result.policyAnalysis?.recommendations.flatMap(item => item.evidence).filter(item => String(item.source).toUpperCase() === "SURVEY").slice(0, 2) ?? []
-  const largest = Math.max(...ordered.map(([, value]) => Math.abs(value)), .001)
+  const analysis = result.policyAnalysis
+  if (!analysis) return <ProfileSignals result={result} />
+
+  const seenReasons = new Set<string>()
+  const findings = analysis.recommendations.filter(item => {
+    const reason = item.reason.trim().replace(/\s+/g, " ").toLocaleLowerCase("vi")
+    if (seenReasons.has(reason)) return false
+    seenReasons.add(reason)
+    return true
+  })
+
   return <div className="space-y-5">
-    <div className="flex items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-600"><ShieldCheck className="mt-0.5 size-5 shrink-0 text-slate-600" />{tr("Các tín hiệu được diễn giải từ hồ sơ, dữ liệu làm việc và phản hồi khảo sát đang có. Nhân sự cần trao đổi trực tiếp trước khi đưa ra quyết định.")}</div>
-<section className="rounded-2xl border border-slate-200 bg-white p-5"><h3 className="font-semibold">{tr("Mức đóng góp của các yếu tố")}</h3><p className="mt-1 text-sm text-slate-600">{tr("Thanh cam làm tăng nguy cơ, thanh xanh là điểm tựa giữ chân. Giá trị là đóng góp của mô hình, không phải xác suất riêng từng yếu tố.")}</p><div className="mt-5 space-y-3">{ordered.length ? ordered.map(([key, value]) => <div key={key} className="grid gap-2 sm:grid-cols-[minmax(125px,1fr)_minmax(150px,2fr)_auto] sm:items-center"><div><span className="block text-sm font-medium text-slate-900">{tr(featureLabel(key))}</span><span className="text-xs text-slate-600">{displayFeature(key, result.preview.features[key], tr)}</span></div><div className="grid h-8 grid-cols-2 items-center gap-0.5" aria-label={tr("{feature}: {direction} nguy cơ {value}", { feature: tr(featureLabel(key)), direction: value > 0 ? tr("tăng") : tr("giảm"), value: Math.abs(value).toFixed(3) })}><div className="flex justify-end border-r border-slate-300 pr-0.5">{value < 0 && <span className="h-5 rounded-l-md bg-emerald-400/80" style={{ width: `${Math.max(4, Math.abs(value) / largest * 100)}%` }} />}</div><div>{value > 0 && <span className="block h-5 rounded-r-md bg-orange-400/80" style={{ width: `${Math.max(4, value / largest * 100)}%` }} />}</div></div><span className={`min-w-14 text-right font-mono text-xs font-semibold ${value > 0 ? "text-orange-700" : "text-emerald-700"}`}>{value > 0 ? "+" : ""}{value.toFixed(3)}</span></div>) : <p className="text-sm text-slate-600">{tr("Chưa có đóng góp mô hình để hiển thị.")}</p>}</div></section>
-    <SignalGroup title={tr("Tín hiệu cần lưu ý")} description={tr("Những thông tin nên được đối soát trong buổi trao đổi tiếp theo")} tone="risk" items={risks} features={result.preview.features} />
-    {survey.length > 0 && <section className="rounded-2xl border border-slate-200 bg-slate-50/50 p-5"><h3 className="font-semibold">{tr("Phản hồi gần đây của nhân viên")}</h3><div className="mt-3 grid gap-3">{survey.map((item, index) => <SurveyQuote key={String(item.id ?? `${item.survey_id}-${index}`)} evidence={item} />)}</div></section>}
-    <SignalGroup title={tr("Điểm tựa giữ chân")} description={tr("Những yếu tố tích cực nên tiếp tục duy trì")} tone="anchor" items={anchors} features={result.preview.features} />
+    <section className="rounded-2xl border border-slate-200 bg-white p-5">
+      <h3 className="font-semibold">{tr("Những gì Agent ghi nhận")}</h3>
+      {findings.length > 0 ? <div className={`mt-3 grid gap-3 ${findings.length > 1 ? "lg:grid-cols-2" : ""}`}>
+        {findings.map(item => <article key={item.policy.id} className="min-w-0 rounded-xl border border-slate-200 p-4">
+          <p className="break-words text-sm leading-6 text-slate-800">{item.reason}</p>
+          {item.evidence.length > 0 && <div className="mt-4">
+            <h4 className="text-sm font-semibold">{tr("Dẫn chứng để đối chiếu")}</h4>
+            <div className="mt-2 grid gap-2">{item.evidence.map((evidence, index) =>
+              evidence.source?.toUpperCase() === "SURVEY"
+                ? <SurveyQuote key={evidence.id ?? index} evidence={evidence} />
+                : <EvidenceCard key={evidence.id ?? index} evidence={evidence} />
+            )}</div>
+          </div>}
+          <div className="mt-4 rounded-lg bg-slate-50 p-3 text-sm leading-6 text-slate-700">
+            <h4 className="font-semibold">{tr("HR cần xác minh")}</h4>
+            <p className="break-words">{item.hrVerification}</p>
+          </div>
+        </article>)}
+      </div> : <p className="mt-2 text-sm text-slate-600">{analysis.noRecommendationReason || tr("Chưa có tín hiệu được Agent đối chiếu từ dẫn chứng.")}</p>}
+    </section>
+    <details className="rounded-2xl border border-slate-200 bg-white p-4">
+      <summary className="cursor-pointer rounded-md text-sm font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-500">{tr("Xem thêm thông tin từ hồ sơ")}</summary>
+      <div className="mt-4"><ProfileSignals result={result} /></div>
+    </details>
   </div>
 }
-function SignalGroup({ title, description, tone, items, features }: { title: string; description: string; tone: "risk" | "anchor"; items: Array<[string, number]>; features: Record<string, string | number> }) {
+function ProfileSignals({ result }: { result: AnalysisResult }) {
+  const tr = useAiTr()
+  const ordered = Object.entries(result.model.contributions).filter(([key, value]) => !["Age", "Gender"].includes(key) && Number.isFinite(value)).sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]))
+  const risks = ordered.filter(([, value]) => value > 0).slice(0, 3), anchors = ordered.filter(([, value]) => value < 0).slice(0, 2)
+  return <div className="space-y-5">
+    <SignalGroup title={tr("Nên hỏi thêm")} tone="risk" items={risks.map(([key]) => key)} result={result} />
+    <SignalGroup title={tr("Nên tìm hiểu điều gì đang hỗ trợ nhân viên")} tone="anchor" items={anchors.map(([key]) => key)} result={result} />
+  </div>
+}
+function SignalGroup({ title, tone, items, result }: { title: string; tone: "risk" | "anchor"; items: string[]; result: AnalysisResult }) {
   const tr = useAiTr()
   const reduceMotion = useReducedMotion()
   return <section className={`rounded-2xl border p-5 ${tone === "risk" ? "border-amber-200/80 bg-amber-50/20" : "border-emerald-200/80 bg-emerald-50/25"}`}>
-    <div className="flex items-start justify-between gap-3"><div className="flex items-start gap-3"><span className={`grid size-10 place-items-center rounded-xl ${tone === "risk" ? "bg-orange-100 text-orange-600" : "bg-emerald-100 text-emerald-700"}`}>{tone === "risk" ? <AlertTriangle className="size-5" /> : <ShieldCheck className="size-5" />}</span><div><h3 className="font-semibold">{title}</h3><p className="mt-1 text-sm text-slate-600">{description}</p></div></div><span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${tone === "risk" ? "bg-amber-100 text-amber-800" : "bg-emerald-100 text-emerald-800"}`}>{items.length} {tr("tín hiệu")}</span></div>
-    {items.length ? <motion.div className="mt-4 grid gap-3 sm:grid-cols-2" initial="hidden" animate="show" variants={{ hidden: {}, show: { transition: { staggerChildren: reduceMotion ? 0 : .06 } } }}>{items.map(([key]) => <motion.article key={key} variants={{ hidden: { opacity: reduceMotion ? 1 : 0, y: reduceMotion ? 0 : 12 }, show: { opacity: 1, y: 0 } }} transition={{ duration: reduceMotion ? 0 : .22 }} className={`rounded-xl border bg-white p-4 shadow-sm transition-all duration-150 hover:-translate-y-0.5 hover:shadow-md motion-reduce:hover:translate-y-0 ${tone === "risk" ? "border-orange-100" : "border-emerald-100"}`}><div className="flex items-center gap-3"><span className={`grid size-10 place-items-center rounded-xl ${tone === "risk" ? "bg-orange-100 text-orange-600" : "bg-emerald-100 text-emerald-700"}`}><SignalIcon feature={key} /></span><div><p className="font-semibold">{tr(featureLabel(key))}</p><p className="text-xs font-medium text-slate-600">{displayFeature(key, features[key], tr)}</p></div></div><p className="mt-3 text-sm leading-6 text-slate-600">{signalText(key, features[key], tone, tr)}</p></motion.article>)}</motion.div> : <p className="mt-4 rounded-xl bg-white p-4 text-sm text-slate-600">{tr("Chưa ghi nhận tín hiệu phù hợp trong nhóm này.")}</p>}
+    <div className="flex items-start justify-between gap-3"><div className="flex items-start gap-3"><span className={`grid size-10 place-items-center rounded-xl ${tone === "risk" ? "bg-orange-100 text-orange-600" : "bg-emerald-100 text-emerald-700"}`}>{tone === "risk" ? <AlertTriangle className="size-5" /> : <ShieldCheck className="size-5" />}</span><div><h3 className="font-semibold">{title}</h3></div></div></div>
+    {items.length ? <motion.div className="mt-4 grid gap-3 sm:grid-cols-2" initial="hidden" animate="show" variants={{ hidden: {}, show: { transition: { staggerChildren: reduceMotion ? 0 : .06 } } }}>
+      {items.map(key => {
+        const period = result.preview.period
+        const hireDate = result.preview.features.Hire_Date
+        const hasHireDate = (key === "Years_At_Company" || key === "Hire_Date") &&
+          typeof hireDate === "string" && /^\d{4}-\d{2}-\d{2}$/.test(hireDate)
+        return <motion.article key={key}
+          variants={{ hidden: { opacity: reduceMotion ? 1 : 0, y: reduceMotion ? 0 : 12 }, show: { opacity: 1, y: 0 } }}
+          transition={{ duration: reduceMotion ? 0 : .22 }}
+          className="min-w-0 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+          <div className="flex items-center gap-3">
+            <span className={`grid size-10 shrink-0 place-items-center rounded-xl ${tone === "risk" ? "bg-orange-100 text-orange-700" : "bg-emerald-100 text-emerald-700"}`}><SignalIcon feature={key} /></span>
+            <h4 className="min-w-0 break-words font-semibold">{tr(featureLabel(key))}</h4>
+          </div>
+          <p className="mt-3 text-sm leading-6 text-slate-700">{signalObservation(key, result.preview.features[key], tr)}</p>
+          {period && <p className="mt-1 text-xs text-slate-600">{tr("Kỳ hồ sơ")} · {`${period.start.split("-").reverse().join("/")} – ${period.end.split("-").reverse().join("/")}`}</p>}
+          {hasHireDate && <div className="mt-4 rounded-lg border border-slate-200 p-3 text-sm leading-6 text-slate-700">
+              <p className="text-xs font-medium text-slate-600">{tr("Hồ sơ nhân sự")}</p>
+              <p className="mt-1">{tr("Ngày vào làm ghi trong hồ sơ là {date}.", { date: displayFeature("Hire_Date", hireDate, tr) })}</p>
+          </div>}
+          <div className="mt-4 rounded-lg bg-slate-50 p-3 text-sm leading-6 text-slate-700">
+            <h5 className="font-semibold">{tr("HR cần xác minh")}</h5>
+            <p>{signalVerification(key, result.preview.features[key], tr)}</p>
+          </div>
+        </motion.article>
+      })}
+    </motion.div> : <p className="mt-4 rounded-xl bg-white p-4 text-sm text-slate-600">{tr("Chưa ghi nhận tín hiệu phù hợp trong nhóm này.")}</p>}
   </section>
 }
 function SignalIcon({ feature }: { feature: string }) { if (/Overtime|Work_Hours/.test(feature)) return <Clock3 className="size-5" />; if (/Hire_Date|Years/.test(feature)) return <CalendarDays className="size-5" />; if (/Department/.test(feature)) return <Building2 className="size-5" />; if (/Satisfaction/.test(feature)) return <HeartHandshake className="size-5" />; return <Sparkles className="size-5" /> }
 function SurveyQuote({ evidence }: { evidence: AiPolicyEvidence }) {
-  const tr = useAiTr(); const answer = evidence.answer_value ?? evidence.comment; return <blockquote className="relative overflow-hidden rounded-xl border border-slate-200 border-l-4 border-l-orange-500 bg-white p-5 shadow-sm"><span className="absolute right-4 top-1 text-5xl font-black leading-none text-orange-100">“</span>{evidence.question_text && <span className="relative block pr-8 text-sm font-semibold leading-6 text-slate-700">{evidence.question_text}</span>}<p className="relative mt-2 text-sm italic leading-7 text-slate-700">“{formatValue(answer) || tr("Chưa có nội dung phản hồi dạng văn bản.")}”</p><footer className="mt-3 inline-flex rounded-full bg-slate-100 px-2.5 py-1 text-xs not-italic text-slate-500">{tr("Khảo sát")}{evidence.survey_id ? ` #${evidence.survey_id}` : ""}{evidence.submitted_at ? ` · ${dateTime(evidence.submitted_at)}` : ""}</footer></blockquote> }
-
+  const tr = useAiTr()
+  const config = evidence.answer_config as { min?: unknown; max?: unknown } | undefined
+  const answer = typeof evidence.answer_value === "number" && typeof config?.min === "number" && typeof config.max === "number"
+    ? tr("{score}/{max} (thang {min}–{max})", { score: evidence.answer_value, min: config.min, max: config.max })
+    : formatValue(evidence.answer_value)
+  return <blockquote className="break-words rounded-lg border border-slate-200 border-l-2 border-l-orange-500 p-3 text-sm leading-6 text-slate-700">
+    <footer className="text-xs font-medium text-slate-600">{tr("Khảo sát")}{evidence.submitted_at ? ` · ${dateTime(evidence.submitted_at)}` : ""}</footer>
+    {evidence.question_text && <p className="mt-1 font-semibold">{evidence.question_text}</p>}
+    {answer && <p>{answer}</p>}
+    {evidence.comment?.trim() && evidence.comment.trim() !== answer && <p className="mt-1 italic">“{evidence.comment.trim()}”</p>}
+  </blockquote>
+}
 function PreviousSessionModal({ result, onClose }: { result: AnalysisResult; onClose: () => void }) {
   const tr = useAiTr()
   const risk = riskPresentation(result.model.riskLevel, result.model.assessment?.status)
@@ -263,6 +334,7 @@ function PreviousSessionModal({ result, onClose }: { result: AnalysisResult; onC
     </motion.section>
   </motion.div>
 }
+
 function ProfileContext({ snapshot }: { snapshot: AiSnapshot | AnalysisResult["preview"] | null }) {
   const tr = useAiTr()
   const f = snapshot?.features ?? {}, satisfaction = Number(f.Employee_Satisfaction_Score), overtime = Number(f.Overtime_Hours)
@@ -278,26 +350,53 @@ function ProfileContext({ snapshot }: { snapshot: AiSnapshot | AnalysisResult["p
 function mergeTrend(history: AnalysisResult[], current: AnalysisResult) { const values = [...history]; if (!values.some(item => item.predictionId && item.predictionId === current.predictionId)) values.push(current); return values.sort((a, b) => Date.parse(a.createdAt ?? a.preview.capturedAt) - Date.parse(b.createdAt ?? b.preview.capturedAt)).slice(-5) }
 function riskPresentation(level?: string | null, status?: string) { const value = (level ?? "").toLowerCase(); if (/high|cao/.test(value)) return { label: "Nguy cơ cao · Cần can thiệp", className: "border-rose-200 bg-rose-50 text-rose-700", icon: <AlertTriangle className="size-4" /> }; if (/medium|trung/.test(value) || status === "REVIEW_REQUIRED") return { label: "Cần lưu ý", className: "border-amber-300 bg-amber-50 text-amber-900", icon: <AlertTriangle className="size-4" /> }; return { label: "Nguy cơ thấp", className: "border-emerald-200 bg-emerald-50 text-emerald-700", icon: <Check className="size-4" /> } }
 type AiTr = ReturnType<typeof useAiTr>
-function signalText(key: string, value: unknown, tone: "risk" | "anchor", tr: AiTr) {
-  const shown = displayFeature(key, value, tr)
-  const risk: Record<string, string> = {
-    Overtime_Hours: tr("Hồ sơ ghi nhận {value}. Nhân sự nên làm rõ thời điểm phát sinh, tải công việc và khả năng bố trí nghỉ bù.", { value: shown }),
-    Work_Hours_Per_Week: tr("Thời lượng làm việc hiện được ghi nhận là {value}. Cần đối chiếu với lịch làm việc đã thống nhất.", { value: shown }),
-    Employee_Satisfaction_Score: tr("Mức hài lòng gần nhất là {value}. Nên trao đổi riêng để xác định trải nghiệm cần cải thiện.", { value: shown }),
-    Sick_Days: tr("Hồ sơ ghi nhận {value}. Cần xác minh loại nghỉ và nhu cầu hỗ trợ khi trở lại công việc.", { value: shown }),
-    Monthly_Salary: tr("Thu nhập hiện được ghi nhận ở mức {value}. Cần đối chiếu với cấp bậc và phạm vi trách nhiệm.", { value: shown }),
-    Promotions: tr("Hồ sơ ghi nhận {value}. Cần kết hợp nguyện vọng phát triển và các cam kết nghề nghiệp đang có.", { value: shown }),
+function signalObservation(feature: string, value: unknown, tr: AiTr) {
+  if (value === undefined || value === null || value === "") return tr("Hồ sơ chưa có giá trị cho mục này.")
+  // Vietnam Labour Force Survey 2024, table 3.7. This is a population average.
+  const nationalWeeklyAverage = 42.5
+  if (feature === "Work_Hours_Per_Week" && Number(value) > nationalWeeklyAverage && Number.isFinite(Number(value))) {
+    return tr("Hồ sơ ghi nhận {value}, cao hơn {difference} giờ so với mức làm việc thực tế bình quân cả nước năm 2024 (42,5 giờ/tuần). Nếu lịch này lặp lại, hãy hỏi xem nhân viên có còn đủ thời gian nghỉ và lo việc riêng sau giờ làm không.", {
+      value: displayFeature(feature, value, tr),
+      difference: (Number(value) - nationalWeeklyAverage).toLocaleString("vi-VN", { maximumFractionDigits: 2 })
+    })
   }
-  const anchor: Record<string, string> = {
-    Years_At_Company: tr("Thâm niên hiện tại là {value}, cho thấy mức độ ổn định cần tiếp tục được phát huy.", { value: shown }),
-    Department: tr("Nhân viên hiện làm việc tại {value}. Tiếp tục duy trì đầu mối phối hợp và hỗ trợ trong phòng ban.", { value: shown }),
-    Work_Hours_Per_Week: tr("Lịch làm việc {value} đang là một điểm ổn định cần tiếp tục duy trì.", { value: shown }),
-    Education_Level: tr("Nền tảng học vấn {value} đang hỗ trợ vai trò hiện tại.", { value: shown }),
-    Monthly_Salary: tr("Mức thu nhập {value} đang đóng vai trò là một điểm tựa cần tiếp tục rà soát theo chu kỳ.", { value: shown }),
+  const observations: Record<string, string> = {
+    Overtime_Hours: "Hồ sơ ghi nhận {value} tăng ca. Nếu công việc thường dồn vào vài ca, đây là chuyện nên hỏi trước khi bàn cách chia lại việc.",
+    Work_Hours_Per_Week: "Hồ sơ ghi nhận {value}. Hỏi xem đây là lịch làm việc thường ngày hay chỉ có vài tuần bận hơn.",
+    Employee_Satisfaction_Score: "Điểm hài lòng trong hồ sơ là {value}. Một ví dụ từ nhân viên sẽ giúp hiểu phần nào trong công việc đang thuận lợi hoặc gây khó khăn.",
+    Sick_Days: "Hồ sơ ghi nhận {value} nghỉ. Có thể hỏi xem nhân viên cần hỗ trợ gì để sắp xếp công việc sau khi quay lại.",
+    Monthly_Salary: "Mức lương trong hồ sơ là {value}. Hãy hỏi nhân viên xem phạm vi trách nhiệm có thay đổi từ lần gần nhất trao đổi về lương không.",
+    Promotions: "Hồ sơ ghi nhận {value} thăng chức. Có thể hỏi nhân viên muốn phát triển theo hướng nào và đã được trao đổi về bước tiếp theo chưa.",
+    Years_At_Company: "Nhân viên đã làm việc {value}. Đây là dịp hỏi điều gì giúp họ gắn bó và điều gì họ muốn thay đổi trong công việc.",
+    Hire_Date: "Hồ sơ ghi ngày vào làm là {value}. Có thể hỏi điều gì giúp họ bắt nhịp và khâu nào còn cần hỗ trợ.",
+    Department: "Nhân viên đang làm ở {value}. Hãy hỏi việc phối hợp hằng ngày đang thuận lợi ở đâu và có vướng mắc gì.",
+    Education_Level: "Hồ sơ ghi bậc học {value}. Có thể hỏi nhân viên muốn dùng hoặc phát triển kỹ năng nào trong công việc hiện tại.",
   }
-  return (tone === "risk" ? risk[key] : anchor[key]) ?? tr("{feature} hiện được ghi nhận là {value}. {guidance}", {
-    feature: tr(featureLabel(key)), value: shown, guidance: tr(tone === "risk" ? "Nhân sự nên trao đổi để xác minh bối cảnh thực tế." : "Đây là điểm tích cực nên tiếp tục theo dõi và duy trì."),
+  return tr(observations[feature] ?? "Hồ sơ ghi nhận {feature} ở mức {value}. Hỏi nhân viên thông tin này có phản ánh công việc hiện tại không.", {
+    feature: tr(featureLabel(feature)), value: displayFeature(feature, value, tr)
   })
+}
+function signalVerification(feature: string, value: unknown, tr: AiTr) {
+  const weeklyHours = Number(value)
+  // The Labour Code encourages a 40-hour week. Confirm the actual schedule before classifying overtime.
+  if (feature === "Work_Hours_Per_Week" && Number.isFinite(weeklyHours) && weeklyHours > 40) {
+    return tr("Nếu lịch chuẩn của nhân viên là 40 giờ/tuần, phần chênh là {difference} giờ. Đối chiếu lịch ca và chấm công từng ngày để xác định giờ làm thêm và xem giờ phát sinh có thường rơi vào buổi tối hoặc ngày nghỉ không.", {
+      difference: (weeklyHours - 40).toLocaleString("vi-VN", { maximumFractionDigits: 2 })
+    })
+  }
+  const prompts: Record<string, string> = {
+    Overtime_Hours: "Đối chiếu ngày tăng ca với lịch phân ca và lịch giao việc. Hỏi quản lý ca nào phát sinh ngoài kế hoạch.",
+    Work_Hours_Per_Week: "Đối chiếu giờ thực tế với lịch làm việc bình thường của nhân viên theo từng ngày. Hỏi xem tuần bận có làm họ phải thay đổi thời gian nghỉ hoặc việc riêng không.",
+    Employee_Satisfaction_Score: "Hỏi nhân viên câu trả lời nào phản ánh vấn đề đang gặp và đề nghị một ví dụ gần đây.",
+    Sick_Days: "Đối chiếu mã loại nghỉ và ngày nghỉ đã duyệt với hồ sơ chấm công.",
+    Monthly_Salary: "Đối chiếu mức lương trong hồ sơ với hợp đồng và kỳ lương tương ứng.",
+    Promotions: "Kiểm tra lịch sử thay đổi cấp bậc và hỏi về mục tiêu phát triển trong kỳ đánh giá tới.",
+    Years_At_Company: "Đối chiếu ngày bắt đầu làm việc và các giai đoạn gián đoạn trong hồ sơ.",
+    Hire_Date: "Đối chiếu ngày bắt đầu chính thức với hợp đồng và lịch sử công tác.",
+    Department: "Xác nhận phòng ban và các lần điều chuyển trong kỳ hồ sơ.",
+    Education_Level: "Xác nhận bậc học ghi trong hồ sơ nhân sự."
+  }
+  return tr(prompts[feature] ?? "Đối chiếu giá trị với nguồn hồ sơ trong kỳ và ghi lại điểm cần làm rõ.")
 }
 function displayFeature(key: string, value: unknown, tr: AiTr) {
   if (value === undefined || value === null || value === "") return tr("Chưa cập nhật")
