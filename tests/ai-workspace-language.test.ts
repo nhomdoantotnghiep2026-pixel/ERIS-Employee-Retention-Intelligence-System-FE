@@ -33,10 +33,10 @@ test("AI assessment directory and action dossier switch their own UI copy withou
     assert.doesNotMatch(enWorkspace, /Đổi nhân sự|Khoảng thời gian đối soát chuyên sâu|Dự báo % rủi ro/)
     const viDossier = render(ActionDossier, { analysis }, "vi")
     const enDossier = render(ActionDossier, { analysis }, "en")
-    assert.match(viDossier, /Hồ sơ hành động điều hành/)
-    assert.match(enDossier, /Action dossier/)
+    assert.match(viDossier, /Hồ sơ hành động &amp; khuyến nghị/)
+    assert.match(enDossier, /Action plans &amp; recommendations/)
     assert.match(enDossier, /HR must verify/)
-    assert.doesNotMatch(enDossier, /Hồ sơ hành động điều hành|Nhân sự cần xác minh|Hành động đề xuất/)
+    assert.doesNotMatch(enDossier, /Hồ sơ hành động|Nhân sự cần xác minh|Hướng xử lý đề xuất/)
     assert.match(enDossier, /Manager supplied reason/)
   } finally {
     await server.close()

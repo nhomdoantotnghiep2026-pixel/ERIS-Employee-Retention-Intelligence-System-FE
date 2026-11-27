@@ -110,7 +110,7 @@ test("assessment shows business signals and read-only recommendations after one 
   assert.match(workspace, /Điểm tựa giữ chân/)
   assert.doesNotMatch(workspace, /Dự báo % rủi ro|detailsUnlocked|Khởi chạy phân tích chuyên sâu|Mức đóng góp của các yếu tố|type="checkbox"/)
   assert.doesNotMatch(dossier, /type="checkbox"|hoàn tất/)
-  assert.match(dossier, /Căn cứ ghi nhận/)
+  assert.match(dossier, /Căn cứ thực tế/)
   assert.doesNotMatch(workspace, /RiskSpectrum|An toàn \(0 - 10%\)/)
   assert.match(workspace, /Ngưỡng cảnh báo:/)
   assert.match(workspace, /Điểm rủi ro đã vượt ngưỡng cảnh báo/)
