@@ -10,9 +10,10 @@ import AttendanceDetail, { attendanceInitials, attendanceState, displayTime, dur
 import AttendanceReconcile from "../components/AttendanceReconcile";
 import { useLanguage } from "../context/LanguageContext";
 import { useAutoDismissFeedback } from "../hooks/useAutoDismissState";
-import { getPositionById, listDepartments, listEmployeeProfiles, listWorkSchedules, type EmployeeProfile, } from "../services/api";
+import { getPositionById, listDepartments, listEmployeeProfiles, listWorkSchedules, type EmployeeProfile, type WorkSchedule, } from "../services/api";
 import { fetchAttendance, fetchAttendanceDetail, fetchCancelledAttendance, fetchCancelledAttendanceDetail, fetchAttendanceAudit, cancelAttendance, attendanceMessage, type ImportedAttendance, type AttendanceAudit, type RecordFilters, } from "../services/attendance";
 const control = "mt-1 h-11 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100";
+const pageSize = 25;
 const workDayFormat = {
     vi: new Intl.DateTimeFormat("vi-VN", { weekday: "short", day: "2-digit", month: "2-digit", year: "numeric", timeZone: "UTC" }),
     en: new Intl.DateTimeFormat("en-GB", { weekday: "short", day: "2-digit", month: "2-digit", year: "numeric", timeZone: "UTC" }),
@@ -83,11 +84,21 @@ export default function AttendanceWorkspace({ own = false, }: {
     const [rows, setRows] = useState<ImportedAttendance[]>([]);
     const [hasAnyRecords, setHasAnyRecords] = useState<boolean | null>(null);
     const [selected, setSelected] = useState<ImportedAttendance | null>(null), [logs, setLogs] = useState<AttendanceAudit[]>([]), [logOffset, setLogOffset] = useState(0);
-    const [offset, setOffset] = useState(0), [pageSize, setPageSize] = useState(25), [revision, setRevision] = useState(0), [loading, setLoading] = useState(true), [busy, setBusy] = useState(false);
+    const [offset, setOffset] = useState(0), [revision, setRevision] = useState(0), [loading, setLoading] = useState(true), [busy, setBusy] = useState(false);
     const { error, message: notice, setError, setMessage: setNotice, } = useAutoDismissFeedback();
     const [logError, setLogError] = useState("");
     const [logsLoading, setLogsLoading] = useState(false);
-    const [schedule, setSchedule] = useState<ReturnType<typeof recordedSchedule>>(null);
+    const [historicalSchedule, setHistoricalSchedule] = useState<ReturnType<typeof recordedSchedule>>(null);
+    const [workSchedules, setWorkSchedules] = useState<WorkSchedule[]>([]);
+    const catalogSchedule = !own && selected?.work_schedule_id != null && selected.scheduled_shift === undefined
+        ? workSchedules.find((item) => String(item.id) === String(selected.work_schedule_id))
+        : undefined;
+    const apiSchedule = selected?.scheduled_shift;
+    const displayedSchedule = apiSchedule?.source === "SNAPSHOT"
+        ? apiSchedule
+        : historicalSchedule ?? apiSchedule ?? catalogSchedule ?? null;
+    const scheduleFromCatalog = displayedSchedule !== null
+        && (displayedSchedule === catalogSchedule || (displayedSchedule === apiSchedule && apiSchedule.source === "CATALOG"));
     const [detailError, setDetailError] = useState("");
     const [position, setPosition] = useState("");
     const [reason, setReason] = useState("");
@@ -129,7 +140,7 @@ export default function AttendanceWorkspace({ own = false, }: {
                 setLoading(false);
         });
         return () => c.abort();
-    }, [filters, revision, own, pageSize]);
+    }, [filters, revision, own]);
     useEffect(() => {
         const c = new AbortController();
         const probe = { limit: 1, offset: 0 };
@@ -153,6 +164,7 @@ export default function AttendanceWorkspace({ own = false, }: {
             const shiftTypes = Array.from(new Set(response.data
                 .filter((schedule) => schedule.status === "ACTIVE" && schedule.shift_type?.trim())
                 .map((schedule) => schedule.shift_type!.trim())));
+            setWorkSchedules(response.data);
             setActiveShiftTypes(shiftTypes);
             setScheduleCheck(shiftTypes.length ? "ready" : "missing");
         })
@@ -209,7 +221,7 @@ export default function AttendanceWorkspace({ own = false, }: {
                 if (!live) return;
                 setLogs(result.data);
                 const originalSchedule = recordedSchedule(result.data);
-                if (originalSchedule) setSchedule(originalSchedule);
+                if (originalSchedule) setHistoricalSchedule(originalSchedule);
             })
             .catch((e) => {
                 if (live) setLogError(attendanceMessage(e, tr("Không tải được lịch sử thao tác.", "Could not load activity history.")));
@@ -249,7 +261,7 @@ export default function AttendanceWorkspace({ own = false, }: {
         try {
             const r = await (row.record_status === "CANCEL" ? fetchCancelledAttendanceDetail(row.id) : fetchAttendanceDetail(row.id));
             setDetailError("");
-            setSchedule(null);
+            setHistoricalSchedule(null);
             setLogs([]);
             setLogError("");
             setLogsLoading(!own && r.data.record_status !== "CANCEL");
@@ -471,7 +483,8 @@ export default function AttendanceWorkspace({ own = false, }: {
           </Card>
         </div>)}
       {selected && <AttendanceDetail key={String(selected.id)} row={selected}
-        department={selectedDepartment} position={position} schedule={schedule} own={own}
+        department={selectedDepartment} position={position}
+        schedule={displayedSchedule} scheduleFromCatalog={scheduleFromCatalog} own={own}
         busy={busy} reason={reason} error={detailError} logs={logs} logsLoading={logsLoading}
         logError={logError} logOffset={logOffset} tr={tr} onReason={setReason} onLogOffset={setLogOffset}
         onClose={() => setSelected(null)} onCancelRecord={save} />}
@@ -491,7 +504,9 @@ export default function AttendanceWorkspace({ own = false, }: {
                 {tr("Bộ lọc dữ liệu", "Data filters")}
               </h2>
               <p className="mt-0.5 text-xs text-slate-600">
-                {tr("Lọc theo kỳ công, nhân sự và trạng thái bản ghi.", "Filter by work period, employee and record status.")}
+                {own
+                    ? tr("Lọc theo kỳ làm việc.", "Filter by work period.")
+                    : tr("Lọc theo kỳ công, nhân sự và trạng thái bản ghi.", "Filter by work period, employee and record status.")}
               </p>
             </div>
             {(departmentId ||
@@ -558,6 +573,7 @@ export default function AttendanceWorkspace({ own = false, }: {
                     </option>))}
                 </SelectControl>
               </label>)}
+            {!own && (<>
             <label className="text-sm font-semibold text-slate-700 xl:col-span-2">
               {tr("Trạng thái", "Status")}
               <SelectControl className={control} value={draft.record_status} onChange={(event) => setDraft((current) => ({
@@ -580,7 +596,8 @@ export default function AttendanceWorkspace({ own = false, }: {
         }} placeholder={tr("Tên hoặc mã nhân viên (EMP...)", "Name or employee code (EMP...)")} className="h-11 w-full rounded-md border border-slate-300 bg-white pl-9 pr-3 text-sm text-slate-900 outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100"/>
               </span>
             </label>
-            <div className={`${periodPreset === "CUSTOM" ? "xl:col-span-2" : "xl:col-span-3"} flex flex-wrap gap-2`}>
+            </>)}
+            <div className={`${own || periodPreset === "CUSTOM" ? "xl:col-span-2" : "xl:col-span-3"} flex flex-wrap gap-2`}>
               <Button type="submit" disabled={loading || invalid} className="flex-1">
                 <Search size={16} aria-hidden="true"/>
                 {tr("Lọc", "Filter")}
@@ -775,17 +792,7 @@ export default function AttendanceWorkspace({ own = false, }: {
               <p>
                 {tr("Hiển thị", "Showing")} {pageStart} – {pageEnd} {tr("trong tổng số", "of")} {filteredRowCount} {tr("bản ghi", "records")}
               </p>
-              <label className="flex items-center gap-2">
-                {tr("Số dòng", "Rows")}
-                <SelectControl value={pageSize} onChange={(event) => {
-                setPageSize(Number(event.target.value));
-                setOffset(0);
-            }} className="h-9 rounded-md border border-slate-300 bg-white px-2 text-sm font-semibold text-slate-700">
-                  {[10, 25, 50, 100].map((size) => (<option key={size} value={size}>
-                      {size}
-                    </option>))}
-                </SelectControl>
-              </label>
+              <span>{pageSize} {tr("dòng mỗi trang", "rows per page")}</span>
             </div>
             <div className="flex flex-wrap gap-2">
               <Button variant="secondary" disabled={loading || currentPage === 1} onClick={() => setOffset(0)}>{tr("Đầu", "First")}</Button>

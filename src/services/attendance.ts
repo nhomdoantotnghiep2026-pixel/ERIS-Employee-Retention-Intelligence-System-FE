@@ -32,6 +32,14 @@ export interface ImportedAttendance {
   record_status: "ACTIVE" | "CANCEL"
   attendance_status?: string
   work_schedule_id?: Id
+  scheduled_shift?: {
+    source: "SNAPSHOT" | "CATALOG"
+    shift_type: string | null
+    start_time: string
+    end_time: string
+    break_start: string | null
+    break_end: string | null
+  } | null
   cancelled_by_name?: string | null
   cancellation_reason?: string | null
   cancelled_at?: string | null

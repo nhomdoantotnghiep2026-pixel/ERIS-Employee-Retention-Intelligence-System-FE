@@ -299,7 +299,7 @@ export default function Login() {
                   className={`flex min-h-16 items-center gap-3 rounded-xl px-4 py-2.5 text-left transition duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-400 disabled:cursor-wait disabled:opacity-60 ${loginPortal === 'management' ? 'bg-white text-slate-900 shadow-sm ring-1 ring-slate-300' : 'text-slate-700 hover:bg-white/70 hover:text-slate-900'}`}
                 >
                   <span className={`grid size-10 shrink-0 place-items-center rounded-xl ${loginPortal === 'management' ? 'bg-orange-50 text-orange-600' : 'bg-white text-slate-500'}`}><BriefcaseBusiness size={20} /></span>
-                  <span className="text-base font-semibold">{t('HR & Quản trị')}</span>
+                  <span className="text-base font-semibold">{t('HR & Admin')}</span>
                 </button>
                 <button
                   type="button"

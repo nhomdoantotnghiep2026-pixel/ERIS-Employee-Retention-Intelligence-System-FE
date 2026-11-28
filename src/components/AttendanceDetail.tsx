@@ -33,6 +33,7 @@ export function attendanceInitials(name: string) {
 
 type Schedule = {
     shift_type?: string | null;
+    name?: string;
     start_time: string;
     end_time: string;
     break_start: string | null;
@@ -75,6 +76,7 @@ interface AttendanceDetailProps {
     department?: string;
     position?: string;
     schedule: Schedule | null;
+    scheduleFromCatalog?: boolean;
     own: boolean;
     busy: boolean;
     reason: string;
@@ -91,7 +93,7 @@ interface AttendanceDetailProps {
 }
 
 export default function AttendanceDetail({
-    row, department, position, schedule, own, busy, reason, error, logs, logsLoading,
+    row, department, position, schedule, scheduleFromCatalog, own, busy, reason, error, logs, logsLoading,
     logError, logOffset, tr, onLogOffset, onReason, onClose, onCancelRecord,
 }: AttendanceDetailProps) {
     const dialogRef = useRef<HTMLDialogElement>(null);
@@ -118,7 +120,8 @@ export default function AttendanceDetail({
         SHIFT_1: tr("Ca sáng", "Morning shift"),
         SHIFT_2: tr("Ca chiều", "Afternoon shift"),
     };
-    const planMinutes = schedule ? shiftMinutes(schedule) : null;
+    const standardMinutes = schedule ? shiftMinutes(schedule) : null;
+    const planMinutes = scheduleFromCatalog ? null : standardMinutes;
     const note = (minutes: number, label: string) => (
         minutes > 0 ? `${label} ${minutes} ${tr("phút", "min")}` : tr("Đúng giờ", "On time")
     );
@@ -165,12 +168,14 @@ export default function AttendanceDetail({
                         <div className="grid min-[430px]:grid-cols-2 min-[430px]:divide-x divide-slate-200">
                             <div className="min-w-0 space-y-3 bg-slate-50/70 p-4">
                                 <h3 className="flex items-center gap-2 text-sm font-semibold"><ClipboardList size={16} className="shrink-0 text-slate-600" />{tr("Ca làm việc quy định", "Scheduled shift")}</h3>
-                                {schedule ? <dl className="space-y-3 text-sm">
-                                    <Metric label={tr("Ca làm việc", "Shift")} value={shiftNames[schedule.shift_type ?? ""] ?? (schedule.shift_type || "—")} />
+                                {schedule ? <>
+                                {scheduleFromCatalog && <p className="text-xs text-slate-600">{tr("Thông tin tham chiếu từ danh mục ca hiện tại.", "Reference details from the current shift catalog.")}</p>}
+                                <dl className="space-y-3 text-sm">
+                                    <Metric label={tr("Ca làm việc", "Shift")} value={shiftNames[schedule.shift_type ?? ""] ?? (schedule.shift_type || schedule.name || "—")} />
                                     <Metric label={tr("Khung giờ", "Shift hours")} value={`${displayTime(schedule.start_time)} – ${displayTime(schedule.end_time)}`} />
                                     <Metric label={tr("Giờ nghỉ giữa ca", "Break")} value={schedule.break_start && schedule.break_end ? `${displayTime(schedule.break_start)} – ${displayTime(schedule.break_end)}` : tr("Không có", "None")} />
-                                    <Metric label={tr("Thời lượng quy định", "Standard duration")} value={durationLabel(planMinutes ?? 0)} />
-                                </dl> : <p className="text-sm text-slate-600">{logsLoading ? tr("Đang tải ca làm việc…", "Loading scheduled shift…") : tr("Chưa có thông tin ca lưu cùng bản ghi.", "No shift details were saved with this record.")}</p>}
+                                    <Metric label={tr("Thời lượng quy định", "Standard duration")} value={durationLabel(standardMinutes ?? 0)} />
+                                </dl></> : <p className="text-sm text-slate-600">{logsLoading ? tr("Đang tải ca làm việc…", "Loading scheduled shift…") : tr("Chi tiết ca làm việc hiện không khả dụng.", "Scheduled shift details are unavailable.")}</p>}
                             </div>
                             <div className="min-w-0 space-y-3 border-t border-slate-200 p-4 min-[430px]:border-t-0">
                                 <h3 className="flex items-center gap-2 text-sm font-semibold"><Clock3 size={16} className="shrink-0 text-slate-600" />{tr("Thực tế ghi nhận", "Recorded attendance")}</h3>

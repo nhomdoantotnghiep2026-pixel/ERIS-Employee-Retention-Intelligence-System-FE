@@ -4,7 +4,6 @@ import { ChevronRight, ClipboardList, Clock3, IdCard, ShieldCheck } from 'lucide
 import { EmployeeQuickStats } from '../components/EmployeeQuickStats';
 import { AppShell } from '../components/AppShell';
 import { EmployeeApiHistory } from '../components/EmployeeApiHistory';
-import { CareerGoals } from '../components/CareerGoals';
 import { Button, Card, SectionHeader } from '../components/ui';
 import { useLanguage } from '../context/LanguageContext';
 import { useRole } from '../context/RoleContext';
@@ -66,7 +65,6 @@ export default function MyWorkspace({ mode }: { mode: 'dashboard' | 'profile' })
       {mode === 'profile' && data?.profileState === 'unavailable' && <p className="mt-5 text-sm leading-6 text-slate-500">{t('Your account information is shown above. Additional employee details are currently unavailable for this account.')}</p>}
     </Card>
     {mode === 'profile' && data?.profileState === 'available' && <EmployeeApiHistory own initialEducations={employee?.educations} />}
-    {mode === 'profile' && data?.profileState === 'available' && user.role === 'Employee / ESS' && <CareerGoals own />}
     <div className={mode === 'dashboard' ? 'mt-5 grid auto-rows-fr grid-cols-1 gap-5 md:grid-cols-2' : 'mt-5 grid gap-4 sm:grid-cols-2'}>
       {(mode === 'profile' ? [{ to: '/forgot-password', label: tr('Đổi mật khẩu & Bảo mật', 'Password & security'), description: tr('Đặt lại mật khẩu qua mã xác thực email.', 'Reset your password using email verification.'), icon: ShieldCheck }, { to: '/my-attendance', label: t('My Attendance'), description: tr('Xem hồ sơ chấm công của bạn.', 'View your attendance records.'), icon: Clock3 }] : [{ to: '/my-profile', label: t('My Profile'), description: t('View your account and available employee information.'), icon: IdCard }, { to: '/my-attendance', label: t('My Attendance'), description: tr('Xem hồ sơ chấm công của bạn.', 'View your attendance records.'), icon: Clock3 }, { to: '/my-requests', label: tr('Đơn từ & Nghỉ phép', 'Requests & leave'), description: tr('Tạo và theo dõi trạng thái đơn xin nghỉ phép.', 'Create and track leave requests.'), icon: ClipboardList }]).map(item => <Link key={item.to} to={item.to} className="group flex h-full cursor-pointer items-start gap-3 rounded-xl border border-slate-200 bg-white px-5 py-3.5 text-slate-900 shadow-sm transition-all hover:border-orange-300 hover:shadow-md focus-visible:outline-2 focus-visible:outline-orange-500"><span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-orange-50 text-orange-600"><item.icon aria-hidden="true" size={21} /></span><div className="min-w-0 flex-1"><div className="flex items-start justify-between gap-2"><h2 className="font-semibold">{item.label}</h2>{mode === 'dashboard' && <ChevronRight size={17} aria-hidden="true" className="mt-0.5 shrink-0 text-slate-400 transition-transform group-hover:translate-x-0.5" />}</div><p className="mt-1 text-sm leading-6 text-slate-600">{item.description}</p></div></Link>)}
       {mode === 'dashboard' && <EmployeeQuickStats key={user.email} reload={reload} />}

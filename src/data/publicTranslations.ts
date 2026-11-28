@@ -160,7 +160,6 @@ export const publicEnglish: Record<string, string> = {
   "Đăng nhập nhân viên": "Employee sign in",
   "Chọn đúng cổng; quyền truy cập được xác minh từ tài khoản của bạn.": "Choose the correct portal; access is verified from your account.",
   "Chọn cổng đăng nhập": "Choose a sign-in portal",
-  "HR & Quản trị": "HR & Management",
   "Nhân viên": "Employee",
   "Dành cho HR và quản trị viên hệ thống.": "For HR and system administrators.",
   "Chỉ tài khoản nhân viên có hồ sơ liên kết được truy cập cổng này.": "Only employee accounts with a linked profile can access this portal.",

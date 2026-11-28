@@ -755,8 +755,8 @@ export default function LeaveRecords({ own = false }: { own?: boolean }) {
             </p>
           ) : visibleRows.length ? (
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[1020px] table-fixed text-left text-sm">
-                <colgroup><col className="w-[220px]" /><col className="w-40" /><col className="w-[200px]" /><col /><col className="w-[140px]" /><col className="w-[106px]" /></colgroup>
+              <table className="w-full min-w-[1100px] table-fixed text-left text-sm">
+                <colgroup><col className="w-[220px]" /><col className="w-40" /><col className="w-[264px]" /><col /><col className="w-[140px]" /><col className="w-[106px]" /></colgroup>
                 <thead className="bg-slate-50">
                   <tr>
                     <th className="p-3 text-xs font-bold uppercase tracking-wide text-slate-600">
@@ -800,7 +800,7 @@ export default function LeaveRecords({ own = false }: { own?: boolean }) {
                     const department = departmentName(record)
                     const avatarTone = ["bg-slate-100 text-slate-700", "bg-indigo-100 text-indigo-800", "bg-teal-100 text-teal-800", "bg-sky-100 text-sky-800", "bg-purple-100 text-purple-800"][(profile?.departmentId || 0) % 5]
                     return (
-                      <tr key={record.id} className="border-b border-slate-100 align-middle hover:bg-slate-50">
+                      <tr key={record.id} className="border-b border-slate-100 align-top hover:bg-slate-50">
                         <td className="p-3">
                           <div className="flex min-w-0 items-center gap-2.5">
                             <span aria-hidden="true" className={`grid size-9 shrink-0 place-items-center rounded-full text-xs font-semibold ${avatarTone}`}>{employeeInitials(record)}</span>
@@ -812,7 +812,7 @@ export default function LeaveRecords({ own = false }: { own?: boolean }) {
                         </td>
                         <td className="p-3"><span className={`inline-flex rounded-full border px-2 py-1 text-xs font-semibold ${meta.tone}`}>{meta.label}</span></td>
                         <td className="p-3">
-                          <p className="flex items-center gap-1.5 whitespace-nowrap font-medium tabular-nums text-slate-900"><CalendarDays size={14} className="shrink-0 text-slate-500" aria-hidden="true" /> {formatDate(record.start_date)} → {formatDate(record.end_date)}</p>
+                          <p className="flex items-start gap-1.5 font-medium tabular-nums text-slate-900"><CalendarDays size={14} className="mt-0.5 shrink-0 text-slate-500" aria-hidden="true" /><span>{formatDate(record.start_date)} → {formatDate(record.end_date)}</span></p>
                           <span className="mt-1 inline-flex rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-700">{recordDayCount(record)} {tr("ngày lịch", "calendar days")}</span>
                         </td>
                         <td className="p-3"><p title={reason} className="line-clamp-2 wrap-break-word leading-5 text-slate-700">{reason}</p></td>
