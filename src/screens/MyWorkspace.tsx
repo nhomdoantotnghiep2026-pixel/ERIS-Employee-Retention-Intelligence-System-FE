@@ -10,6 +10,7 @@ import { useRole } from '../context/RoleContext';
 import { getApiErrorMessage, getOwnEmployeeData, type OwnEmployeeData } from '../services/api';
 import { useAutoDismissState } from '../hooks/useAutoDismissState';
 import { employeeDate } from '../utils/employeeDates';
+import { OwnContactEditor } from '../components/OwnContactEditor';
 
 function profileDate(value: string | null | undefined, language: string) {
   const date = employeeDate(value);
@@ -59,6 +60,7 @@ export default function MyWorkspace({ mode }: { mode: 'dashboard' | 'profile' })
     <Card className="p-6">
       <div className="flex flex-wrap items-center justify-between gap-3"><div className="flex min-w-0 flex-wrap items-center gap-3"><h2 className="font-bold text-slate-900">{account?.fullName || user.name}</h2>{mode === 'profile' && account && [['Account status', account.status]].map(([label, value]) => <span key={label} className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium ${value === 'ACTIVE' ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-700'}`}><span aria-hidden="true" className={`size-1.5 rounded-full ${value === 'ACTIVE' ? 'bg-emerald-500' : 'bg-slate-500'}`} />{t(label)}: {t(statuses[value] || value)}</span>)}</div><Button variant="secondary" disabled={loading} onClick={() => setReload(value => value + 1)}>{t('Reload my information')}</Button></div>
       {loading && <p role="status" className="mt-4 text-sm text-slate-500">{t('Loading your account...')}</p>}
+      {mode === 'profile' && employee?.employmentStatus === 'ACTIVE' && user.role === 'Employee / ESS' && <OwnContactEditor key={user.email} employee={employee} onSaved={updated => setData(previous => previous && ({ ...previous, employee: { ...previous.employee!, ...updated } }))} />}
       {error && <p role="alert" className="mt-4 rounded-xl bg-red-50 p-4 text-sm text-red-700">{t(error)}</p>}
       {account && <dl className={mode === 'dashboard' ? 'mt-5 grid gap-5 md:grid-cols-3' : 'mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3'}>{items.map(([label, value]) => <div key={label} className={`min-w-0 rounded-xl bg-slate-50 p-4 ${label === 'Address' ? 'sm:col-span-2' : ''}`}><dt className="text-sm text-slate-600">{label === 'Address' ? tr('Địa chỉ', 'Address') : t(label)}</dt><dd className="mt-2 break-words font-semibold text-slate-900">{label === 'Account status' ? <span className={'inline-flex items-center gap-2 rounded-full px-3 py-1 text-sm font-medium ' + (account.status === 'ACTIVE' ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-700')}><span aria-hidden="true" className={'size-1.5 rounded-full ' + (account.status === 'ACTIVE' ? 'bg-emerald-500' : 'bg-slate-500')} />{value}</span> : value}</dd></div>)}</dl>}
       {data?.profileState === 'unlinked' && <p className="mt-5 rounded-xl bg-orange-50 p-4 text-sm text-orange-800">{t('Your account has no linked employee profile. Please contact HR.')}</p>}

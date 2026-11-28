@@ -569,6 +569,10 @@ export async function createEmployeeProfile(input: EmployeeInput & { employeeCod
 export async function updateEmployeeProfile(id: number, changes: EmployeeChanges) {
   return (await request<{ data: EmployeeProfile }>(`/employees/${id}`, { method: 'PATCH', body: JSON.stringify(changes) })).data;
 }
+
+export async function updateMyContact(changes: { phone?: string; address?: string }) {
+  return (await request<{ data: EmployeeProfile }>('/employees/me', { method: 'PATCH', body: JSON.stringify(changes) })).data;
+}
 export function deactivateEmployeeProfile(id: number) {
   return request<{ data: { id: number; employmentStatus: string } }>(`/employees/${id}`, { method: 'DELETE' });
 }
