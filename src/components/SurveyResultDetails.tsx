@@ -21,6 +21,7 @@ import {
   type SurveyResults,
 } from '../services/api';
 import { Button } from './ui';
+import { surveyRatingText } from '../utils/surveyRating';
 
 const formatDateTime = (value: string | null, language: string) =>
   value
@@ -47,7 +48,11 @@ const isChoice = (
 ): config is { options: Array<{ code: string; label: string }> } =>
   Boolean(config && 'options' in config);
 
-const valueText = (value: SurveyAnswerValue, question?: SurveyQuestion) => {
+const valueText = (value: SurveyAnswerValue, question?: Partial<Pick<SurveyQuestion, 'questionType' | 'answerConfig'>>) => {
+  if (typeof value === 'number' && question?.questionType === 'RATING') {
+    const config = question.answerConfig;
+    return surveyRatingText(value, config && 'labels' in config ? config.labels : undefined);
+  }
   if (typeof value === 'string' || typeof value === 'number') return String(value);
   const config = question?.answerConfig;
   if (!question || !isChoice(config))
@@ -399,7 +404,7 @@ function ParticipantAnswers({
                     {question?.questionText || `Câu hỏi #${answer.questionId}`}
                   </h4>
                   <p className="mt-3 rounded-xl bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-800">
-                    {valueText(answer.answerValue, question)}
+                    {valueText(answer.answerValue, question || answer)}
                   </p>
                   {answer.comment && (
                     <p className="mt-3 whitespace-pre-wrap rounded-xl border border-slate-100 px-4 py-3 text-sm leading-6 text-slate-600">

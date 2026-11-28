@@ -390,6 +390,10 @@ export function getMySurveyResponse(id: number, signal?: AbortSignal) {
   return request<{ data: SurveyParticipantResponse }>(`/surveys/${id}/my-response`, { signal, cache: 'no-store' });
 }
 
+export function listMySurveyHistory(signal?: AbortSignal) {
+  return request<{ data: Array<{ id: number; title: string; status: string; submittedAt: string }> }>('/surveys/my-history', { signal, cache: 'no-store' });
+}
+
 export function submitSurveyResponse(id: number, answers: Array<{ questionId: number; answerValue: SurveyAnswerValue; comment?: string | null }>) {
   return request<{ data: SurveyResponse }>(`/surveys/${id}/responses`, {
     method: 'POST',
