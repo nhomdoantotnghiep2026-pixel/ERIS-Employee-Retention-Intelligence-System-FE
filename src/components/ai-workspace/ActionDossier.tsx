@@ -1,4 +1,4 @@
-import { ChevronRight, Clock, Compass, FileCheck2 } from "lucide-react"
+import { ChevronRight, Compass, FileCheck2 } from "lucide-react"
 import { useAiTr } from "./aiWorkspaceLanguage"
 import { useLanguage } from "../../context/LanguageContext"
 import { featureLabel } from "./analysis"
@@ -30,16 +30,12 @@ function RecommendationCard({ item, number }: { item: AiUnifiedPolicyAnalysis["r
         <span className="grid size-6 shrink-0 place-items-center rounded-lg bg-orange-600 text-xs text-white">{String(number).padStart(2, "0")}</span>
         <span className="min-w-0 [overflow-wrap:anywhere]">{item.policy.name}</span>
       </h4>
-      <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs text-slate-700">
-        <Clock aria-hidden="true" className="size-3.5" />{tr("Chưa có mốc riêng")}
-      </span>
     </header>
     <div className="grid grid-cols-1 items-start gap-4 md:grid-cols-2">
       <section className="min-w-0 rounded-xl border border-slate-100 bg-slate-50/70 p-3.5">
         <h5 className="flex items-center gap-1.5 text-xs font-semibold text-slate-800"><Compass aria-hidden="true" className="size-3.5 shrink-0 text-orange-700" />{tr("Hướng xử lý đề xuất")}</h5>
         {item.policy.description && <p className="mt-2 whitespace-pre-line text-sm leading-6 text-slate-700 [overflow-wrap:anywhere]">{item.policy.description}</p>}
         {item.hrVerification && <><h5 className="mt-3 text-xs font-semibold text-slate-700">{tr("Nhân sự cần xác minh")}</h5><p className="mt-1 whitespace-pre-line text-sm leading-6 text-slate-700 [overflow-wrap:anywhere]">{item.hrVerification}</p></>}
-        <p className="mt-3 border-t border-slate-200 pt-2 text-xs text-slate-600">{tr("Đầu mối phối hợp")}: {tr("Chưa chỉ định")}</p>
       </section>
       <section className="min-w-0 rounded-xl border border-slate-100 bg-slate-50/70 p-3.5 [overflow-wrap:anywhere]">
         <h5 className="flex items-center gap-1.5 text-xs font-semibold text-slate-800"><FileCheck2 aria-hidden="true" className="size-3.5 shrink-0 text-emerald-700" />{tr("Căn cứ thực tế")}</h5>
