@@ -67,10 +67,12 @@ const valueText = (value: SurveyAnswerValue, question?: Partial<Pick<SurveyQuest
 
 export function SurveyResultDetails({
   result,
+  totalEmployees,
   participants,
   onClose,
 }: {
   result: SurveyResults;
+  totalEmployees: number;
   participants: SurveyParticipant[];
   onClose: () => void;
 }) {
@@ -133,7 +135,7 @@ export function SurveyResultDetails({
               <p className="mt-1 truncate text-sm text-slate-500">
                 {selected
                   ? `${selected.employeeCode} · ${formatDateTime(selected.submittedAt, language)}`
-                  : `${result.survey.title} · ${result.responseCount}/${result.invitedCount} ${tr('đã gửi', 'submitted')}`}
+                  : `${result.survey.title} · ${result.responseCount}/${totalEmployees} ${tr('đã gửi', 'submitted')}`}
               </p>
             </div>
           </div>

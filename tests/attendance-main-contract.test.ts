@@ -10,7 +10,7 @@ test("shift timeline accepts overnight and rejects breaks outside the actual shi
   assert.equal(validScheduleTimeline("08:00", "08:00", null, null), false)
   assert.equal(validScheduleTimeline("08:00", "17:00", null, "13:00"), false)
 })
-test("main attendance contract: stateless preview, explicit row decisions, fingerprint cancellation, owner endpoints and authenticated export", async () => {
+test("main attendance contract: stateless preview, explicit row decisions, reasoned cancellation, owner endpoints and authenticated export", async () => {
   const server = await createServer({
     configFile: false,
     server: { middlewareMode: true, ws: false },
@@ -53,7 +53,7 @@ test("main attendance contract: stateless preview, explicit row decisions, finge
     const confirmOptions = JSON.parse(String((calls.at(-1)!.init!.body as FormData).get("options")))
     assert.equal(confirmOptions.preview_token, "preview-token")
     assert.deepEqual(confirmOptions.choices, choices)
-    const row = { id: "9007199254740995", record_fingerprint: "a".repeat(64) }
+    const row = { id: "9007199254740995" }
     await api.cancelAttendance(row, " why ")
     assert.equal(
       calls.at(-1)!.url,
@@ -61,9 +61,12 @@ test("main attendance contract: stateless preview, explicit row decisions, finge
     )
     assert.equal(calls.at(-1)!.init?.method, "PATCH")
     assert.deepEqual(JSON.parse(String(calls.at(-1)!.init?.body)), {
-      expected_fingerprint: "a".repeat(64),
       reason: "why",
     })
+    await api.fetchCancelledAttendance({ limit: 25, offset: 0 })
+    assert.equal(calls.at(-1)!.url, "/api/v1/attendance/cancellations?limit=25&offset=0")
+    await api.fetchCancelledAttendanceDetail("9007199254740995")
+    assert.equal(calls.at(-1)!.url, "/api/v1/attendance/cancellations/9007199254740995")
     await api.fetchAttendance(
       { record_status: "CANCEL", offset: 20, limit: 20 },
       true,

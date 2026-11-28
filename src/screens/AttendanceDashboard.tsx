@@ -10,7 +10,7 @@ import {
   Users,
 } from "lucide-react"
 import {
-  Bar,
+  Area,
   CartesianGrid,
   ComposedChart,
   Line,
@@ -98,8 +98,10 @@ export default function AttendanceDashboard() {
     const days = new Map<string, { work: number; overtime: number; records: number }>()
     const attention = new Map<
       string,
-      { employeeCode: string; fullName: string; late: number; early: number; occurrences: number }
+      { employeeId: string; employeeCode: string; fullName: string; late: number; early: number; occurrences: number }
     >()
+    const overtimeEmployees = new Set<string>()
+    let onTimeRecords = 0
     let workMinutes = 0
     let overtimeMinutes = 0
     let lateMinutes = 0
@@ -114,6 +116,8 @@ export default function AttendanceDashboard() {
       overtimeMinutes += overtime
       lateMinutes += late
       earlyMinutes += early
+      if (!late && !early && record.attendance_status !== "ABSENT") onTimeRecords++
+      if (overtime > 0) overtimeEmployees.add(String(record.employee_id))
       const statusKey = record.attendance_status || "UNCLASSIFIED"
       status.set(statusKey, (status.get(statusKey) || 0) + 1)
       const day = days.get(record.work_date) || { work: 0, overtime: 0, records: 0 }
@@ -124,6 +128,7 @@ export default function AttendanceDashboard() {
       if (late || early) {
         const key = String(record.employee_id)
         const current = attention.get(key) || {
+          employeeId: key,
           employeeCode: record.employee_code,
           fullName: record.full_name,
           late: 0,
@@ -138,6 +143,8 @@ export default function AttendanceDashboard() {
     }
     return {
       employees: employees.size,
+      onTimeRecords,
+      overtimeEmployees: overtimeEmployees.size,
       workMinutes,
       overtimeMinutes,
       lateMinutes,
@@ -181,28 +188,36 @@ export default function AttendanceDashboard() {
     return label ? tr(label[0], label[1]) : status
   }
   const maxStatus = Math.max(1, ...overview.status.map(([, count]) => count))
+  const onTimeRate = records.length ? overview.onTimeRecords / records.length * 100 : 0
+  const plannedMinutes = records.length * 480
+  const workPlanRate = plannedMinutes ? overview.workMinutes / plannedMinutes * 100 : 0
+  const maxVariance = Math.max(1, ...overview.attention.map(item => item.late + item.early))
+  const initials = (name: string) => name.trim().split(/\s+/).slice(-2).map(part => part[0]).join("").toUpperCase()
 
   const metrics = [
     {
-      label: tr("Bản ghi ngày công", "Attendance records"),
-      value: number.format(records.length),
-      detail: tr(`${overview.employees} nhân viên có dữ liệu`, `${overview.employees} employees with data`),
+      label: tr("Tỷ lệ chấm công đúng giờ", "On-time attendance rate"),
+      value: `${onTimeRate.toFixed(1)}%`,
+      detail: tr(`${overview.onTimeRecords}/${records.length} bản ghi đúng giờ`, `${overview.onTimeRecords}/${records.length} on-time records`),
       icon: CalendarCheck2,
-      tone: "bg-orange-50 text-orange-700",
+      tone: "border-orange-200/80 bg-gradient-to-br from-orange-500/10 via-amber-500/5 to-white",
+      iconTone: "bg-orange-100 text-orange-700",
     },
     {
       label: tr("Tổng giờ làm", "Total work hours"),
       value: number.format(overview.workMinutes / 60),
-      detail: tr("Tính từ dữ liệu đang sử dụng", "From active records"),
+      detail: tr(`Đạt ${workPlanRate.toFixed(1)}% kế hoạch giờ chuẩn`, `${workPlanRate.toFixed(1)}% of standard hours`),
       icon: Clock3,
-      tone: "bg-blue-50 text-blue-700",
+      tone: "border-emerald-200/80 bg-gradient-to-br from-emerald-500/10 to-teal-500/5",
+      iconTone: "bg-emerald-100 text-emerald-700",
     },
     {
       label: tr("Giờ tăng ca", "Overtime hours"),
       value: number.format(overview.overtimeMinutes / 60),
-      detail: tr("Tổng OT trong khoảng lọc", "Total OT in the selected range"),
+      detail: tr(`${overview.overtimeEmployees} nhân sự có phát sinh OT`, `${overview.overtimeEmployees} employees with overtime`),
       icon: Timer,
-      tone: "bg-violet-50 text-violet-700",
+      tone: "border-purple-200/80 bg-gradient-to-br from-purple-500/10 to-indigo-500/5",
+      iconTone: "bg-purple-100 text-purple-700",
     },
     {
       label: tr("Phút lệch giờ", "Schedule variance minutes"),
@@ -212,7 +227,8 @@ export default function AttendanceDashboard() {
         `${overview.lateMinutes} late · ${overview.earlyMinutes} early`,
       ),
       icon: AlertTriangle,
-      tone: "bg-amber-50 text-amber-800",
+      tone: "border-amber-200/80 bg-gradient-to-br from-amber-500/10 to-orange-500/5",
+      iconTone: "bg-amber-100 text-amber-800",
     },
   ]
 
@@ -265,12 +281,13 @@ export default function AttendanceDashboard() {
       ) : (
         <div className="space-y-5">
           <dl className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            {metrics.map(({ label, value, detail, icon: Icon, tone }) => (
-              <Card key={label} className="p-5">
-                <div className={`flex size-10 items-center justify-center rounded-md ${tone}`}><Icon size={20} aria-hidden="true" /></div>
+            {metrics.map(({ label, value, detail, icon: Icon, tone, iconTone }) => (
+              <Card key={label} className={`border p-5 ${tone}`}>
+                <div className={`flex size-10 items-center justify-center rounded-xl ${iconTone}`}><Icon size={20} aria-hidden="true" /></div>
                 <dt className="mt-4 text-sm font-semibold text-slate-600">{label}</dt>
                 <dd className="mt-1 text-3xl font-bold tabular-nums text-slate-950">{value}</dd>
                 <p className="mt-2 text-xs font-medium leading-5 text-slate-600">{detail}</p>
+                {label === tr("Tỷ lệ chấm công đúng giờ", "On-time attendance rate") && <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-white/80"><div className="h-full rounded-full bg-gradient-to-r from-orange-500 to-amber-400" style={{ width: `${Math.min(100, onTimeRate)}%` }} /></div>}
               </Card>
             ))}
           </dl>
@@ -282,16 +299,17 @@ export default function AttendanceDashboard() {
               <div className="mt-5 h-80 min-w-0">
                 <ResponsiveContainer width="100%" height="100%">
                   <ComposedChart data={overview.trend} margin={{ top: 12, right: 12, bottom: 4, left: 0 }}>
+                    <defs><linearGradient id="workHoursArea" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#F97316" stopOpacity={0.32} /><stop offset="100%" stopColor="#FDBA74" stopOpacity={0.02} /></linearGradient></defs>
                     <CartesianGrid vertical={false} stroke="#E2E8F0" strokeDasharray="4 4" />
                     <XAxis dataKey="date" tickFormatter={dateLabel} axisLine={false} tickLine={false} tick={{ fill: "#475569", fontSize: 11 }} minTickGap={18} />
                     <YAxis axisLine={false} tickLine={false} width={36} tick={{ fill: "#475569", fontSize: 11 }} />
                     <Tooltip labelFormatter={(value) => dateLabel(String(value))} formatter={(value, name) => [number.format(Number(value)), name === "workHours" ? tr("Giờ làm", "Work hours") : tr("Tăng ca", "Overtime")]} />
-                    <Bar dataKey="workHours" fill="#FDBA74" radius={[4, 4, 0, 0]} maxBarSize={28} />
+                    <Area type="monotone" dataKey="workHours" stroke="#F97316" strokeWidth={2.5} fill="url(#workHoursArea)" activeDot={{ r: 4 }} />
                     <Line type="monotone" dataKey="overtimeHours" stroke="#7C3AED" strokeWidth={2.5} dot={{ r: 3, fill: "#FFFFFF", strokeWidth: 2 }} />
                   </ComposedChart>
                 </ResponsiveContainer>
               </div>
-              <div className="mt-2 flex flex-wrap gap-4 text-xs font-semibold text-slate-600"><span><i className="mr-1.5 inline-block size-2 rounded-sm bg-orange-300" />{tr("Giờ làm", "Work hours")}</span><span><i className="mr-1.5 inline-block size-2 rounded-full bg-violet-600" />{tr("Tăng ca", "Overtime")}</span></div>
+              <div className="mt-2 flex flex-wrap gap-4 text-xs font-semibold text-slate-600"><span><i className="mr-1.5 inline-block size-2 rounded-full bg-orange-500" />{tr("Giờ làm", "Work hours")}</span><span><i className="mr-1.5 inline-block size-2 rounded-full bg-violet-600" />{tr("Tăng ca", "Overtime")}</span></div>
             </Card>
 
             <Card className="p-5">
@@ -314,7 +332,7 @@ export default function AttendanceDashboard() {
               <Users size={20} className="text-orange-600" aria-hidden="true" />
             </div>
             {overview.attention.length ? (
-              <div className="overflow-x-auto"><table className="w-full min-w-[680px] text-left text-sm"><thead className="bg-slate-50 text-xs font-bold uppercase tracking-wide text-slate-600"><tr><th className="px-5 py-3">{tr("Nhân viên", "Employee")}</th><th className="px-5 py-3">{tr("Số ngày phát sinh", "Affected days")}</th><th className="px-5 py-3">{tr("Đi muộn", "Late")}</th><th className="px-5 py-3">{tr("Về sớm", "Early leave")}</th><th className="px-5 py-3">{tr("Tổng lệch", "Total variance")}</th></tr></thead><tbody>{overview.attention.map((item) => <tr key={item.employeeCode} className="border-t border-slate-100"><td className="px-5 py-3"><strong className="block text-slate-950">{item.fullName}</strong><span className="text-xs font-medium text-slate-600">{item.employeeCode}</span></td><td className="px-5 py-3 font-semibold tabular-nums text-slate-700">{item.occurrences}</td><td className="px-5 py-3 tabular-nums text-amber-800">{item.late} {tr("phút", "min")}</td><td className="px-5 py-3 tabular-nums text-amber-800">{item.early} {tr("phút", "min")}</td><td className="px-5 py-3 font-bold tabular-nums text-slate-950">{item.late + item.early} {tr("phút", "min")}</td></tr>)}</tbody></table></div>
+              <div className="overflow-x-auto"><table className="w-full min-w-[860px] text-left text-sm"><thead className="bg-slate-50 text-xs font-bold uppercase tracking-wide text-slate-600"><tr><th className="px-5 py-3">{tr("Nhân viên", "Employee")}</th><th className="px-5 py-3">{tr("Số ngày phát sinh", "Affected days")}</th><th className="px-5 py-3">{tr("Đi muộn", "Late")}</th><th className="px-5 py-3">{tr("Về sớm", "Early leave")}</th><th className="px-5 py-3">{tr("Tổng lệch", "Total variance")}</th><th className="px-5 py-3">{tr("Thao tác", "Actions")}</th></tr></thead><tbody>{overview.attention.map((item) => <tr key={item.employeeCode} className="border-t border-slate-100"><td className="px-5 py-3"><div className="flex items-center gap-3"><span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-orange-100 text-xs font-bold text-orange-700">{initials(item.fullName)}</span><span><strong className="block text-slate-950">{item.fullName}</strong><span className="text-xs font-medium text-slate-600">{item.employeeCode}</span></span></div></td><td className="px-5 py-3 font-semibold tabular-nums text-slate-700">{item.occurrences}</td><td className="px-5 py-3 tabular-nums text-amber-800">{item.late} {tr("phút", "min")}</td><td className="px-5 py-3 tabular-nums text-amber-800">{item.early} {tr("phút", "min")}</td><td className="px-5 py-3"><strong className="block tabular-nums text-slate-950">{item.late + item.early} {tr("phút", "min")}</strong><div className="mt-1.5 h-1.5 w-28 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-gradient-to-r from-amber-400 to-orange-500" style={{ width: `${((item.late + item.early) / maxVariance) * 100}%` }} /></div></td><td className="px-5 py-3"><div className="flex gap-2"><Link to={`/employees/${item.employeeId}`}><Button size="sm" variant="secondary">{tr("Xem chi tiết", "View details")}</Button></Link><Button size="sm" variant="secondary" disabled title={tr("Chức năng gửi nhắc nhở cần API thông báo từ backend.", "Reminder delivery requires a backend notification API.")}>{tr("Gửi nhắc nhở", "Send reminder")}</Button></div></td></tr>)}</tbody></table></div>
             ) : <p className="p-6 text-sm text-slate-600">{tr("Không có trường hợp đi muộn hoặc về sớm trong khoảng lọc.", "No late or early-leave cases in this range.")}</p>}
           </Card>
         </div>

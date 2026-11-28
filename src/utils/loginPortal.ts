@@ -1,4 +1,9 @@
-import type { UserRole } from '../context/RoleContext';
+import {
+  ACTIVE_USER_ROLES,
+  isActiveUserRole,
+  type ActiveUserRole,
+  type UserRole,
+} from '../domain/roleContract.ts';
 
 export type LoginPortal = 'management' | 'employee';
 
@@ -7,31 +12,35 @@ export interface ApiRoleIdentity {
   roleName?: string | null;
 }
 
-const MANAGEMENT_ROLES: UserRole[] = ['HR', 'System Administrator'];
+const MANAGEMENT_ROLES: ActiveUserRole[] = ['HR', 'System Administrator'];
 
 export function loginPortalForRole(role: UserRole): LoginPortal | null {
   if (role === 'Employee / ESS') return 'employee';
-  return MANAGEMENT_ROLES.includes(role) ? 'management' : null;
+  return MANAGEMENT_ROLES.some(item => item === role) ? 'management' : null;
 }
 
 export function portalAllowsRole(portal: LoginPortal, role: UserRole) {
   return portal === 'employee'
     ? role === 'Employee / ESS' || role === 'HR'
-    : MANAGEMENT_ROLES.includes(role);
+    : MANAGEMENT_ROLES.some(item => item === role);
 }
 
-export function workspaceRoleForPortal(portal: LoginPortal, accountRole: UserRole): UserRole {
+export function workspaceRoleForPortal(portal: LoginPortal, accountRole: ActiveUserRole): ActiveUserRole {
   return portal === 'employee' && accountRole === 'HR' ? 'Employee / ESS' : accountRole;
 }
 
-export function mapApiRole(identity: ApiRoleIdentity): UserRole | null {
+export function mapApiRole(identity: ApiRoleIdentity): ActiveUserRole | null {
   const rawRole = typeof identity.role === 'string'
     ? identity.role
     : identity.role?.name || identity.roleName;
   const normalized = rawRole?.trim().toUpperCase().replace(/[\s/-]+/g, '_');
 
-  if (normalized === 'ADMIN' || normalized === 'SYSTEM_ADMINISTRATOR') return 'System Administrator';
-  if (normalized === 'HR') return 'HR';
-  if (normalized === 'EMPLOYEE' || normalized === 'EMPLOYEE_ESS' || normalized === 'ESS') return 'Employee / ESS';
-  return null;
+  const mapped = normalized === 'ADMIN' || normalized === 'SYSTEM_ADMINISTRATOR'
+    ? 'System Administrator'
+    : normalized === 'HR'
+      ? 'HR'
+      : normalized === 'EMPLOYEE' || normalized === 'EMPLOYEE_ESS' || normalized === 'ESS'
+        ? 'Employee / ESS'
+        : null;
+  return mapped && isActiveUserRole(mapped) && ACTIVE_USER_ROLES.includes(mapped) ? mapped : null;
 }

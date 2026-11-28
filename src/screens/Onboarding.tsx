@@ -1,3 +1,4 @@
+import { SelectControl } from "../components/ui/select-control"
 import { useLanguage } from '../context/LanguageContext';
 import { AppShell } from '../components/AppShell';
 import { Card, SectionHeader, StatusBadge, Button, Tabs } from '../components/ui';
@@ -324,22 +325,22 @@ export default function Onboarding() {
                   </div>
                 )}
               </label>
-              <label className="text-[13px] font-medium text-slate-700"> {t("Job role")} <select
+              <label className="text-[13px] font-medium text-slate-700"> {t("Job role")} <SelectControl
                   value={newHire.role}
                   onChange={e => setNewHire(hire => ({ ...hire, role: e.target.value }))}
                   className="mt-1 h-10 w-full rounded-[5px] border border-slate-300 bg-white px-3 text-[13px] outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-100"
                 >
                   <option value="">{t("Select job role")}</option>
                   {(roleOptionsByDept[newHire.dept] || []).map(role => <option key={role} value={role}>{t(role)}</option>)}
-                </select>
+                </SelectControl>
               </label>
-              <label className="text-[13px] font-medium text-slate-700"> {t("Department")} <select
+              <label className="text-[13px] font-medium text-slate-700"> {t("Department")} <SelectControl
                   value={newHire.dept}
                   onChange={e => setDepartment(e.target.value)}
                   className="mt-1 h-10 w-full rounded-[5px] border border-slate-300 bg-white px-3 text-[13px] outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-100"
                 >
                   {departments.map(dept => <option key={dept} value={dept}>{t(dept)}</option>)}
-                </select>
+                </SelectControl>
               </label>
               <label className="text-[13px] font-medium text-slate-700"> {t("Start date")} <input
                   type="date"
@@ -349,21 +350,21 @@ export default function Onboarding() {
                   className="mt-1 h-10 w-full rounded-[5px] border border-slate-300 px-3 text-[13px] outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-100"
                 />
               </label>
-              <label className="text-[13px] font-medium text-slate-700"> {t("Buddy")} <select
+              <label className="text-[13px] font-medium text-slate-700"> {t("Buddy")} <SelectControl
                   value={newHire.buddy}
                   onChange={e => setNewHire(hire => ({ ...hire, buddy: e.target.value }))}
                   className="mt-1 h-10 w-full rounded-[5px] border border-slate-300 bg-white px-3 text-[13px] outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-100"
                 >
                   {(buddyOptionsByDept[newHire.dept] || []).map(buddy => <option key={buddy} value={buddy}>{t(buddy)}</option>)}
-                </select>
+                </SelectControl>
               </label>
-              <label className="text-[13px] font-medium text-slate-700"> {t("Status")} <select
+              <label className="text-[13px] font-medium text-slate-700"> {t("Status")} <SelectControl
                   value={newHire.status}
                   onChange={e => setNewHire(hire => ({ ...hire, status: e.target.value }))}
                   className="mt-1 h-10 w-full rounded-[5px] border border-slate-300 bg-white px-3 text-[13px] outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-100"
                 >
                   {['Pending', 'Active'].map(status => <option key={status} value={status}>{t(status)}</option>)}
-                </select>
+                </SelectControl>
               </label>
             </div>
 

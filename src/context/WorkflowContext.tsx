@@ -27,7 +27,8 @@ export function WorkflowProvider({ children }: { children: ReactNode }) {
   const { employees } = useEmployees();
   const { user } = useRole();
   useEffect(() => { sessionStorage.setItem('eris-erd-workflow-ui-v1', JSON.stringify({ snapshot:state.snapshot,models:state.models })); }, [state]);
-  const analystOnly = () => { if (user.role !== 'Data / AI Analyst') throw new Error('Only the Data / AI Analyst can perform this action.'); };
+  // Legacy demo workflow. The active three-role product uses the HR AI analysis API instead.
+  const analystOnly = () => { if (user.role !== 'Data / AI Analyst') throw new Error('Only the legacy Data / AI Analyst fixture can perform this action.'); };
   const generateSnapshot = (period: Period) => {
     if (!['HR', 'Data / AI Analyst'].includes(user.role)) throw new Error('Access denied.');
     const snapshot = prepareSnapshot(db.employees.map(row => employeeView(db,row,readInputDrafts(),period.end)), period);

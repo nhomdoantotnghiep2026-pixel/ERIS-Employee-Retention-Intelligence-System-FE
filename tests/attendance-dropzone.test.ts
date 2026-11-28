@@ -13,8 +13,8 @@ test("dropzone exposes separate native buttons: file picker and template downloa
       const html = renderToStaticMarkup(React.createElement(LanguageProvider, { initialLanguage: "vi" }, React.createElement(Dropzone, { file: null, busy, onSelect: () => {} })))
       assert.equal((html.match(/<button\b/g) || []).length, 2)
       assert(!html.includes("<label"), "download must not become the label's implicit associated control")
-      assert.match(html, /aria-label="Chọn tệp chấm công XLSX"/)
-      assert.match(html, /<input[^>]*hidden=""[^>]*type="file"[^>]*accept="\.xlsx"/)
+      assert.match(html, /aria-label="Chọn tệp chấm công Excel"/)
+      assert.match(html, /<input[^>]*hidden=""[^>]*type="file"[^>]*accept="\.xlsx,\.xls"/)
       assert.match(html, /Tải tệp mẫu/)
       const buttons = html.match(/<button\b[^>]*>/g)!
       assert.equal(buttons[0].includes('disabled=""'), busy)

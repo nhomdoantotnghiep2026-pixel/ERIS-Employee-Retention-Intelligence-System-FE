@@ -1,837 +1,572 @@
-import { useAutoDismissState } from '../../hooks/useAutoDismissState';
-import { useEffect, useRef, useState, type ReactNode } from "react"
-import {
-  Activity,
-  Banknote,
-  AlertTriangle,
-  BriefcaseBusiness,
-  BrainCircuit,
-  CheckCircle2,
-  Loader2,
-  UserRound,
-} from "lucide-react"
-import {
-  getAiResult,
-  listAiEmployeeResults,
-  getAiSnapshot,
-  getApiErrorMessage,
-  listAiSnapshots,
-  predictAiEmployee,
-  previewAiEmployee,
-  type AiEmployee,
-  type AiPrediction,
-  type AiSnapshot,
-} from "../../services/api"
-import {
-  FEATURE_CHOICES,
-  FEATURE_UNITS,
-  featureLabel,
-  formatDateTime,
-} from "./analysis"
-import {
-  EmployeePredictionDashboard,
-  type PredictionDashboardState,
-} from "./EmployeePredictionDashboard"
-import { Empty, Loading, Notice } from "./States"
+import { useAiTr } from "./aiWorkspaceLanguage"
+import { useEffect, useMemo, useState } from "react"
+
+import { ArrowRight, Search, SlidersHorizontal, Sparkles, X } from "lucide-react"
+import { motion, useReducedMotion } from "motion/react"
+import { Button } from "../ui/button"
+import { SelectControl } from "../ui/select-control"
+
+import { type AiEmployee } from "../../services/api"
+
+import { UnifiedWorkspace } from "./UnifiedWorkspace"
 
 type Sel = {
-  employeeId?: number | undefined
-  snapshotId?: number | undefined
-  resultId?: number | undefined
+  employeeId?: number
+  resultId?: number
 }
-type Props = {
-  employees: AiEmployee[]
-  initial: Sel
-  onSelectionChange: (s: Sel) => void
-  adapter?: {
-    listSnapshots: typeof listAiSnapshots
-    getSnapshot: typeof getAiSnapshot
-    preview: typeof previewAiEmployee
-    predict: typeof predictAiEmployee
-    getResult: typeof getAiResult
-    listResults?: typeof listAiEmployeeResults
-  }
-  illustrative?: boolean
-}
-type Busy = "" | "preview" | "predict" | "save" | "result"
-type FailedAction = { type: "predict" } | { type: "result"; id: number } | null
-
-const FEATURE_GROUPS = [
-  {
-    icon: UserRound,
-    title: "Nhân thân",
-    keys: ["Department", "Gender", "Age", "Education_Level"],
-  },
-  {
-    icon: BriefcaseBusiness,
-    title: "Chế độ đãi ngộ & Thâm niên",
-    keys: ["Hire_Date", "Years_At_Company", "Monthly_Salary", "Promotions"],
-  },
-  {
-    icon: Activity,
-    title: "Nhịp độ công việc & Mức độ thỏa mãn",
-    keys: [
-      "Work_Hours_Per_Week",
-      "Overtime_Hours",
-      "Sick_Days",
-      "Employee_Satisfaction_Score",
-    ],
-  },
-]
 
 export function IndividualAnalysis({
   employees,
   initial,
   onSelectionChange,
-  adapter,
-  illustrative = false,
-}: Props) {
-  const apiRef = useRef(
-    adapter ?? {
-      listSnapshots: listAiSnapshots,
-      getSnapshot: getAiSnapshot,
-      preview: previewAiEmployee,
-      predict: predictAiEmployee,
-      getResult: getAiResult,
-      listResults: listAiEmployeeResults,
-    },
-  )
-  const [employeeId, setEmployeeId] = useState<number | undefined>(
-    initial.employeeId,
-  )
-  const [snapshots, setSnapshots] = useState<AiSnapshot[] | null>(null)
-  const [snapshotId, setSnapshotId] = useState<number | undefined>(
-    initial.snapshotId,
-  )
-  const [snapshot, setSnapshot] = useState<AiSnapshot | null>(null)
-  const [snapshotLoading, setSnapshotLoading] = useState(false)
-  const [supplement, setSupplement] = useState<Record<string, string>>({})
-  const [save, setSave] = useState(false)
-  const predictionLock = useRef(false)
-  const selectionVersion = useRef(0)
-  const [busy, setBusy] = useState<Busy>("")
-  const [dataError, setDataError] = useState("")
-  const [result, setResult] = useState<AiPrediction | null>(null)
-  const resultRef = useRef<AiPrediction | null>(null)
-  const [savedResults, setSavedResults] = useState<AiPrediction[]>([])
-  const [historyLoading, setHistoryLoading] = useState(false)
-  const [historyError, setHistoryError] = useState("")
-  const [saveNotice, setSaveNotice] = useAutoDismissState()
-  function rememberSaved(value: AiPrediction) {
-    if (!value.saved || !value.predictionId) return;
-    setSavedResults(current => [value, ...current.filter(item => item.predictionId !== value.predictionId)]
-      .sort((a, b) => (Date.parse(b.createdAt || "") || 0) - (Date.parse(a.createdAt || "") || 0)));
-  }
-  const [resultError, setResultError] = useState("")
-  const [failedAction, setFailedAction] = useState<FailedAction>(null)
-  const [mobileTab, setMobileTab] = useState<"data" | "result">("data")
-  const seq = useRef(0)
-  const snapSeq = useRef(0)
-  const historySeq = useRef(0)
-  const headingRef = useRef<HTMLHeadingElement>(null)
-  const openedInitialResult = useRef(false)
+  onResultAvailabilityChange,
+}: {
+  employees: AiEmployee[]
+  initial: Sel
+  onSelectionChange: (s: Sel) => void
+  onResultAvailabilityChange?: (available: boolean) => void
+}) {
+  const [id, setId] = useState(initial.employeeId)
 
-  useEffect(() => {
-    const api = apiRef.current
-    const my = ++historySeq.current
-    setSavedResults([])
-    setHistoryError("")
-    setHistoryLoading(!!employeeId)
-    if (!employeeId || !api.listResults) {
-      setHistoryLoading(false)
-      return
-    }
-    api.listResults(employeeId)
-      .then(async response => {
-        const details = await Promise.allSettled(response.data.map(item => api.getResult(item.predictionId)))
-        if (my !== historySeq.current) return
-        const loaded = details.flatMap(item => item.status === "fulfilled" ? [item.value.data] : [])
-        const ordered = loaded.sort((a, b) => (Date.parse(b.createdAt || "") || 0) - (Date.parse(a.createdAt || "") || 0))
-        setSavedResults(ordered)
-        const latest = ordered[0]
-        if (latest && !resultRef.current && !predictionLock.current) {
-          resultRef.current = latest
-          setResult(latest)
-          setSnapshot(latest.preview)
-          setSnapshotId(latest.snapshotId ?? latest.preview.snapshotId ?? undefined)
-          onSelectionChange({
-            employeeId,
-            snapshotId: latest.snapshotId ?? latest.preview.snapshotId ?? undefined,
-            resultId: latest.predictionId,
-          })
-        }
-        if (loaded.length !== response.data.length) setHistoryError("Một số lần đánh giá cũ chưa thể tải chi tiết.")
-      })
-      .catch(error => {
-        if (my === historySeq.current) setHistoryError(getApiErrorMessage(error, "Không tải được lịch sử đánh giá."))
-      })
-      .finally(() => {
-        if (my === historySeq.current) setHistoryLoading(false)
-      })
-  }, [employeeId])
+  const [query, setQuery] = useState(""),
+    [department, setDepartment] = useState("ALL")
 
-  useEffect(() => {
-    const api = apiRef.current
-    const my = ++seq.current
-    setSnapshots(null)
-    setDataError("")
-    setSnapshot(null)
-    setSupplement({})
-    if (!employeeId) return
-    api
-      .listSnapshots(employeeId)
-      .then((response) => my === seq.current && setSnapshots(response.data))
-      .catch(
-        (error) =>
-          my === seq.current &&
-          setDataError(
-            getApiErrorMessage(error, "Không tải được danh sách bản dữ liệu."),
-          ),
-      )
-  }, [employeeId])
+  const employee = employees.find((item) => item.id === id)
 
-  useEffect(() => {
-    const api = apiRef.current
-    const my = ++snapSeq.current
-    setSnapshotLoading(false)
-    if (!employeeId || !snapshotId) return
-    setSnapshotLoading(true)
-    api
-      .getSnapshot(employeeId, snapshotId)
-      .then((response) => my === snapSeq.current && setSnapshot(response.data))
-      .catch(
-        (error) =>
-          my === snapSeq.current &&
-          setDataError(
-            getApiErrorMessage(error, "Không tải được bản dữ liệu."),
-          ),
-      )
-      .finally(() => my === snapSeq.current && setSnapshotLoading(false))
-  }, [employeeId, snapshotId])
-
-  useEffect(() => {
-    if (openedInitialResult.current || !initial.resultId) return
-    openedInitialResult.current = true
-    void openResult(initial.resultId)
-    // The URL result is opened once; later selections are explicit user actions.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-
-  useEffect(() => {
-    if (result) {
-      const frame = window.requestAnimationFrame(() => {
-        const main = headingRef.current?.closest("main")
-        main?.scrollTo({ top: 0, behavior: "auto" })
-        headingRef.current?.focus({ preventScroll: true })
-      })
-      resultRef.current = result
-      return () => window.cancelAnimationFrame(frame)
-    }
-    resultRef.current = result
-  }, [result, mobileTab])
-
-  function chooseEmployee(id?: number) {
-    selectionVersion.current++
-    snapSeq.current++
-    setSave(false)
-    setEmployeeId(id)
-    setSnapshotId(undefined)
-    setResult(null)
-    resultRef.current = null
-    setResultError("")
-    setFailedAction(null)
-    setMobileTab("data")
+  function choose(id?: number) {
+    setId(id)
     onSelectionChange({ employeeId: id })
+    onResultAvailabilityChange?.(false)
   }
 
-  function chooseSnapshot(id?: number) {
-    selectionVersion.current++
-    snapSeq.current++
-    setSave(false)
-    setSnapshotId(id)
-    setSnapshot(null)
-    setResult(null)
-    resultRef.current = null
-    setResultError("")
-    setFailedAction(null)
-    setMobileTab("data")
-    onSelectionChange({ employeeId, snapshotId: id })
-  }
+  return employee ? (
+    <UnifiedWorkspace
+      key={employee.id}
+      employee={employee}
+      employees={employees}
+      onChoose={choose}
+      onBack={() => choose()}
+      onResult={onResultAvailabilityChange}
+    />
+  ) : (
+    <WorkspaceHub
+      employees={employees}
+      query={query}
+      onQueryChange={setQuery}
+      department={department}
+      onDepartmentChange={setDepartment}
+      onChoose={(item) => choose(item.id)}
+    />
+  )
+}
 
-  async function prepare() {
-    if (!employeeId || busy) return
-    const version = selectionVersion.current
-    if (snapshotId) {
-      setBusy("preview")
-      setDataError("")
-      try {
-        const response = await apiRef.current.getSnapshot(
-          employeeId,
-          snapshotId,
-        )
-        if (version === selectionVersion.current) setSnapshot(response.data)
-      } catch (error) {
-        if (version === selectionVersion.current)
-          setDataError(
-            getApiErrorMessage(
-              error,
-              "Không thể kiểm tra bản dữ liệu. Vui lòng thử lại.",
-            ),
-          )
-      } finally {
-        setBusy("")
-      }
-      return
-    }
-    const extras: Record<string, string | number> = {}
-    for (const [key, value] of Object.entries(supplement))
-      if (value.trim())
-        extras[key] =
-          FEATURE_CHOICES[key] || key === "Hire_Date" ? value : Number(value)
-    if (
-      Object.values(extras).some(
-        (value) => typeof value === "number" && !Number.isFinite(value),
+function employmentStatusLabel(value?: string | null) {
+  return value === "ACTIVE"
+    ? "Đang làm việc"
+    : value === "INACTIVE"
+      ? "Đã ngừng làm việc"
+      : value === "IN_PROCESS"
+        ? "Đang hoàn thiện hồ sơ"
+        : "Chưa xác định"
+}
+
+function WorkspaceHub({
+  employees,
+  query,
+  onQueryChange,
+  department,
+  onDepartmentChange,
+  onChoose,
+}: {
+  employees: AiEmployee[]
+  query: string
+  onQueryChange: (value: string) => void
+  department: string
+  onDepartmentChange: (value: string) => void
+  onChoose: (employee: AiEmployee) => void
+}) {
+  const tr = useAiTr()
+  const [page, setPage] = useState(1)
+  const reduceMotion = useReducedMotion()
+
+  const [status, setStatus] = useState("ALL")
+
+  const [sort, setSort] = useState("NAME")
+
+  const pageSize = 7
+
+  const departments = useMemo(
+    () =>
+      [
+        ...new Set(
+          employees
+            .map((item) => item.departmentName)
+            .filter((value): value is string => Boolean(value)),
+        ),
+      ].sort((a, b) => a.localeCompare(b, "vi")),
+    [employees],
+  )
+
+  const departmentCounts = useMemo(
+    () =>
+      new Map(
+        departments.map((name) => [
+          name,
+          employees.filter((item) => item.departmentName === name).length,
+        ]),
+      ),
+    [departments, employees],
+  )
+
+  useEffect(() => setPage(1), [department, query, sort, status])
+
+  const filtered = useMemo(() => {
+    const needle = query.trim().toLocaleLowerCase("vi-VN")
+
+    return employees
+
+      .filter(
+        (item) =>
+          (department === "ALL" || item.departmentName === department) &&
+          (status === "ALL" ||
+            (status === "ACTIVE"
+              ? item.employmentStatus === "ACTIVE"
+              : item.employmentStatus === status)) &&
+          (!needle ||
+            `${item.employeeCode} ${item.fullName} ${item.departmentName ?? ""} ${item.positionName ?? ""}`
+              .toLocaleLowerCase("vi-VN")
+              .includes(needle)),
       )
-    ) {
-      setDataError("Vui lòng kiểm tra các giá trị số.")
-      return
-    }
-    setBusy("preview")
-    setDataError("")
-    setResult(null)
-    setResultError("")
-    try {
-      const response = await apiRef.current.preview(employeeId, {
-        ...(Object.keys(extras).length ? { supplementalFeatures: extras } : {}),
-      })
-      setSnapshot(response.data)
-      if (response.data.snapshotId) {
-        setSupplement({})
-        setSnapshotId(response.data.snapshotId)
-        onSelectionChange({ employeeId, snapshotId: response.data.snapshotId })
-        apiRef.current
-          .listSnapshots(employeeId)
-          .then((next) => setSnapshots(next.data))
-          .catch(() => undefined)
-      }
-    } catch (error) {
-      setDataError(getApiErrorMessage(error, "Không kiểm tra được dữ liệu."))
-    } finally {
-      setBusy("")
-    }
-  }
 
-  async function runPrediction(
-    saveOption = save,
-    action: "predict" | "save" = "predict",
-  ) {
-    if (
-      !employeeId ||
-      !snapshot?.snapshotId ||
-      !snapshot.ready ||
-      busy ||
-      predictionLock.current
-    )
-      return
-    predictionLock.current = true
-    const version = selectionVersion.current
-    setBusy(action)
-    setResult(null)
-    setResultError("")
-    setFailedAction(null)
-    setMobileTab("result")
-    try {
-      const response = await apiRef.current.predict(
-        employeeId,
-        snapshot.snapshotId,
-        saveOption,
+      .sort((a, b) =>
+        sort === "CODE"
+          ? a.employeeCode.localeCompare(b.employeeCode, "vi", {
+              numeric: true,
+            })
+          : sort === "DEPARTMENT"
+            ? `${a.departmentName ?? ""} ${a.fullName}`.localeCompare(
+                `${b.departmentName ?? ""} ${b.fullName}`,
+                "vi",
+              )
+            : sort === "TENURE"
+              ? Date.parse(a.hireDate ?? "9999-12-31") -
+                Date.parse(b.hireDate ?? "9999-12-31")
+            : a.fullName.localeCompare(b.fullName, "vi"),
       )
-      if (version !== selectionVersion.current) return
-      resultRef.current = response.data
-      setResult(response.data)
-      rememberSaved(response.data)
-      if (response.data.saved) setSaveNotice("Đã lưu kết quả vào hồ sơ theo dõi.")
-      if (response.data.saved && response.data.predictionId && !response.data.createdAt) {
-        void apiRef.current.getResult(response.data.predictionId).then(detail => {
-          rememberSaved(detail.data);
-          if (version === selectionVersion.current) setResult(current => current?.predictionId === detail.data.predictionId ? detail.data : current);
-        }).catch(() => {});
-      }
-      if (response.data.saved && response.data.predictionId)
-        onSelectionChange({
-          employeeId,
-          snapshotId: snapshot.snapshotId,
-          resultId: response.data.predictionId,
-        })
-    } catch (error) {
-      if (version !== selectionVersion.current) return
+  }, [department, employees, query, sort, status])
 
-      setResultError(getApiErrorMessage(error, "Không hoàn thành được lần đánh giá."))
-      setFailedAction({ type: "predict" })
-    } finally {
-      predictionLock.current = false
-      setBusy("")
-    }
-  }
+  const pages = Math.max(1, Math.ceil(filtered.length / pageSize))
 
-  async function openResult(id: number) {
-    if (busy) return
-    setBusy("result")
-      setResult(null)
-      resultRef.current = null
-    setResultError("")
-    setFailedAction(null)
-    setMobileTab("result")
-    try {
-      const response = await apiRef.current.getResult(id)
-      const nextSnapshot = response.data.preview
-      if (employeeId && nextSnapshot.employee.id !== employeeId) throw new Error("Kết quả không thuộc nhân viên đang chọn.");
-      rememberSaved(response.data)
-      resultRef.current = response.data
-      setResult(response.data)
-      setSnapshot(nextSnapshot)
-      setEmployeeId(nextSnapshot.employee.id)
-      setSnapshotId(
-        response.data.snapshotId ?? nextSnapshot.snapshotId ?? undefined,
-      )
-      onSelectionChange({
-        employeeId: nextSnapshot.employee.id,
-        snapshotId:
-          response.data.snapshotId ?? nextSnapshot.snapshotId ?? undefined,
-        resultId: id,
-      })
-    } catch (error) {
-      setResultError(getApiErrorMessage(error, "Không mở được kết quả đã lưu."))
-      setFailedAction({ type: "result", id })
-    } finally {
-      setBusy("")
-    }
-  }
+  const safePage = Math.min(page, pages)
 
-  const employee = employees.find((item) => item.id === employeeId)
-  const snapshotStatus = !snapshot
-    ? null
-    : snapshot.invalidFeatures?.length
-      ? "invalid"
-      : !snapshot.ready || snapshot.missingFeatures.length
-        ? "missing"
-        : "ready"
-  const dashboardState: PredictionDashboardState =
-    busy === "predict" || busy === "save" || busy === "result"
-      ? "loading"
-      : resultError
-        ? "error"
-        : result
-          ? "success"
-          : "idle"
-  const loadingLabel =
-    busy === "result"
-      ? "Đang mở kết quả đã lưu…"
-      : busy === "save"
-        ? "Đang đánh giá và lưu kết quả…"
-        : "Đang phân tích dữ liệu…"
-  const dataVisible =
-    mobileTab === "data" ? "block min-w-0" : "hidden min-w-0 min-[1200px]:block"
-  const resultVisible =
-    mobileTab === "result" ? "block min-w-0" : "hidden min-w-0 min-[1200px]:block"
+  const rows = filtered.slice((safePage - 1) * pageSize, safePage * pageSize)
+
+  const start = filtered.length ? (safePage - 1) * pageSize + 1 : 0
+
+  const end = Math.min(safePage * pageSize, filtered.length)
+
+  const activeCount = employees.filter(
+    (item) => item.employmentStatus === "ACTIVE",
+  ).length
+
+  const steps = [
+    tr("Chọn nhân sự"),
+    tr("Đánh giá tình trạng gắn kết"),
+    tr("Xem kế hoạch hành động"),
+  ]
 
   return (
-    <div className="space-y-5">
-      <section
-        className={`panel p-4 ${
-          mobileTab === "result" ? "hidden min-[1200px]:block" : ""
-        }`}
-        aria-labelledby="prediction-selector-heading"
-      >
-        <h2
-          id="prediction-selector-heading"
-          className="text-base font-semibold"
-        >
-          Chọn nhân viên và bản dữ liệu
-        </h2>
-        <div className="mt-3 grid items-end gap-3 min-[768px]:grid-cols-2 min-[1200px]:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto_auto]">
-          <label className="text-xs font-medium text-slate-500">
-            Nhân viên
-            <select
-              aria-label="Nhân viên"
-              disabled={!!busy}
-              className="field mt-1.5 text-slate-900"
-              value={employeeId ?? ""}
-              onChange={(event) =>
-                chooseEmployee(
-                  event.target.value ? Number(event.target.value) : undefined,
-                )
-              }
+    <section
+      className="overflow-hidden rounded-2xl border border-orange-100/80 bg-white shadow-sm"
+      aria-labelledby="workspace-hub-heading"
+    >
+      <div className="relative overflow-hidden border-b border-orange-100/80 bg-gradient-to-r from-orange-50/90 via-amber-50/40 to-white px-5 py-4 sm:px-6">
+        <span
+          className="pointer-events-none absolute -right-14 -top-16 size-48 rounded-full bg-orange-200/30 blur-3xl"
+          aria-hidden
+        />
+        <div className="relative grid gap-3 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-center">
+          <div className="min-w-0">
+            <p className="inline-flex items-center gap-1.5 rounded-full border border-orange-100 bg-white/80 px-2.5 py-1 text-xs font-semibold uppercase tracking-wider text-orange-700 backdrop-blur-sm">
+              <Sparkles className="size-3.5" />
+              {tr("Không gian đánh giá nhân sự")}
+            </p>
+            <h2
+              id="workspace-hub-heading"
+              className="mt-2 text-xl font-semibold tracking-tight text-slate-950 sm:text-2xl"
             >
-              <option value="">Chọn nhân viên</option>
-              {employees.map((item) => (
-                <option key={item.id} value={item.id}>
-                  {item.employeeCode} · {item.fullName}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="text-xs font-medium text-slate-500">
-            Bản dữ liệu
-            <select
-              aria-label="Bản dữ liệu"
-              className="field mt-1.5 text-slate-900"
-              value={snapshotId ?? ""}
-              disabled={!employeeId || !snapshots || !!busy}
-              onChange={(event) =>
-                chooseSnapshot(
-                  event.target.value ? Number(event.target.value) : undefined,
-                )
-              }
-            >
-              <option value="">
-                {!employeeId
-                  ? "Chọn nhân viên trước"
-                  : !snapshots
-                    ? "Đang tải…"
-                    : snapshots.length
-                      ? "Chọn bản dữ liệu"
-                      : "Chưa có bản dữ liệu"}
-              </option>
-              {snapshots?.map(
-                (item) =>
-                  item.snapshotId && (
-                    <option key={item.snapshotId} value={item.snapshotId}>
-                      Bản {item.snapshotId} ·{" "}
-                      {formatDateTime(item.snapshotDate || item.capturedAt)} ·{" "}
-                      {item.ready ? "Sẵn sàng" : "Thiếu dữ liệu"}
-                    </option>
-                  ),
-              )}
-            </select>
-          </label>
-          <div>
-            <span className="mb-1.5 block text-xs font-medium text-slate-500">
-              Trạng thái
-            </span>
-            <SnapshotStatus status={snapshotStatus} />
-          </div>
-          <button
-            type="button"
-            className="btn btn-secondary whitespace-nowrap"
-            disabled={!employeeId || !!busy}
-            onClick={() => void prepare()}
-          >
-            {busy === "preview"
-              ? "Đang kiểm tra…"
-              : snapshotId
-                ? "Kiểm tra dữ liệu"
-                : "Tạo bản dữ liệu"}
-          </button>
-        </div>
-        {employeeId && (
-          <details
-            className="mt-3 border-t pt-3 text-sm"
-            open={!!snapshot && !snapshot.ready}
-          >
-            <summary className="cursor-pointer text-xs font-medium text-slate-500">
-              Tùy chọn kiểm tra và bổ sung dữ liệu
-            </summary>
-            <div className="mt-3 grid gap-3 md:grid-cols-2 lg:grid-cols-3">
-              {snapshot?.missingFeatures.map((key) => (
-                <label key={key} className="text-xs font-medium">
-                  {featureLabel(key)}
-                  {FEATURE_UNITS[key] ? ` (${FEATURE_UNITS[key]})` : ""}
-                  {FEATURE_CHOICES[key] ? (
-                    <select
-                      className="field mt-1.5"
-                      value={supplement[key] || ""}
-                      onChange={(event) =>
-                        setSupplement((current) => ({
-                          ...current,
-                          [key]: event.target.value,
-                        }))
-                      }
-                    >
-                      <option value="">Chọn giá trị</option>
-                      {FEATURE_CHOICES[key].map((choice) => (
-                        <option key={choice} value={choice}>
-                          {choice}
-                        </option>
-                      ))}
-                    </select>
-                  ) : (
-                    <input
-                      className="field tabular mt-1.5"
-                      type={key === "Hire_Date" ? "date" : "number"}
-                      value={supplement[key] || ""}
-                      onChange={(event) =>
-                        setSupplement((current) => ({
-                          ...current,
-                          [key]: event.target.value,
-                        }))
-                      }
-                    />
-                  )}
-                </label>
+              {tr("Bắt đầu đánh giá gắn kết nhân sự")}
+            </h2>
+            <p className="mt-1 text-sm leading-5 text-slate-600">
+              {tr("Chọn đúng nhân sự, đọc tín hiệu có căn cứ và xây dựng kế hoạch giữ chân từ dữ liệu hiện có.")}
+            </p>
+            <div className="mt-3 flex flex-wrap gap-1.5">
+              {steps.map((step, index) => (
+                <span key={step} className="inline-flex items-center gap-1.5 rounded-full border border-orange-100 bg-white/75 px-2.5 py-1 text-xs font-medium text-slate-700 backdrop-blur-sm">
+                  <span className="grid size-5 place-items-center rounded-full bg-orange-500 text-[11px] font-bold text-white">{index + 1}</span>
+                  {tr(step)}
+                </span>
               ))}
             </div>
-          </details>
-        )}
-      </section>
-
-      <div
-        role="tablist"
-        aria-label="Nội dung đánh giá cá nhân"
-        className="grid grid-cols-2 rounded-lg bg-slate-100 p-1 min-[1200px]:hidden"
-      >
-        {(["data", "result"] as const).map((tab) => (
-          <button
-            key={tab}
+          </div>
+          <div className="grid grid-cols-3 gap-2 xl:min-w-[300px]">
+            {[
+              [tr("Tổng nhân sự"), employees.length],
+              [tr("Phòng ban"), departments.length],
+              [tr("Đang làm việc"), activeCount],
+            ].map(([label, value]) => (
+              <span
+                key={String(label)}
+                className="rounded-xl border border-white/90 bg-white/70 px-2.5 py-2 shadow-sm ring-1 ring-orange-100/50 backdrop-blur-sm"
+              >
+                <span className="block text-xs font-medium text-slate-600">
+                  {tr(String(label))}
+                </span>
+                <strong className="mt-0.5 block tabular-nums text-lg text-slate-950">
+                  {value}
+                </strong>
+              </span>
+            ))}
+          </div>
+        </div>
+      </div>
+      <div className="p-5">
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <p className="metadata-label">{tr("Danh mục nhân sự")}</p>
+            <h3 className="mt-1 font-semibold tracking-tight text-slate-900">
+              {tr("Danh mục nhân viên")}
+            </h3>
+          </div>
+          <span role="status" className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold tabular-nums text-slate-700">
+            {filtered.length} {tr("hồ sơ phù hợp")}
+          </span>
+        </div>
+        <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-[minmax(280px,1fr)_190px_200px]">
+          <label className="block sm:col-span-2 lg:col-span-1">
+            <span className="sr-only">{tr("Tìm kiếm nhân viên")}</span>
+            <div className="relative w-full">
+              <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
+              <input
+                className="h-11 w-full rounded-md border border-slate-200 bg-white pl-10 pr-10 text-sm text-slate-900 outline-none placeholder:text-slate-400 focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20"
+                value={query}
+                onChange={(event) => onQueryChange(event.target.value)}
+                placeholder={tr("Tìm tên, mã, phòng ban hoặc chức danh…")}
+              />
+              {query && (
+                <button type="button" aria-label={tr("Xóa tìm kiếm")} onClick={() => onQueryChange("")} className="absolute right-3 top-1/2 grid size-7 -translate-y-1/2 place-items-center rounded-md text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-2 focus-visible:outline-orange-500">
+                  <X className="size-4" />
+                </button>
+              )}
+            </div>
+          </label>
+          <SelectControl
+            aria-label={tr("Lọc theo trạng thái")}
+            value={status}
+            onChange={(event) => setStatus(event.target.value)}
+          >
+            <option value="ALL">{tr("Tất cả trạng thái")}</option>
+            <option value="ACTIVE">{tr("Đang làm việc")}</option>
+            <option value="IN_PROCESS">{tr("Đang hoàn thiện")}</option>
+            <option value="INACTIVE">{tr("Đã ngừng làm việc")}</option>
+          </SelectControl>
+          <label className="block">
+            <span className="sr-only">{tr("Sắp xếp")}</span>
+            <SelectControl
+              prefixIcon={<SlidersHorizontal className="size-4" />}
+              value={sort}
+              onChange={(event) => setSort(event.target.value)}
+            >
+              <option value="NAME">{tr("Tên A–Z")}</option>
+              <option value="CODE">{tr("Mã nhân viên")}</option>
+              <option value="TENURE">{tr("Thâm niên cao nhất")}</option>
+              <option value="DEPARTMENT">{tr("Phòng ban")}</option>
+            </SelectControl>
+          </label>
+        </div>
+        <div
+          className="mt-3 flex gap-2 overflow-x-auto pb-1"
+          aria-label={tr("Lọc nhanh theo phòng ban")}
+        >
+          <motion.button
             type="button"
-            role="tab"
-            aria-selected={mobileTab === tab}
-            onClick={() => setMobileTab(tab)}
-            className={`h-9 rounded-md text-sm font-medium ${
-              mobileTab === tab
-                ? "bg-white text-slate-900 shadow-sm"
-                : "text-slate-500"
+            onClick={() => onDepartmentChange("ALL")}
+            whileTap={reduceMotion ? undefined : { scale: 0.97 }}
+            aria-pressed={department === "ALL"}
+            className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors duration-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-500 ${
+              department === "ALL"
+                ? "border-slate-900 bg-slate-900 text-white"
+                : "border-slate-200 bg-white text-slate-600 hover:border-slate-300"
             }`}
           >
-            {tab === "data" ? "Dữ liệu" : "Kết quả"}
-          </button>
-        ))}
-      </div>
-
-      <div className="grid items-stretch gap-5 min-[1200px]:grid-cols-[minmax(0,38fr)_minmax(0,62fr)]">
-        <div className={dataVisible}>
-          <section
-            className="panel flex min-h-[680px] w-full flex-col overflow-hidden"
-            aria-labelledby="prediction-input-heading"
-          >
-            <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-200 px-5 py-4">
-              <div className="flex min-w-0 items-center gap-3">
-                <span className={`grid h-11 w-11 shrink-0 place-items-center rounded-full bg-slate-100 text-sm font-semibold text-slate-700 ${snapshot ? 'ring-2 ring-emerald-400 ring-offset-2' : ''}`}>
-                  {getInitials(snapshot?.employee.fullName)}
-                </span>
-                <div className="min-w-0">
-                  <p className="metadata-label">Hồ sơ nhân viên</p>
-                  <h2 id="prediction-input-heading" className="mt-1 truncate font-semibold text-slate-900">
-                    {snapshot?.employee.fullName || "Chưa chọn nhân viên"}
-                  </h2>
-                  {snapshot?.employee.employeeCode && <span className="mt-1 inline-flex rounded-md bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">{snapshot.employee.employeeCode}</span>}
-                  {snapshot && <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-slate-600">
-                    <span>{snapshot.features.Age} tuổi</span><span aria-hidden>•</span>
-                    <span>{formatDisplayValue(snapshot, 'Gender')}</span><span aria-hidden>•</span>
-                    <span>{educationTag(snapshot.features.Education_Level)}</span><span aria-hidden>•</span>
-                    <span>{snapshot.features.Department}</span>
-                  </div>}
-                </div>
-              </div>
-              <div className="flex flex-col items-end gap-1.5">
-                <SnapshotStatus status={snapshotStatus} />
-                {snapshot?.snapshotId && <span className="text-xs font-medium text-slate-500">Bản ghi #{snapshot.snapshotId}</span>}
-              </div>
-            </div>
-            {dataError && (
-              <div className="px-5 pt-4">
-                <Notice tone="error">{dataError}</Notice>
-              </div>
-            )}
-            <div className="min-h-72 flex-1 overflow-y-auto px-5 py-4">
-              {snapshotLoading ? (
-                <Loading label="Đang tải bản dữ liệu…" />
-              ) : !snapshot ? (
-                <Empty>
-                  Chọn nhân viên và bản dữ liệu, hoặc tạo bản dữ liệu mới từ hồ
-                  sơ hiện tại.
-                </Empty>
-              ) : (
-                <>
-                  {snapshotStatus !== "ready" && (
-                    <Notice
-                      tone="warning"
-                      title={
-                        snapshotStatus === "invalid"
-                          ? "Dữ liệu không hợp lệ"
-                          : "Dữ liệu còn thiếu"
-                      }
-                    >
-                      {[
-                        ...snapshot.missingFeatures.map(
-                          (key) => `Thiếu ${featureLabel(key)}`,
-                        ),
-                        ...(snapshot.invalidFeatures ?? []).map(
-                          (key) => `Không hợp lệ: ${featureLabel(key)}`,
-                        ),
-                        ...snapshot.issues,
-                      ].join(". ")}
-                    </Notice>
-                  )}
-                  <div className="mt-3 space-y-3">
-                    <FeatureGroups snapshot={snapshot} />
-                  </div>
-                </>
+            {tr("Tất cả (")}{employees.length})
+          </motion.button>
+          {departments.map((name) => {
+            const theme = getDepartmentTheme(name)
+            return (
+              <motion.button
+                key={name}
+                type="button"
+                onClick={() => onDepartmentChange(name)}
+                whileTap={reduceMotion ? undefined : { scale: 0.97 }}
+                aria-pressed={department === name}
+                className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition-all duration-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-500 ${
+                  department === name
+                    ? theme.active
+                    : `${theme.badge} hover:shadow-sm`
+                }`}
+              >
+                <span className={`size-1.5 rounded-full ${theme.dot}`} />
+                {name} ({departmentCounts.get(name)})
+              </motion.button>
+            )
+          })}
+        </div>
+        <div className="mt-4 overflow-x-auto rounded-2xl border border-slate-200/80 bg-white shadow-sm">
+          <table className="w-full min-w-[780px] text-left">
+            <thead className="bg-slate-50/80 text-[11px] font-bold uppercase tracking-wider text-slate-600">
+              <tr>
+                <th className="px-4 py-3">{tr("Nhân viên")}</th>
+                <th className="px-4 py-3">{tr("Phòng ban & Chức danh")}</th>
+                <th className="px-4 py-3">{tr("Thâm niên & Trạng thái")}</th>
+                <th className="px-4 py-3 text-right">{tr("Thao tác")}</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {rows.map((item, index) => {
+                const theme = getDepartmentTheme(item.departmentName)
+                return (
+                  <motion.tr
+                    key={item.id}
+                    initial={reduceMotion ? false : "hidden"}
+                    animate="visible"
+                    variants={{ hidden: { opacity: 0, y: 6 }, visible: { opacity: 1, y: 0 } }}
+                    transition={{ duration: reduceMotion ? 0 : 0.2, delay: reduceMotion ? 0 : index * 0.025 }}
+                    className="group cursor-pointer bg-white transition-colors duration-200 hover:bg-orange-50/40 focus-visible:bg-orange-50/60 focus-visible:outline-2 focus-visible:outline-orange-500"
+                    onClick={() => onChoose(item)}
+                    tabIndex={0}
+                    onKeyDown={(event) => { if (event.target !== event.currentTarget) return; if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onChoose(item) } }}
+                    aria-label={`${tr("Chọn")} ${item.fullName} ${tr("để phân tích")}`}
+                  >
+                    <td className="px-4 py-3.5">
+                      <div className="flex items-center gap-3">
+                        <span
+                          className={`grid size-10 shrink-0 place-items-center rounded-full text-xs font-bold ${theme.avatar}`}
+                        >
+                          {getInitials(item.fullName)}
+                        </span>
+                        <span>
+                          <strong className="block text-sm font-semibold text-slate-950">
+                            {item.fullName}
+                          </strong>
+                          <span className="font-mono text-xs text-slate-500">
+                            {item.employeeCode}
+                          </span>
+                        </span>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3.5">
+                      <span
+                        className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold ${theme.badge}`}
+                      >
+                        <span
+                          className={`size-1.5 rounded-full ${theme.dot}`}
+                        />
+                        {item.departmentName || tr("Chưa cập nhật")}
+                      </span>
+                      <span className="mt-1.5 block text-xs text-slate-500">
+                        {item.positionName || tr("Chưa cập nhật chức danh")}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3.5">
+                      <p className="mb-2 text-xs font-medium text-slate-700">{formatTenure(item.hireDate, tr)}</p>
+                      <span
+                        className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${
+                          item.employmentStatus === "INACTIVE"
+                            ? "bg-slate-100 text-slate-600"
+                            : item.employmentStatus === "IN_PROCESS"
+                              ? "bg-amber-50 text-amber-700"
+                              : "bg-emerald-50 text-emerald-700"
+                        }`}
+                      >
+                        <span
+                          className={`size-1.5 rounded-full ${
+                            item.employmentStatus === "INACTIVE"
+                              ? "bg-slate-400"
+                              : item.employmentStatus === "IN_PROCESS"
+                                ? "bg-amber-500"
+                                : "bg-emerald-500"
+                          }`}
+                        />
+                        {tr(employmentStatusLabel(item.employmentStatus))}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3.5 text-right">
+                      <Button type="button" variant="outline" onClick={(event) => { event.stopPropagation(); onChoose(item) }} className="min-h-9 rounded-md border-orange-200 bg-white px-3 text-xs font-semibold text-orange-700 transition-all duration-200 hover:border-orange-500 hover:bg-orange-500 hover:text-white group-hover:border-orange-500 group-hover:bg-orange-500 group-hover:text-white focus-visible:ring-2 focus-visible:ring-orange-500/30">{tr("Chọn phân tích")} <ArrowRight className="size-3.5" /></Button>
+                    </td>
+                  </motion.tr>
+                )
+              })}
+              {!rows.length && (
+                <tr>
+                  <td
+                    colSpan={4}
+                    className="px-4 py-12 text-center text-sm text-slate-600"
+                  >
+                    {tr("Không có nhân viên phù hợp với bộ lọc hiện tại.")}
+                  </td>
+                </tr>
               )}
-            </div>
-            <div className="flex flex-wrap items-center justify-between gap-3 border-t bg-white px-5 py-4">
-              <button
-                type="button"
-                role="switch"
-                aria-checked={save}
-                disabled={!!busy}
-                onClick={() => setSave(current => !current)}
-                className="group flex items-center gap-2.5 rounded-md text-left text-sm font-medium text-slate-700 outline-none focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2"
-              >
-                <span
-                  className={`relative h-6 w-10 shrink-0 rounded-full transition-colors ${save ? "bg-orange-500" : "bg-slate-200"}`}
-                  aria-hidden
-                >
-                  <span className={`absolute left-1 top-1 h-4 w-4 rounded-full bg-white shadow-sm transition-transform ${save ? "translate-x-4" : "translate-x-0"}`} />
-                </span>
-                <span>Lưu vào hồ sơ theo dõi định kỳ</span>
-              </button>
-              <button
-                type="button"
-                className="btn btn-primary"
-                disabled={!snapshot?.ready || !!busy}
-                onClick={() => void runPrediction(save, "predict")}
-              >
-                {busy === "predict" ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <BrainCircuit className="h-4 w-4" aria-hidden />}
-                {busy === "predict" ? "Đang đánh giá…" : "Đánh giá mức độ gắn kết"}
-              </button>
-            </div>
-          </section>
+            </tbody>
+          </table>
         </div>
-        <div className={resultVisible}>
-          <EmployeePredictionDashboard
-            history={savedResults.filter(item => item.preview.employee.id === employeeId)}
-            historyLoading={historyLoading}
-            historyError={historyError}
-            ref={headingRef}
-            state={dashboardState}
-            result={result}
-            snapshot={snapshot}
-            employee={employee}
-            error={resultError}
-            loadingLabel={loadingLabel}
-            illustrative={illustrative}
-            busy={!!busy}
-            onRetry={
-              failedAction
-                ? () => {
-                    if (failedAction.type === "result")
-                      void openResult(failedAction.id)
-                    else void runPrediction(save, "predict")
-                  }
-                : undefined
-            }
-            onPredict={() => void runPrediction(save, "predict")}
-            onSave={() => void runPrediction(true, "save")}
-            onOpenSaved={(id) => void openResult(id)}
-          />
-        </div>
-      </div>
-      {saveNotice && <div role="status" className="fixed bottom-5 right-5 z-50 flex items-center gap-2 rounded-xl border border-emerald-200 bg-white px-4 py-3 text-sm font-medium text-emerald-800 shadow-lg"><CheckCircle2 className="h-4 w-4" aria-hidden />{saveNotice}</div>}
-    </div>
-  )
-}
-
-function SnapshotStatus({
-  status,
-}: {
-  status: "ready" | "missing" | "invalid" | null
-}) {
-  if (!status)
-    return (
-      <span className="flex h-10 items-center text-sm text-slate-500">
-        Chưa chọn
-      </span>
-    )
-  const config =
-    status === "ready"
-      ? {
-          label: "Sẵn sàng",
-          className: "bg-orange-50 text-emerald-700",
-          Icon: CheckCircle2,
-        }
-      : {
-          label: status === "invalid" ? "Không hợp lệ" : "Thiếu dữ liệu",
-          className:
-            status === "invalid"
-              ? "bg-red-50 text-red-700"
-              : "bg-amber-50 text-amber-800",
-          Icon: AlertTriangle,
-        }
-  return (
-    <span
-      className={`inline-flex h-10 items-center gap-1.5 whitespace-nowrap rounded-full px-3 text-xs font-medium ${config.className}`}
-    >
-      <config.Icon className="h-3.5 w-3.5" aria-hidden />
-      {config.label}
-    </span>
-  )
-}
-
-function FeatureGroups({ snapshot }: { snapshot: AiSnapshot }) {
-  const f = snapshot.features
-  const satisfaction = Number(f.Employee_Satisfaction_Score)
-  return <div className="grid gap-3">
-    <section className="rounded-lg bg-slate-50 p-3.5">
-      <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-900"><BriefcaseBusiness className="size-4 text-slate-500" />Đãi ngộ & Thâm niên</div>
-      <div className="grid gap-2 sm:grid-cols-2">
-        <Metric label="Ngày vào làm" value={formatDisplayValue(snapshot, 'Hire_Date')} note={`Thâm niên ${f.Years_At_Company} năm`} />
-        <Metric label="Lương cơ bản" value={formatDisplayValue(snapshot, 'Monthly_Salary')} icon={<Banknote className="size-4 text-slate-500" />} />
-        <Metric label="Đã thăng chức" value={`${f.Promotions} lần`} />
-      </div>
-    </section>
-    <section>
-      <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-slate-900"><Activity className="size-4 text-slate-500" />Vận hành & Cảm xúc</div>
-      <div className="grid grid-cols-2 gap-2">
-        <Metric label="Giờ làm / tuần" value={`${formatNumber(f.Work_Hours_Per_Week)}h`} />
-        <Metric label="Tăng ca YTD" value={`${formatNumber(f.Overtime_Hours)}h`} />
-        <Metric label="Vắng mặt YTD" value={`${formatNumber(f.Sick_Days)} ngày`} />
-        <div className="rounded-lg border border-slate-200 bg-white p-3">
-          <p className="text-xs font-medium text-slate-500">Điểm hài lòng</p>
-          <p className="mt-1 text-base font-semibold tabular-nums text-slate-900">{Number.isFinite(satisfaction) ? satisfaction.toFixed(2) : '—'} <span className="text-xs font-medium text-slate-500">/ 5.0</span></p>
-          <SatisfactionBar value={satisfaction} />
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-sm text-slate-600">
+          <span className="tabular-nums">
+            {tr("Hiển thị")} {start}–{end} / {filtered.length} {tr("hồ sơ")}
+          </span>
+          <nav aria-label={tr("Phân trang danh mục nhân viên")} className="flex items-center gap-2">
+            <Button
+              type="button" variant="outline"
+              disabled={safePage <= 1}
+              onClick={() => setPage((value) => Math.max(1, value - 1))}
+              className="min-h-9 rounded-md border-slate-200 px-3 font-semibold text-slate-700 hover:border-orange-300 hover:bg-orange-50 disabled:opacity-40"
+            >
+              {tr("Trước")}
+            </Button>
+            <span aria-current="page" className="grid min-h-9 min-w-12 place-items-center rounded-md bg-slate-900 px-2 text-xs font-semibold tabular-nums text-white">
+              {safePage}/{pages}
+            </span>
+            <Button
+              type="button" variant="outline"
+              disabled={safePage >= pages}
+              onClick={() => setPage((value) => Math.min(pages, value + 1))}
+              className="min-h-9 rounded-md border-slate-200 px-3 font-semibold text-slate-700 hover:border-orange-300 hover:bg-orange-50 disabled:opacity-40"
+            >
+              Sau
+            </Button>
+          </nav>
         </div>
       </div>
     </section>
-  </div>
-}
-
-function Metric({label, value, note, icon}: {label: string; value: string; note?: string; icon?: ReactNode}) {
-  return <div className="rounded-lg border border-slate-200 bg-white p-3">
-    <p className="text-xs font-medium text-slate-500">{label}</p>
-    <div className="mt-1 flex items-center gap-1.5">{icon}<p className="text-base font-semibold tabular-nums text-slate-900">{value}</p></div>
-    {note && <p className="mt-0.5 text-xs text-slate-500">{note}</p>}
-  </div>
-}
-function formatNumber(value: unknown) {
-  const number = Number(value)
-  return Number.isFinite(number) ? number.toLocaleString('vi-VN', {maximumFractionDigits: 2}) : '—'
-}
-function educationTag(value: unknown) {
-  return ({Bachelor: 'Cử nhân (Đại học)', Master: 'Thạc sĩ', PhD: 'Tiến sĩ', 'High School': 'Trung học phổ thông'} as Record<string,string>)[String(value)] ?? String(value ?? '—')
+  )
 }
 
 function getInitials(name?: string) {
   if (!name) return "—"
+
   const parts = name.trim().split(/\s+/)
+
   return `${parts.at(-2)?.[0] ?? ""}${parts.at(-1)?.[0] ?? ""}`.toUpperCase()
 }
 
-function formatDisplayValue(snapshot: AiSnapshot, key: string) {
-  const value = snapshot.features[key]
-  if (value === null || value === undefined || value === "") return "—"
-  if (key === "Gender") return ({ Male: "Nam", Female: "Nữ" } as Record<string, string>)[String(value)] ?? String(value)
-  if (key === "Education_Level") return ({ Master: "Thạc sĩ", Bachelor: "Đại học", PhD: "Tiến sĩ", "High School": "Trung học phổ thông" } as Record<string, string>)[String(value)] ?? String(value)
-  if (key === "Hire_Date") return formatDateTime(String(value))
-  if (key === "Monthly_Salary" && Number.isFinite(Number(value)))
-    return `${Number(value).toLocaleString("en-US")} USD/tháng`
-  if (key === "Employee_Satisfaction_Score" && Number.isFinite(Number(value)))
-    return `${Number(value).toFixed(2)} / 5.0`
-  return String(value)
+function formatTenure(hireDate: string | null | undefined, tr: (copy: string) => string) {
+  if (!hireDate) return tr("Thâm niên: —")
+  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(hireDate)
+  if (!match) return tr("Thâm niên: —")
+  const year = Number(match[1]), month = Number(match[2]), day = Number(match[3])
+  const now = new Date()
+  const months = (now.getFullYear() - year) * 12 + now.getMonth() + 1 - month - (now.getDate() < day ? 1 : 0)
+  if (months < 0) return `${tr("Vào làm:")} ${match[3]}/${match[2]}/${match[1]}`
+  return months >= 12 ? `${tr("Thâm niên:")} ${Math.floor(months / 12)} ${tr("năm")}` : `${tr("Thâm niên:")} ${months} ${tr("tháng")}`
 }
 
-function SatisfactionBar({ value }: { value: number }) {
-  const score = Number.isFinite(value) ? Math.max(0, Math.min(5, value)) : 0
-  const colors = ['bg-orange-300', 'bg-amber-300', 'bg-lime-300', 'bg-teal-300', 'bg-emerald-400']
-  return <span className="mt-2 flex gap-1" aria-hidden>{colors.map((color, index) => <span key={color} className="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-100"><span className={`block h-full rounded-full ${color}`} style={{width: `${Math.max(0, Math.min(1, score - index)) * 100}%`}} /></span>)}</span>
+type DepartmentTheme = {
+  badge: string
+  avatar: string
+  dot: string
+  active: string
+  accent: string
+  wash: string
+}
+
+const departmentThemes: DepartmentTheme[] = [
+  {
+    badge: "border-indigo-200/70 bg-indigo-50 text-indigo-700",
+    avatar: "bg-gradient-to-br from-indigo-50 to-indigo-200 text-indigo-800",
+    dot: "bg-indigo-500",
+    active: "border-indigo-500 bg-indigo-600 text-white",
+    accent: "border-l-indigo-500",
+    wash: "bg-gradient-to-r from-indigo-50/70 via-white to-white",
+  },
+
+  {
+    badge: "border-teal-200/70 bg-teal-50 text-teal-700",
+    avatar: "bg-gradient-to-br from-teal-50 to-teal-200 text-teal-800",
+    dot: "bg-teal-500",
+    active: "border-teal-500 bg-teal-600 text-white",
+    accent: "border-l-teal-500",
+    wash: "bg-gradient-to-r from-teal-50/70 via-white to-white",
+  },
+
+  {
+    badge: "border-rose-200/70 bg-rose-50 text-rose-700",
+    avatar: "bg-gradient-to-br from-rose-50 to-rose-200 text-rose-800",
+    dot: "bg-rose-500",
+    active: "border-rose-500 bg-rose-600 text-white",
+    accent: "border-l-rose-500",
+    wash: "bg-gradient-to-r from-rose-50/70 via-white to-white",
+  },
+
+  {
+    badge: "border-amber-200/70 bg-amber-50 text-amber-700",
+    avatar: "bg-gradient-to-br from-amber-50 to-amber-200 text-amber-900",
+    dot: "bg-amber-500",
+    active: "border-amber-500 bg-amber-500 text-white",
+    accent: "border-l-amber-500",
+    wash: "bg-gradient-to-r from-amber-50/70 via-white to-white",
+  },
+
+  {
+    badge: "border-emerald-200/70 bg-emerald-50 text-emerald-700",
+    avatar: "bg-gradient-to-br from-emerald-50 to-emerald-200 text-emerald-800",
+    dot: "bg-emerald-500",
+    active: "border-emerald-500 bg-emerald-600 text-white",
+    accent: "border-l-emerald-500",
+    wash: "bg-gradient-to-r from-emerald-50/70 via-white to-white",
+  },
+
+  {
+    badge: "border-violet-200/70 bg-violet-50 text-violet-700",
+    avatar: "bg-gradient-to-br from-violet-50 to-violet-200 text-violet-800",
+    dot: "bg-violet-500",
+    active: "border-violet-500 bg-violet-600 text-white",
+    accent: "border-l-violet-500",
+    wash: "bg-gradient-to-r from-violet-50/70 via-white to-white",
+  },
+
+  {
+    badge: "border-cyan-200/70 bg-cyan-50 text-cyan-700",
+    avatar: "bg-gradient-to-br from-cyan-50 to-cyan-200 text-cyan-800",
+    dot: "bg-cyan-500",
+    active: "border-cyan-500 bg-cyan-600 text-white",
+    accent: "border-l-cyan-500",
+    wash: "bg-gradient-to-r from-cyan-50/70 via-white to-white",
+  },
+]
+
+function getDepartmentTheme(departmentName?: string | null): DepartmentTheme {
+  const normalized = (departmentName ?? "").trim().toLocaleLowerCase("vi-VN")
+
+  if (/\bit\b|engineer|kỹ thuật|công nghệ|software/.test(normalized))
+    return departmentThemes[0]
+
+  if (/support|operation|vận hành|chăm sóc|hỗ trợ/.test(normalized))
+    return departmentThemes[1]
+
+  if (/marketing|tiếp thị/.test(normalized)) return departmentThemes[2]
+
+  if (/sales|kinh doanh/.test(normalized)) return departmentThemes[3]
+
+  if (/finance|account|tài chính|kế toán/.test(normalized))
+    return departmentThemes[4]
+
+  if (/\bhr\b|human|nhân sự|admin|hành chính/.test(normalized))
+    return departmentThemes[5]
+
+  const hash = [...normalized].reduce(
+    (total, character) => (total * 31 + character.charCodeAt(0)) >>> 0,
+    0,
+  )
+
+  return departmentThemes[hash % departmentThemes.length]
 }

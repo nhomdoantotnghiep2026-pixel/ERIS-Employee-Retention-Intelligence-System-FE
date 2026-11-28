@@ -21,4 +21,7 @@ logs/
 /.plugins/
 /.opencode-skills/
 
+# Optional local UI/UX design skill. Install from the link documented in README.md.
+/.agents/skills/ui-ux-pro-max/
+
 .vercel

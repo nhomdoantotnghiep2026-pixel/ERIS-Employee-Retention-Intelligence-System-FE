@@ -1,12 +1,13 @@
+import { SelectControl } from "../ui/select-control"
 import { forwardRef, useId, useMemo, useState } from "react";
 import { buildInsights } from "./insight-engine";
 import { InsightPlaybook } from "./InsightPlaybook";
 import {
   AlertTriangle,
   ArrowRightLeft,
+  BarChart3,
   CheckCircle2,
   Clock3,
-  Database,
   History,
   Loader2,
   Minus,
@@ -48,6 +49,9 @@ type Props = {
   historyLoading?: boolean;
   historyError?: string;
   onOpenSaved: (id: number) => void;
+  policyBusy?: boolean;
+  policyError?: string;
+  onAnalyzePolicy?: (options: { from: string; to: string; save: boolean }) => void;
 };
 
 const riskConfig = (percent: number) =>
@@ -58,6 +62,10 @@ const riskConfig = (percent: number) =>
         text: "text-emerald-700",
         surface: "border-emerald-200 bg-emerald-50",
         stroke: "#059669",
+        gradientFrom: "#10b981",
+        gradientTo: "#14b8a6",
+        hero: "border-emerald-200/60 bg-gradient-to-br from-emerald-50/70 via-white to-teal-50/30",
+        glow: "drop-shadow-[0_0_5px_rgba(16,185,129,0.35)]",
       }
     : percent <= 60
       ? {
@@ -66,6 +74,10 @@ const riskConfig = (percent: number) =>
           text: "text-amber-700",
           surface: "border-amber-200 bg-amber-50",
           stroke: "#d97706",
+          gradientFrom: "#f59e0b",
+          gradientTo: "#f97316",
+          hero: "border-amber-200/60 bg-gradient-to-br from-amber-50/70 via-white to-orange-50/30",
+          glow: "drop-shadow-[0_0_5px_rgba(245,158,11,0.35)]",
         }
       : {
           label: "ƯU TIÊN QUAN TÂM",
@@ -73,6 +85,10 @@ const riskConfig = (percent: number) =>
           text: "text-rose-700",
           surface: "border-rose-200 bg-rose-50",
           stroke: "#e11d48",
+          gradientFrom: "#f43f5e",
+          gradientTo: "#dc2626",
+          hero: "border-rose-200/60 bg-gradient-to-br from-rose-50/70 via-white to-orange-50/30",
+          glow: "drop-shadow-[0_0_5px_rgba(244,63,94,0.35)]",
         };
 
 export const EmployeePredictionDashboard = forwardRef<
@@ -83,6 +99,7 @@ export const EmployeePredictionDashboard = forwardRef<
     state,
     result,
     snapshot,
+    employee,
     error,
     loadingLabel,
     illustrative = false,
@@ -94,12 +111,15 @@ export const EmployeePredictionDashboard = forwardRef<
     history = [],
     historyLoading = false,
     historyError = "",
+    policyBusy = false,
+    policyError = "",
+    onAnalyzePolicy,
   },
   ref,
 ) {
-  const gradientId = useId();
   const [activeTab, setActiveTab] = useState(0);
   const [focusFeature, setFocusFeature] = useState<string | null>(null);
+  const gaugeGradientId = useId();
   const insights = useMemo(() => buildInsights(result?.model.contributions, result ? {
     ...result.preview.features,
     __capturedAt: result.preview.capturedAt,
@@ -145,7 +165,7 @@ export const EmployeePredictionDashboard = forwardRef<
   return (
     <section
       aria-label="Mức độ gắn kết tổng thể"
-      className="panel min-h-[680px] w-full min-w-0"
+      className="panel min-h-[620px] w-full min-w-0"
       aria-busy={state === "loading"}
     >
       <div className="p-5 sm:p-6">
@@ -165,7 +185,7 @@ export const EmployeePredictionDashboard = forwardRef<
               aria-selected={activeTab === index}
               key={label}
               onClick={() => setActiveTab(index)}
-              className={`rounded-md px-3 py-2 text-sm font-medium ${activeTab === index ? "bg-slate-900 text-white" : "text-slate-600 hover:bg-slate-100"}`}
+              className={`rounded-lg px-3 py-2 text-sm font-medium transition-all ${activeTab === index ? "bg-gradient-to-r from-slate-950 to-slate-800 text-white shadow-sm" : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"}`}
             >
               {label}
             </button>
@@ -173,7 +193,7 @@ export const EmployeePredictionDashboard = forwardRef<
         </div>
 
         <div hidden={activeTab !== 0}>
-          {state === "idle" && <EmptyResult />}
+          {state === "idle" && <EmptyResult employee={employee} ready={Boolean(snapshot?.ready)} busy={busy} onPredict={onPredict} />}
           {state === "loading" && (
             <div
               role="status"
@@ -227,7 +247,7 @@ export const EmployeePredictionDashboard = forwardRef<
                 result={result}
                 percent={percent}
                 risk={risk}
-                gradientId={gradientId}
+                gradientId={gaugeGradientId}
               />
               <StatusCards
                 result={result}
@@ -257,6 +277,11 @@ export const EmployeePredictionDashboard = forwardRef<
           features={source?.features}
           focusFeature={focusFeature}
           onPolicy={(feature) => { setFocusFeature(feature); setActiveTab(2); }}
+          snapshot={source}
+          policyAnalysis={result.policyAnalysis}
+          policyBusy={policyBusy}
+          policyError={policyError}
+          onAnalyzePolicy={onAnalyzePolicy}
         /> : <p className="text-sm text-slate-600">Hãy chọn một kết quả đánh giá để xem các tín hiệu.</p>)}
       </div>
     </section>
@@ -275,52 +300,39 @@ function Hero({
   gradientId: string;
 }) {
   return (
-    <article className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-      <div className="flex flex-col gap-6 lg:flex-row lg:items-center">
-        <div className="relative mx-auto h-36 w-36 shrink-0 lg:mx-0">
+    <article className={`rounded-xl border p-5 shadow-sm ${risk.hero}`}>
+      <div className="grid gap-6 md:grid-cols-[220px_minmax(0,1fr)] md:items-center">
+        <div className="relative mx-auto h-32 w-52 shrink-0">
           <svg
-            viewBox="0 0 112 112"
-            className="h-full w-full -rotate-90"
+            viewBox="0 0 160 96"
+            className="h-full w-full"
             role="img"
             aria-label={`Nguy cơ rời bỏ ${formatPercent(result.model.score)}`}
           >
             <defs>
-              <linearGradient id={gradientId}>
-                <stop offset="0%" stopColor={risk.stroke} stopOpacity=".7" />
-                <stop offset="100%" stopColor={risk.stroke} />
+              <linearGradient id={gradientId} x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%" stopColor={risk.gradientFrom} />
+                <stop offset="100%" stopColor={risk.gradientTo} />
               </linearGradient>
             </defs>
-            <circle
-              cx="56"
-              cy="56"
-              r="46"
+            <path d="M20 82 A60 60 0 0 1 140 82" fill="none" stroke="#e2e8f0" strokeWidth="10" strokeLinecap="round" pathLength="100" />
+            <path
+              d="M20 82 A60 60 0 0 1 140 82"
               fill="none"
-              strokeWidth="8"
-              stroke="#e2e8f0"
-            />
-            <circle
-              cx="56"
-              cy="56"
-              r="46"
-              fill="none"
-              strokeWidth="8"
+              strokeWidth="10"
               strokeLinecap="round"
               pathLength={100}
               strokeDasharray={`${percent} 100`}
               stroke={`url(#${gradientId})`}
+              className={risk.glow}
             />
           </svg>
-          <div className="absolute inset-0 grid place-items-center">
-            <span className="tabular text-3xl font-semibold tracking-tight text-slate-900">
-              {formatPercent(result.model.score)}
-            </span>
+          <div className="absolute inset-x-0 bottom-0 text-center"><span className="block tabular-nums text-3xl font-bold tracking-tight text-slate-900">{formatPercent(result.model.score)}</span><span className="mt-0.5 block text-xs font-medium text-slate-500">Nguy cơ rời bỏ</span>
           </div>
         </div>
         <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-3">
-            <h3 className="font-semibold text-slate-900">
-              Tín hiệu nguy cơ rời bỏ
-            </h3>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div><p className="metadata-label">Phân loại hiện tại</p><h3 className="mt-1 font-semibold text-slate-900">Tín hiệu nguy cơ rời bỏ</h3></div>
             <span
               className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold ${risk.surface} ${risk.text}`}
             >
@@ -329,17 +341,17 @@ function Hero({
             </span>
           </div>
           <div className="mt-5">
-            <div className="relative h-2 rounded-full bg-gradient-to-r from-emerald-500 via-amber-400 to-rose-500">
+            <div className="relative flex h-3 overflow-visible rounded-full bg-slate-100 shadow-inner">
+              <span className="h-full w-1/4 rounded-l-full bg-gradient-to-r from-emerald-500 to-teal-400" />
+              <span className="h-full w-[35%] bg-gradient-to-r from-amber-300 to-orange-400" />
+              <span className="h-full flex-1 rounded-r-full bg-gradient-to-r from-rose-400 to-rose-600" />
               <span
-                className="absolute top-1/2 h-4 w-1 -translate-x-1/2 -translate-y-1/2 rounded-full bg-slate-900 ring-2 ring-white"
+                className="absolute top-1/2 h-5 w-1 -translate-x-1/2 -translate-y-1/2 rounded-full bg-slate-950 shadow-[0_0_0_3px_rgba(255,255,255,0.9),0_0_10px_rgba(15,23,42,0.35)]"
                 style={{ left: `${percent}%` }}
               />
             </div>
-            <div className="mt-2 flex justify-between text-[11px] font-medium text-slate-600">
-              <span>0%</span>
-              <span>25%</span>
-              <span>60%</span>
-              <span>100%</span>
+            <div className="mt-2 grid grid-cols-[25fr_35fr_40fr] text-[11px] font-semibold text-slate-600">
+              <span>0–25% · Thấp</span><span className="text-center">25–60% · Trung bình</span><span className="text-right">60–100% · Cao</span>
             </div>
           </div>
         </div>
@@ -431,7 +443,7 @@ function StatusCards({
               <span className="rounded-full bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-700">
                 Bản nháp
               </span>
-              <Button size="sm" disabled={busy} onClick={onSave}>
+              <Button size="sm" disabled={busy} onClick={onSave} className="bg-slate-900 text-white hover:bg-slate-800">
                 {busy ? <Loader2 className="animate-spin" /> : <Save />}Lưu
                 phiên này
               </Button>
@@ -476,13 +488,13 @@ function HistoryToolbar({
       aria-label="Lịch sử đánh giá"
       className="rounded-lg border border-slate-200 bg-slate-50/50 p-3 shadow-sm"
     >
-      <div className="grid min-w-0 gap-3">
-        <div className="flex min-w-0 items-center gap-2">
+      <div className="flex min-w-0 flex-wrap items-center gap-3 xl:flex-nowrap">
+        <div className="flex min-w-0 flex-1 items-center gap-2">
           <History className="h-4 w-4 shrink-0 text-slate-500" aria-hidden />
-          <label className="grid min-w-0 flex-1 gap-2 text-sm font-medium text-slate-700 sm:grid-cols-[auto_minmax(0,1fr)] sm:items-center">
+          <label className="flex min-w-0 flex-1 items-center gap-2 text-sm font-medium text-slate-700">
             <span className="shrink-0">Phiên đánh giá:</span>
-            <select
-              className="field h-auto min-h-11 min-w-0"
+            <SelectControl
+              className="field h-10 min-w-[280px] flex-1"
               disabled={busy || loading || history.length === 0}
               value={selectedId}
               onChange={(event) => {
@@ -503,10 +515,10 @@ function HistoryToolbar({
                   {index === 0 ? " (Mới nhất)" : ""}
                 </option>
               ))}
-            </select>
+            </SelectControl>
           </label>
         </div>
-        <div className="flex flex-wrap justify-end gap-2">
+        <div className="flex shrink-0 flex-wrap justify-end gap-2">
           <Button
             variant="outline"
             disabled={busy || history.length === 0 || !selected?.predictionId}
@@ -750,18 +762,23 @@ function formatHistoryOption(value?: string) {
   const p = dateTimeParts(value);
   return p ? `${p.day}/${p.month} ${p.hour}:${p.minute}` : "Chưa có thời gian";
 }
-function EmptyResult() {
+function EmptyResult({ employee, ready, busy, onPredict }: { employee?: AiEmployee | null; ready: boolean; busy: boolean; onPredict: () => void }) {
   return (
     <div className="flex min-h-80 flex-col items-center justify-center px-4 text-center">
       <span className="grid h-14 w-14 place-items-center rounded-full bg-slate-100 text-slate-500">
-        <Database className="h-6 w-6" aria-hidden />
+        <BarChart3 className="h-6 w-6" aria-hidden />
       </span>
       <h3 className="mt-4 font-semibold text-slate-900">
         Chưa có kết quả đánh giá
       </h3>
-      <p className="mt-2 max-w-64 text-sm leading-6 text-slate-600">
-        Kiểm tra dữ liệu bên trái và chọn Đánh giá mức độ gắn kết để bắt đầu.
+      <p className="mt-2 max-w-md text-sm leading-6 text-slate-600">
+        {employee
+          ? ready
+            ? `Dữ liệu hồ sơ của ${employee.fullName} đã được nạp đầy đủ. Bấm nút “Đánh giá mức độ gắn kết” ở cột bên trái để chạy phân tích.`
+            : `Hồ sơ của ${employee.fullName} cần được bổ sung trước khi đánh giá.`
+          : "Vui lòng chọn nhân viên ở thanh tìm kiếm để nạp hồ sơ và bắt đầu đánh giá."}
       </p>
+      {employee && <Button className="mt-5 bg-orange-500 text-white hover:bg-orange-600" disabled={!ready || busy} onClick={onPredict}>{busy ? <Loader2 className="animate-spin" /> : <BarChart3 />}Chạy phân tích ngay</Button>}
     </div>
   );
 }

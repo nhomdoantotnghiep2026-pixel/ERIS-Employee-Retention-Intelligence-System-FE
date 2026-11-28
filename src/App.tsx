@@ -1,4 +1,4 @@
-import { type ReactNode, useEffect, useState } from 'react';
+import { Suspense, type ReactNode, useEffect, useState } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { RoleProvider, useRole } from './context/RoleContext';
 import { LanguageProvider, useLanguage } from './context/LanguageContext';
@@ -8,61 +8,59 @@ import { canAccessRoute, ROLE_HOME } from './workflows/access';
 import { AppShell } from './components/AppShell';
 import { Card } from './components/ui';
 import { Link } from 'react-router-dom';
-import EmployeeRecord from './screens/EmployeeRecord';
-import ModelLifecycle from './screens/ModelLifecycle';
-import Predictions from './screens/Predictions';
-import EmployeeImport from './screens/EmployeeImport';
-import EmployeeOutcomes from './screens/EmployeeOutcomes';
-import WorkflowActivity from './screens/WorkflowActivity';
-import AdminAuditLogs from './screens/AdminAuditLogs';
-import DepartmentPage from './screens/DepartmentPage';
-import DataWorkspace from './screens/DataWorkspace';
-import RiskWorkspace from './screens/RiskWorkspace';
-import ErdSurveys from './screens/ErdSurveys';
-import ErdAccounts from './screens/ErdAccounts';
-import EmployeeAccountProvisioning from './screens/EmployeeAccountProvisioning';
-import ErdOwnProfile from './screens/ErdOwnProfile';
-import ErdSchema from './screens/ErdSchema';
-import ErdEmployeeDetails from './screens/ErdEmployeeDetails';
-import Landing from './screens/Landing';
-import PublicDetail from './screens/PublicDetail';
+import { RouteErrorBoundary } from './components/ApplicationErrorBoundary';
+import { RouteLoadingFallback } from './components/RouteLoadingFallback';
 import { PUBLIC_TOPICS } from './data/publicTopics';
-import Login from './screens/Login';
-import ForgotPassword from './screens/ForgotPassword';
-import AttendanceHistory from './screens/AttendanceHistory';
-import AttendanceDashboard from './screens/AttendanceDashboard';
-import WorkSchedules from './screens/WorkSchedules';
-import EmployeeHistory from './screens/EmployeeHistory';
-import CompanyLocationScreen from './screens/CompanyLocation';
-import LeaveRecords from './screens/LeaveRecords';
-import LeaveDataDashboard from './screens/LeaveDataDashboard';
-import PolicyDemo from './screens/PolicyDemo';
-import AiAnalysis from './screens/AiAnalysis';
-import PortalHub from './screens/PortalHub';
-
-// HR
-import Dashboard from './screens/Dashboard';
-import Departments from './screens/Departments';
-import Positions, { PositionDetail, PositionEdit } from './screens/Positions';
-import RetentionInterventions from './screens/RetentionInterventions';
-
-// Shared HR screens
-import Employees from './screens/Employees';
-import HrEmployees from './screens/HrEmployees';
-import EmployeeDirectoryDashboard from './screens/EmployeeDirectoryDashboard';
-import RiskAnalysis from './screens/RiskAnalysis';
-import EmployeeDataManagement from './screens/EmployeeDataManagement';
-import EmployeePortal from './screens/EmployeePortal';
-
-// Data / AI Analyst
-import DataPipelines from './screens/DataPipelines';
-import FeatureImportance from './screens/FeatureImportance';
-
-// System Administrator
-import AdminOverview from './screens/AdminOverview';
-import Roles from './screens/Roles';
-import SystemConfig from './screens/SystemConfig';
-import SystemHealth from './screens/SystemHealth';
+import {
+  AdminAuditLogs,
+  AdminOverview,
+  AiAnalysis,
+  AttendanceDashboard,
+  AttendanceHistory,
+  CompanyLocationScreen,
+  Dashboard,
+  DataPipelines,
+  DataWorkspace,
+  DepartmentPage,
+  Departments,
+  EmployeeAccountProvisioning,
+  EmployeeDataManagement,
+  EmployeeDirectoryDashboard,
+  EmployeeHistory,
+  EmployeeImport,
+  EmployeeOutcomes,
+  EmployeePortal,
+  EmployeeRecord,
+  Employees,
+  ErdAccounts,
+  ErdEmployeeDetails,
+  ErdOwnProfile,
+  ErdSchema,
+  ErdSurveys,
+  FeatureImportance,
+  ForgotPassword,
+  HrEmployees,
+  Landing,
+  LeaveDataDashboard,
+  LeaveRecords,
+  Login,
+  ModelLifecycle,
+  PolicyDemo,
+  PortalHub,
+  PositionDetail,
+  PositionEdit,
+  Positions,
+  Predictions,
+  PublicDetail,
+  RetentionInterventions,
+  RiskAnalysis,
+  RiskWorkspace,
+  Roles,
+  SystemConfig,
+  SystemHealth,
+  WorkflowActivity,
+  WorkSchedules,
+} from './routes/lazyScreens';
 import { hasRoutePermission, RBAC_UPDATED_EVENT } from './utils/rbacAccess';
 
 function RoleGuard({ children }: { children: ReactNode }) {
@@ -103,6 +101,8 @@ export default function App() {
         <EmployeeProvider>
         <WorkflowProvider>
         <BrowserRouter>
+          <RouteErrorBoundary>
+          <Suspense fallback={<RouteLoadingFallback />}>
           <Routes>
           <Route path="/" element={<Landing />} />
           {Object.values(PUBLIC_TOPICS).map(topic => <Route key={topic.id} path={topic.path} element={<PublicDetail topicId={topic.id} />} />)}
@@ -155,7 +155,7 @@ export default function App() {
           <Route path="/my-requests" element={<RoleGuard><LeaveRecords own /></RoleGuard>} />
           <Route path="/my-surveys" element={<RoleGuard><ErdSurveys /></RoleGuard>} />
 
-          {/* Data / AI Analyst */}
+          {/* Legacy Data / AI workspace: retained for fixture/test compatibility; not an active login role. */}
           <Route path="/data-overview" element={<RoleGuard><DataWorkspace /></RoleGuard>} />
           <Route path="/data" element={<RoleGuard><Navigate to="/employees" replace /></RoleGuard>} />
           <Route path="/import" element={<RoleGuard><EmployeeImport /></RoleGuard>} />
@@ -183,6 +183,8 @@ export default function App() {
           {/* Catch-all: redirect to role home */}
           <Route path="*" element={<RouteFallback />} />
           </Routes>
+          </Suspense>
+          </RouteErrorBoundary>
         </BrowserRouter>
         </WorkflowProvider>
         </EmployeeProvider>

@@ -1,5 +1,6 @@
 // Application feedback and API-owned copy. Never translate arbitrary profile data.
 const pairs: Array<[string, string]> = [
+  ["Could not load analysis data. Please try again.", "Không tải được dữ liệu phân tích. Vui lòng thử lại."],
   ["Clear search", "Xóa tìm kiếm"],
   ["Next", "Tiếp"],
   ["System accounts", "Tài khoản hệ thống"],
@@ -430,7 +431,10 @@ const pairs: Array<[string, string]> = [
   ['Engagement assessment', 'Đánh giá mức độ gắn kết'],
   ['Employee wellbeing profile & retention plan', 'Hồ sơ sức khỏe nhân sự & Kế hoạch giữ chân'],
   ['Download HR summary (PDF)', 'Tải bản tóm tắt nhân sự (PDF)'],
+  ['Download HR summary (PDF)', 'Tải tóm tắt nhân sự (PDF)'],
   ['Refresh data from HRIS', 'Cập nhật dữ liệu từ HRIS'],
+  ['Assess attrition risk and propose a retention path based on actual work data.', 'Đánh giá rủi ro thôi việc và đề xuất lộ trình giữ chân dựa trên dữ liệu làm việc thực tế.'],
+  ['Complete an assessment before downloading the summary.', 'Hãy hoàn thành một lần đánh giá trước khi tải bản tóm tắt.'],
   ['Check data and review support results for each employee.', 'Kiểm tra dữ liệu và xem kết quả hỗ trợ cho từng nhân viên.'],
   ['AI results are for reference only. HR must review them before making a decision.', 'Kết quả AI chỉ để tham khảo. HR cần xem xét trước khi đưa ra quyết định.'],
   ['Unable to connect to AI. Please try again.', 'Chưa thể kết nối AI. Vui lòng thử lại.'],

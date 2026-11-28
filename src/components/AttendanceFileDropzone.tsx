@@ -27,7 +27,7 @@ export default function AttendanceFileDropzone({ file, busy, onSelect }: {
     >
       <button
         type="button"
-        aria-label={tr("Chọn tệp chấm công XLSX", "Choose attendance XLSX file")}
+        aria-label={tr("Chọn tệp chấm công Excel", "Choose attendance Excel file")}
         aria-describedby={hintId}
         disabled={busy}
         onClick={() => input.current?.click()}
@@ -39,7 +39,7 @@ export default function AttendanceFileDropzone({ file, busy, onSelect }: {
           {file?.name || tr("Kéo thả tệp vào đây hoặc bấm để chọn", "Drop a file here or click to choose")}
         </span>
         <span id={hintId} className="text-sm font-medium text-slate-600">
-          {tr("Tệp XLSX · tối đa 10 MiB", "XLSX file · up to 10 MiB")}
+          {tr("Tệp .xlsx hoặc .xls · tối đa 10 MiB", ".xlsx or .xls file · up to 10 MiB")}
         </span>
       </div>
       <button
@@ -55,7 +55,7 @@ export default function AttendanceFileDropzone({ file, busy, onSelect }: {
       ref={input}
       hidden
       type="file"
-      accept=".xlsx"
+      accept=".xlsx,.xls"
       disabled={busy}
       aria-label={tr("Tệp chấm công", "Attendance file")}
       onChange={event => {

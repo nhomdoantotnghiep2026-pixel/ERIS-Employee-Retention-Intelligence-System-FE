@@ -1,250 +1,96 @@
+import { SelectControl } from "../components/ui/select-control"
 import {
   useEffect,
-  useLayoutEffect,
-  useRef,
+  useMemo,
   useState,
   type FormEvent,
 } from "react"
-
-import { createPortal } from "react-dom"
-
 import { useNavigate } from "react-router-dom"
-
 import {
-  AlertTriangle,
-  BarChart3,
   ArrowDown,
   ArrowUp,
   ArrowUpDown,
-  Eye,
-  FileSpreadsheet,
-  HelpCircle,
+  BarChart3,
+  CalendarCheck2,
+  CalendarDays,
+  Clock3,
   Inbox,
-  MoreHorizontal,
   RotateCcw,
   Search,
   Upload,
-  X,
+  Users,
 } from "lucide-react"
-
 import { AppShell } from "../components/AppShell"
-
+import LeaveImportDialog from "../components/leave/LeaveImportDialog"
+import LeaveRecordDrawer from "../components/leave/LeaveRecordDrawer"
 import { Button, Card, SectionHeader } from "../components/ui"
-
+import { useRole } from "../context/RoleContext"
 import { useLanguage } from "../context/LanguageContext"
-
 import { useAutoDismissFeedback } from "../hooks/useAutoDismissState"
-
+import { listDepartments, listEmployeeProfiles, type EmployeeProfile } from "../services/api"
 import {
-  fetchLeaveTypes,
-  fetchLeaveRecords,
-  fetchLeaveSummary,
-  cancelLeaveRecord,
-  previewLeaveFile,
-  confirmLeaveFile,
   attendanceMessage,
-  type LeaveType,
-  type LeaveRecord,
-  type LeavePreview,
+  cancelLeaveRecord,
+  confirmLeaveFile,
+  fetchLeaveRecords,
+  fetchLeaveTypes,
+  previewLeaveFile,
   type LeaveImportResult,
+  type LeavePreview,
+  type LeaveRecord,
+  type LeaveType,
   type RecordFilters,
 } from "../services/attendance"
 
+import { displayLeaveReason, leaveCalendarDays, leaveTypeDisplay } from "../utils/leaveRecordDisplay"
+
+const PAGE_SIZE = 25
 const control =
-  "mt-1 h-11 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100"
+  "mt-1 h-11 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none transition-colors duration-200 focus:border-orange-400 focus:ring-4 focus:ring-orange-100"
 
-function RowActionsMenu({
-  disabled,
-
-  detailLabel,
-
-  toggleLabel,
-
-  moreLabel,
-
-  destructive = false,
-
-  onDetail,
-
-  onToggle,
-}: {
-  disabled: boolean
-
-  detailLabel: string
-
-  toggleLabel?: string
-
-  moreLabel: string
-
-  destructive?: boolean
-
-  onDetail: () => void
-
-  onToggle?: () => void
-}) {
-  const [open, setOpen] = useState(false)
-
-  const [position, setPosition] = useState({ top: 0, left: 0 })
-
-  const buttonRef = useRef<HTMLButtonElement>(null)
-
-  const menuRef = useRef<HTMLDivElement>(null)
-
-  useLayoutEffect(() => {
-    if (!open || !buttonRef.current) return
-
-    const rect = buttonRef.current.getBoundingClientRect()
-
-    const menuHeight = 104
-
-    const openAbove = window.innerHeight - rect.bottom < menuHeight + 16
-
-    setPosition({
-      top: openAbove ? Math.max(8, rect.top - menuHeight - 6) : rect.bottom + 6,
-
-      left: Math.max(8, Math.min(window.innerWidth - 216, rect.right - 208)),
-    })
-  }, [open])
-
-  useEffect(() => {
-    if (!open) return
-
-    const close = () => setOpen(false)
-
-    const closeOutside = (event: MouseEvent) => {
-      const target = event.target as Node
-
-      if (
-        !buttonRef.current?.contains(target) &&
-        !menuRef.current?.contains(target)
-      )
-        setOpen(false)
-    }
-
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setOpen(false)
-    }
-
-    window.addEventListener("resize", close)
-
-    window.addEventListener("scroll", close, true)
-
-    document.addEventListener("mousedown", closeOutside)
-
-    document.addEventListener("keydown", closeOnEscape)
-
-    return () => {
-      window.removeEventListener("resize", close)
-
-      window.removeEventListener("scroll", close, true)
-
-      document.removeEventListener("mousedown", closeOutside)
-
-      document.removeEventListener("keydown", closeOnEscape)
-    }
-  }, [open])
-
-  return (
-    <>
-      <button
-        ref={buttonRef}
-        type="button"
-        disabled={disabled}
-        aria-label={moreLabel}
-        aria-haspopup="menu"
-        aria-expanded={open}
-        onClick={() => setOpen((value) => !value)}
-        className="flex size-9 items-center justify-center rounded-md border border-slate-300 bg-white text-slate-700 transition hover:border-orange-300 hover:bg-orange-50 hover:text-orange-700 disabled:opacity-50"
-      >
-        <MoreHorizontal size={18} />
-      </button>
-      {open &&
-        createPortal(
-          <div
-            ref={menuRef}
-            role="menu"
-            style={{ top: position.top, left: position.left }}
-            className="fixed z-[120] w-52 rounded-md border border-slate-200 bg-white p-1.5 text-left shadow-xl"
-          >
-            <button
-              type="button"
-              role="menuitem"
-              onClick={() => {
-                setOpen(false)
-                onDetail()
-              }}
-              className="flex h-10 w-full items-center gap-2 rounded-md px-3 text-sm font-medium text-slate-700 hover:bg-slate-50"
-            >
-              <Eye size={16} /> {detailLabel}
-            </button>
-            {toggleLabel && onToggle && (
-              <button
-                type="button"
-                role="menuitem"
-                onClick={() => {
-                  setOpen(false)
-                  onToggle()
-                }}
-                className={`flex h-10 w-full items-center gap-2 rounded-md px-3 text-sm font-semibold ${
-                  destructive
-                    ? "text-red-700 hover:bg-red-50"
-                    : "text-emerald-700 hover:bg-emerald-50"
-                }`}
-              >
-                <AlertTriangle size={16} /> {toggleLabel}
-              </button>
-            )}
-          </div>,
-
-          document.body,
-        )}
-    </>
-  )
+async function loadLeaveRows(filters: RecordFilters, own: boolean, signal: AbortSignal) {
+  // The API returns offsets without a total. Gather the selected date range for filtering and exact page counts.
+  const records: LeaveRecord[] = []
+  let limit = PAGE_SIZE
+  for (;;) {
+    const page = await fetchLeaveRecords({ ...filters, limit, offset: records.length }, own, signal)
+    records.push(...page.data)
+    if (page.data.length < (page.limit || limit)) return records
+    limit = 200
+  }
 }
 
 export default function LeaveRecords({ own = false }: { own?: boolean }) {
   const { language } = useLanguage()
-
+  const { user } = useRole()
   const navigate = useNavigate()
-
   const tr = (vi: string, en: string) => (language === "vi" ? vi : en)
+  const initialFilters: RecordFilters = { record_status: "ACTIVE" }
 
-  const [types, setTypes] = useState<LeaveType[]>([]),
-    [rows, setRows] = useState<LeaveRecord[]>([])
-
-  const [filters, setFilters] = useState<RecordFilters>({
-      record_status: "ACTIVE",
-    }),
-    [draft, setDraft] = useState<RecordFilters>({ record_status: "ACTIVE" })
-
+  const [types, setTypes] = useState<LeaveType[]>([])
+  const [rows, setRows] = useState<LeaveRecord[]>([])
+  const [employees, setEmployees] = useState<EmployeeProfile[] | null>(null)
+  const [departments, setDepartments] = useState<{ id: number; name: string }[]>([])
+  const [filters, setFilters] = useState<RecordFilters>(initialFilters)
+  const [draft, setDraft] = useState<RecordFilters>(initialFilters)
+  const [employeeSearch, setEmployeeSearch] = useState("")
+  const [leaveTypeId, setLeaveTypeId] = useState("")
+  const [unpaidOnly, setUnpaidOnly] = useState(false)
   const [file, setFile] = useState<File | null>(null)
-
-  const [preview, setPreview] = useState<LeavePreview | null>(null),
-    [result, setResult] = useState<LeaveImportResult | null>(null)
-
-  const [importModalOpen, setImportModalOpen] = useState(false),
-    [dragging, setDragging] = useState(false)
-
+  const [preview, setPreview] = useState<LeavePreview | null>(null)
+  const [result, setResult] = useState<LeaveImportResult | null>(null)
+  const [importModalOpen, setImportModalOpen] = useState(false)
   const [detailRecord, setDetailRecord] = useState<LeaveRecord | null>(null)
-
-  const [confirmRecord, setConfirmRecord] = useState<LeaveRecord | null>(null)
-
   const [cancellationReason, setCancellationReason] = useState("")
-
   const [sort, setSort] = useState<{
     key: "employee" | "dates"
     direction: "asc" | "desc"
-  }>({
-    key: "dates",
-
-    direction: "desc",
-  })
-
-  const [offset, setOffset] = useState(0),
-    [revision, setRevision] = useState(0),
-    [loading, setLoading] = useState(true),
-    [busy, setBusy] = useState(false)
-
+  }>({ key: "dates", direction: "desc" })
+  const [offset, setOffset] = useState(0)
+  const [revision, setRevision] = useState(0)
+  const [loading, setLoading] = useState(true)
+  const [busy, setBusy] = useState(false)
+  const [hasAnyRecords, setHasAnyRecords] = useState<boolean | null>(null)
   const {
     error,
     message: notice,
@@ -252,169 +98,98 @@ export default function LeaveRecords({ own = false }: { own?: boolean }) {
     setMessage: setNotice,
   } = useAutoDismissFeedback()
 
-  const [summary, setSummary] = useState<Array<{
-    employee_id: number
-
-    leave_type_id: number
-
-    records: number
-
-    total_days: number | null
-
-    total_hours: null
-  }>>([])
-
-  const [hasAnyRecords, setHasAnyRecords] = useState<boolean | null>(null)
-
   useEffect(() => {
     let live = true
-
     void fetchLeaveTypes()
-
-      .then((r) => {
-        if (live) setTypes(r.data)
+      .then((response) => {
+        if (live) setTypes(response.data)
       })
-
-      .catch((e) => {
-        if (live)
+      .catch((reason) => {
+        if (live) {
           setError(
             attendanceMessage(
-              e,
-
+              reason,
               tr("Không tải được loại nghỉ.", "Could not load leave types."),
             ),
           )
+        }
       })
-
     return () => {
       live = false
     }
   }, [own])
 
   useEffect(() => {
-    const c = new AbortController()
-
-    setLoading(true)
-
-    setRows([])
-
-    setSummary([])
-
-    setError("")
-
-    void fetchLeaveRecords({ ...filters, limit: 20, offset }, own, c.signal)
-
-      .then((response) => {
-        if (!c.signal.aborted) setRows(response.data)
-      })
-
-      .catch((e) => {
-        if (!c.signal.aborted)
-          setError(
-            attendanceMessage(
-              e,
-
-              tr("Không tải được hồ sơ nghỉ.", "Could not load leave records."),
-            ),
-          )
-      })
-
-      .finally(() => {
-        if (!c.signal.aborted) setLoading(false)
-      })
-
-    if (!own) {
-      void fetchLeaveSummary(filters, c.signal)
-
-        .then((response) => {
-          if (!c.signal.aborted) setSummary(response.data)
-        })
-
-        .catch(() => {
-          if (!c.signal.aborted) setSummary([])
-        })
-    }
-
-    void fetchLeaveRecords(
-      { record_status: "ALL", limit: 1, offset: 0 },
-      own,
-      c.signal,
-    )
-
-      .then((response) => {
-        if (!c.signal.aborted) setHasAnyRecords(response.data.length > 0)
-      })
-
-      .catch(() => undefined)
-
-    return () => c.abort()
-  }, [filters, offset, revision, own])
+    if (own) return
+    const controller = new AbortController()
+    void Promise.allSettled([
+      listEmployeeProfiles({ limit: Number.MAX_SAFE_INTEGER }, controller.signal),
+      listDepartments(controller.signal, { limit: Number.MAX_SAFE_INTEGER }),
+    ]).then(([staff, teams]) => {
+      if (controller.signal.aborted) return
+      if (staff.status === "fulfilled") setEmployees(staff.value.data)
+      if (teams.status === "fulfilled") setDepartments(teams.value.data)
+    })
+    return () => controller.abort()
+  }, [own, revision])
 
   useEffect(() => {
-    if (
-      !importModalOpen &&
-      !detailRecord &&
-      !confirmRecord
-    )
-      return
+    const controller = new AbortController()
+    setLoading(true)
+    setRows([])
+    setError("")
+    void loadLeaveRows(filters, own, controller.signal)
+      .then((data) => { if (!controller.signal.aborted) setRows(data) })
+      .catch((reason) => {
+        if (!controller.signal.aborted) setError(attendanceMessage(reason, tr("Không tải được hồ sơ nghỉ.", "Could not load leave records.")))
+      })
+      .finally(() => { if (!controller.signal.aborted) setLoading(false) })
+    return () => controller.abort()
+  }, [filters, revision, own])
 
-    const previousOverflow = document.body.style.overflow
-
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key !== "Escape" || busy) return
-
-      if (confirmRecord) {
-        closeCancellationDialog()
-
-        return
-      }
-
-      setImportModalOpen(false)
-
-      setDetailRecord(null)
-
-      setConfirmRecord(null)
-    }
-
-    document.body.style.overflow = "hidden"
-
-    document.addEventListener("keydown", closeOnEscape)
-
-    return () => {
-      document.body.style.overflow = previousOverflow
-
-      document.removeEventListener("keydown", closeOnEscape)
-    }
-  }, [importModalOpen, detailRecord, confirmRecord, cancellationReason, busy])
+  useEffect(() => {
+    const controller = new AbortController()
+    void fetchLeaveRecords({ record_status: "ALL", limit: 1, offset: 0 }, own, controller.signal)
+      .then(({ data }) => { if (!controller.signal.aborted) setHasAnyRecords(data.length > 0) })
+      .catch(() => undefined)
+    return () => controller.abort()
+  }, [revision, own])
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
       if (draft.from && draft.to && draft.from > draft.to) return
-
-      setFilters({ ...draft })
-
+      setFilters(current => current.from === draft.from && current.to === draft.to && current.record_status === draft.record_status ? current : draft)
       setOffset(0)
     }, 350)
-
     return () => window.clearTimeout(timer)
   }, [draft])
 
+  useEffect(() => {
+    if (!importModalOpen) return
+    const previousOverflow = document.body.style.overflow
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key !== "Escape" || busy) return
+      closeImportDialog()
+    }
+    document.body.style.overflow = "hidden"
+    document.addEventListener("keydown", closeOnEscape)
+    return () => {
+      document.body.style.overflow = previousOverflow
+      document.removeEventListener("keydown", closeOnEscape)
+    }
+  }, [importModalOpen, file, preview, busy])
+
   async function work(action: () => Promise<void>) {
     if (busy) return
-
     setBusy(true)
-
     setError("")
-
     setNotice("")
-
     try {
       await action()
-    } catch (e) {
+    } catch (reason) {
       setError(
         attendanceMessage(
-          e,
-
+          reason,
           tr("Không thực hiện được thao tác.", "Could not complete action."),
         ),
       )
@@ -423,9 +198,8 @@ export default function LeaveRecords({ own = false }: { own?: boolean }) {
     }
   }
 
-  function closeCancellationDialog() {
+  function closeDetailDrawer() {
     if (busy) return
-
     if (
       cancellationReason.trim() &&
       !window.confirm(
@@ -434,39 +208,55 @@ export default function LeaveRecords({ own = false }: { own?: boolean }) {
           "Discard the cancellation reason you entered?",
         ),
       )
-    )
+    ) {
       return
-
-    setConfirmRecord(null)
-
+    }
+    setDetailRecord(null)
     setCancellationReason("")
+  }
+
+  function closeImportDialog() {
+    if (busy) return
+    if (
+      (file || preview) &&
+      !window.confirm(
+        tr(
+          "Đóng và bỏ dữ liệu nhập đang xem?",
+          "Close and discard the current import preview?",
+        ),
+      )
+    ) {
+      return
+    }
+    setImportModalOpen(false)
+    setFile(null)
+    setPreview(null)
+    setResult(null)
+    setError("")
   }
 
   function cancelRecord(record: LeaveRecord) {
     if (!cancellationReason.trim()) {
-      setError(tr("Vui lòng nhập lý do hủy hồ sơ nghỉ.", "Enter a cancellation reason."))
+      setError(
+        tr(
+          "Vui lòng nhập lý do hủy hồ sơ nghỉ.",
+          "Enter a cancellation reason.",
+        ),
+      )
       return
     }
     void work(async () => {
       await cancelLeaveRecord(record.id, cancellationReason)
-
       setDetailRecord(null)
-
-      setConfirmRecord(null)
-
       setCancellationReason("")
-
       setRevision((value) => value + 1)
-
       setNotice(tr("Đã hủy hồ sơ nghỉ.", "Leave record cancelled."))
     })
   }
 
-  function upload(e: FormEvent) {
-    e.preventDefault()
-
+  function upload(event: FormEvent) {
+    event.preventDefault()
     if (!file) return
-
     if (
       !/\.(xlsx|csv)$/i.test(file.name) ||
       !file.size ||
@@ -475,187 +265,227 @@ export default function LeaveRecords({ own = false }: { own?: boolean }) {
       setError(
         tr(
           "Tệp XLSX hoặc CSV, tối đa 10 MiB.",
-
           "Choose XLSX or CSV, maximum 10 MiB.",
         ),
       )
-
       return
     }
-
     void work(async () => {
       setPreview(await previewLeaveFile(file))
-
       setResult(null)
     })
   }
 
   function chooseImportFile(nextFile: File | null) {
     setFile(nextFile)
-
     setPreview(null)
-
     setResult(null)
-
     setError("")
   }
 
-  const importStatusLabel = (status: string) =>
-    (({
-      VALID: tr("Hợp lệ", "Valid"),
-
-      DUPLICATE: tr("Trùng, sẽ bỏ qua", "Duplicate, will skip"),
-
-      CONFLICT: tr("Xung đột", "Conflict"),
-
-      ERROR: tr("Lỗi", "Error"),
-
-      INSERTED: tr("Đã lưu", "Inserted"),
-
-      SKIPPED: tr("Đã bỏ qua", "Skipped"),
-    }) as Record<string, string>)[status] || status
-
-  const importMessage = (code?: string, fallback?: string) => {
-    const messages: Record<string, string> = {
-      EMPLOYEE_NOT_FOUND: tr(
-        "Không tìm thấy mã nhân viên.",
-        "Employee code was not found.",
-      ),
-
-      LEAVE_TYPE_NOT_FOUND: tr(
-        "Không tìm thấy mã loại nghỉ.",
-        "Leave type code was not found.",
-      ),
-
-      LEAVE_CONFLICT: tr(
-        "Khoảng nghỉ bị chồng với hồ sơ nghỉ khác.",
-        "The leave period overlaps another leave record.",
-      ),
-
-      ATTENDANCE_CONFLICT: tr(
-        "Khoảng nghỉ bị chồng với dữ liệu chấm công.",
-        "The leave period overlaps attendance data.",
-      ),
-
-      VALIDATION_ERROR: tr(
-        "Dữ liệu dòng không hợp lệ. Kiểm tra mã và định dạng ngày.",
-        "The row is invalid. Check codes and date formats.",
-      ),
+  function confirmImport() {
+    if (!file || !preview) return
+    if (
+      !window.confirm(
+        tr(
+          "Lưu các dòng nghỉ hợp lệ sau khi kiểm tra lại?",
+          "Revalidate and save valid leave rows?",
+        ),
+      )
+    ) {
+      return
     }
-
-    return messages[code || ""] || fallback || ""
+    void work(async () => {
+      const imported = await confirmLeaveFile(file, preview.fingerprint)
+      setRevision((value) => value + 1)
+      if (imported.conflicted || imported.failed) {
+        setResult(imported)
+        return
+      }
+      setFile(null)
+      setPreview(null)
+      setResult(null)
+      setImportModalOpen(false)
+      setNotice(
+        tr(
+          `Nhập hồ sơ nghỉ thành công: đã lưu ${imported.inserted} hồ sơ, bỏ qua ${imported.skipped}.`,
+          `Leave records imported successfully: saved ${imported.inserted}, skipped ${imported.skipped}.`,
+        ),
+      )
+    })
   }
 
-  const invalid = !!(draft.from && draft.to && draft.from > draft.to)
-
-  const activeRecordCount = summary.reduce(
-    (total, item) => total + Number(item.records || 0),
-    0,
-  )
-
-  const summaryHasDayCount = summary.some((item) => item.total_days !== null)
-
-  const summaryDayCount = summary.reduce(
-    (total, item) => total + Number(item.total_days ?? 0),
-    0,
-  )
-
-  const calendarDaysInFilter = (record: LeaveRecord) => {
-    const start = new Date(`${record.start_date}T00:00:00Z`)
-
-    const end = new Date(`${record.end_date}T00:00:00Z`)
-
-    const filterStart = filters.from
-      ? new Date(`${filters.from}T00:00:00Z`)
-      : start
-
-    const filterEnd = filters.to ? new Date(`${filters.to}T00:00:00Z`) : end
-
-    const overlapStart = Math.max(start.getTime(), filterStart.getTime())
-
-    const overlapEnd = Math.min(end.getTime(), filterEnd.getTime())
-
-    return overlapEnd < overlapStart
-      ? 0
-      : Math.floor((overlapEnd - overlapStart) / 86_400_000) + 1
+  function finishPartialImport(imported: LeaveImportResult) {
+    setFile(null)
+    setPreview(null)
+    setResult(null)
+    setImportModalOpen(false)
+    setNotice(
+      tr(
+        `Đã lưu ${imported.inserted} hồ sơ; ${imported.conflicted + imported.failed} dòng chưa được lưu.`,
+        `Saved ${imported.inserted} records; ${imported.conflicted + imported.failed} rows were not saved.`,
+      ),
+    )
   }
 
-  const activeDayCount = summaryHasDayCount
-    ? summaryDayCount
-    : activeRecordCount === rows.length
-      ? rows.reduce((total, record) => total + calendarDaysInFilter(record), 0)
-      : null
-
-  const activeEmployeeCount = new Set(summary.map((item) => item.employee_id))
-    .size
-
-  const pageStart = rows.length ? offset + 1 : 0
-
-  const pageEnd = offset + rows.length
-
-  const knownTotal =
-    filters.record_status === "ACTIVE" ? activeRecordCount : null
-
+  const invalid = Boolean(draft.from && draft.to && draft.from > draft.to)
+  const employeeById = useMemo(() => new Map(employees?.map(employee => [employee.id, employee])), [employees])
+  const departmentsById = useMemo(() => new Map(departments.map(team => [team.id, team.name])), [departments])
+  const typeById = useMemo(() => new Map(types.map(type => [type.id, type])), [types])
+  const metaFor = (record: LeaveRecord) => {
+    const type = typeById.get(record.leave_type_id)
+    return leaveTypeDisplay(record.leave_type || type?.code, record.leave_type_name || type?.name, tr)
+  }
+  const employeeForRecord = (record: LeaveRecord) => employeeById.get(record.employee_id)
+  const employeeName = (record: LeaveRecord) => employeeForRecord(record)?.fullName || (own ? user.name : "")
+  const departmentName = (record: LeaveRecord) => departmentsById.get(employeeForRecord(record)?.departmentId ?? -1)
+  const reasonFor = (record: LeaveRecord) => displayLeaveReason(record.reason, metaFor(record).kind === "ANNUAL", tr)
+  const searchable = (value: string) => value.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase().replace(/đ/g, "d")
+  const query = searchable(employeeSearch.trim())
+  const filteredRows = rows.filter(record => {
+    if (leaveTypeId && String(record.leave_type_id) !== leaveTypeId) return false
+    if (unpaidOnly && metaFor(record).kind !== "UNPAID") return false
+    if (!query) return true
+    return searchable(`${employeeName(record)} ${record.employee_code || employeeForRecord(record)?.employeeCode || ""} ${reasonFor(record)}`).includes(query)
+  })
+  const activeRows = filteredRows.filter(record => record.record_status === "ACTIVE")
+  const peopleOnLeave = new Set(activeRows.map(record => record.employee_id))
+  const employeeCount = employees?.filter(employee => employee.employmentStatus === "ACTIVE").length
+  const activePeopleOnLeave = [...peopleOnLeave].filter(id => employeeById.get(id)?.employmentStatus === "ACTIVE").length
+  const activeDayCount = activeRows.reduce((days, record) => days + leaveCalendarDays(record, filters.from, filters.to), 0)
+  const average = (value: number) => value.toLocaleString(language, { minimumFractionDigits: 1, maximumFractionDigits: 1 })
+  const recordDayCount = leaveCalendarDays
+  const [year, month] = new Intl.DateTimeFormat("sv-SE", {
+    timeZone: "Asia/Ho_Chi_Minh", year: "numeric", month: "2-digit", day: "2-digit",
+  }).format(new Date()).split("-").map(Number)
+  const setPeriod = (period: "month" | "quarter" | "year") => {
+    const startMonth = period === "year" ? 0 : period === "quarter" ? Math.floor((month - 1) / 3) * 3 : month - 1
+    const months = period === "year" ? 12 : period === "quarter" ? 3 : 1
+    const from = new Date(Date.UTC(year, startMonth, 1)).toISOString().slice(0, 10)
+    const to = new Date(Date.UTC(year, startMonth + months, 0)).toISOString().slice(0, 10)
+    setDraft(previous => ({ ...previous, from, to }))
+  }
+  const formatDate = (value: string) => {
+    const date = new Date(`${value}T00:00:00Z`)
+    return Number.isNaN(date.getTime())
+      ? value
+      : new Intl.DateTimeFormat(language === "vi" ? "vi-VN" : "en-GB", {
+          day: "2-digit",
+          month: "2-digit",
+          year: "numeric",
+          timeZone: "UTC",
+        }).format(date)
+  }
   const formatDateTime = (value?: string | null) => {
     if (!value) return "—"
-
     const date = new Date(value)
-
     return Number.isNaN(date.getTime())
       ? value
       : new Intl.DateTimeFormat(language === "vi" ? "vi-VN" : "en-US", {
           dateStyle: "medium",
-
           timeStyle: "short",
-
           timeZone: "Asia/Ho_Chi_Minh",
         }).format(date)
   }
-
-  const sortedRows = [...rows].sort((left, right) => {
+  const employeeInitials = (record: LeaveRecord) => {
+    const name = employeeName(record)
+    if (!name) return (record.employee_code || "NV").slice(0, 2).toUpperCase()
+    return name
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(-2)
+      .map((part) => part[0])
+      .join("")
+      .toUpperCase()
+  }
+  const sortedRows = [...filteredRows].sort((left, right) => {
     const leftValue =
       sort.key === "employee"
-        ? left.employee_code || String(left.employee_id)
+        ? `${employeeName(left)} ${left.employee_code || left.employee_id}`
         : `${left.start_date}-${left.end_date}`
-
     const rightValue =
       sort.key === "employee"
-        ? right.employee_code || String(right.employee_id)
+        ? `${employeeName(right)} ${right.employee_code || right.employee_id}`
         : `${right.start_date}-${right.end_date}`
-
     return (
       leftValue.localeCompare(rightValue, language === "vi" ? "vi" : "en", {
         numeric: true,
       }) * (sort.direction === "asc" ? 1 : -1)
     )
   })
+  const pageCount = Math.max(1, Math.ceil(sortedRows.length / PAGE_SIZE))
+  const currentPage = Math.min(Math.floor(offset / PAGE_SIZE) + 1, pageCount)
+  const pageOffset = (currentPage - 1) * PAGE_SIZE
+  const visibleRows = sortedRows.slice(pageOffset, pageOffset + PAGE_SIZE)
+  const pageStart = visibleRows.length ? pageOffset + 1 : 0
+  const pageEnd = pageOffset + visibleRows.length
+  const detailMeta = detailRecord ? metaFor(detailRecord) : { label: "", tone: "" }
+  const annualTypeIds = types.filter(type => leaveTypeDisplay(type.code, type.name, tr).kind === "ANNUAL").map(type => type.id).join(",")
 
   const toggleSort = (key: "employee" | "dates") => {
+    setOffset(0)
     setSort((current) =>
       current.key === key
-        ? { key, direction: current.direction === "asc" ? "desc" : "asc" }
+        ? {
+            key,
+            direction: current.direction === "asc" ? "desc" : "asc",
+          }
         : { key, direction: "asc" },
     )
   }
-
   const sortIcon = (key: "employee" | "dates") => {
     if (sort.key !== key) return <ArrowUpDown size={14} />
-
     return sort.direction === "asc" ? (
       <ArrowUp size={14} />
     ) : (
       <ArrowDown size={14} />
     )
   }
+  const resetFilters = () => {
+    setNotice("")
+    setDraft(initialFilters)
+    setFilters(initialFilters)
+    setEmployeeSearch("")
+    setLeaveTypeId("")
+    setUnpaidOnly(false)
+    setOffset(0)
+  }
+
+  const kpis = [
+    {
+      label: tr("Hồ sơ hợp lệ", "Valid records"),
+      value: activeRows.length,
+      detail: tr("Hồ sơ đang có hiệu lực", "Effective records"),
+      icon: CalendarCheck2,
+      tone: "border-emerald-200/60 from-emerald-50/70",
+      badge: "bg-emerald-100 text-emerald-800",
+    },
+    {
+      label: tr("Nhân viên nghỉ", "Employees on leave"),
+      value: `${peopleOnLeave.size} ${tr("nhân sự", "employees")}`,
+      detail: employeeCount
+        ? tr(`${average(activePeopleOnLeave / employeeCount * 100)}% trong ${employeeCount} nhân sự đang làm việc`, `${average(activePeopleOnLeave / employeeCount * 100)}% of ${employeeCount} active employees`)
+        : tr("Trong phạm vi đang lọc", "Within current filters"),
+      icon: Users,
+      tone: "border-blue-200/60 from-blue-50/70",
+      badge: "bg-blue-100 text-blue-800",
+    },
+    {
+      label: tr("Tổng ngày nghỉ", "Total leave days"),
+      value: `${activeDayCount} ${tr("ngày lịch", "calendar days")}`,
+      detail: tr(`Trung bình ${average(peopleOnLeave.size ? activeDayCount / peopleOnLeave.size : 0)} ngày lịch/người có nghỉ`, `Average ${average(peopleOnLeave.size ? activeDayCount / peopleOnLeave.size : 0)} calendar days per employee on leave`),
+      icon: Clock3,
+      tone: "border-amber-200/60 from-amber-50/70",
+      badge: "bg-amber-100 text-amber-800",
+    },
+  ]
 
   return (
     <AppShell
       breadcrumb={[
         tr("Nhân sự", "Workforce"),
-
         tr(
           own ? "Ngày nghỉ của tôi" : "Dữ liệu ngày nghỉ nhân viên",
-
           own ? "My leave records" : "Employee leave records",
         ),
       ]}
@@ -663,24 +493,32 @@ export default function LeaveRecords({ own = false }: { own?: boolean }) {
       <SectionHeader
         title={tr(
           own ? "Ngày nghỉ của tôi" : "Dữ liệu ngày nghỉ nhân viên",
-
           own ? "My leave data" : "Employee leave data",
         )}
         description={tr(
-          own ? "Xem dữ liệu ngày nghỉ do HR đã thu thập từ tệp nguồn." : "HR nhập tệp ngày nghỉ từ nguồn bên ngoài; hệ thống kiểm tra và lưu dữ liệu, không tự tạo ngày nghỉ.",
-
-          own ? "View leave data collected by HR from source files." : "HR imports leave files from an external source; the system validates and stores data but does not create leave automatically.",
+          own
+            ? "Xem dữ liệu ngày nghỉ do HR đã thu thập từ tệp nguồn."
+            : "Theo dõi, lọc và kiểm tra dữ liệu ngày nghỉ đã được ghi nhận.",
+          own
+            ? "View leave data collected by HR from source files."
+            : "Review, filter and audit imported employee leave records.",
         )}
       >
         {!own && (
           <>
-            <Button variant="secondary" onClick={() => navigate("/employee-requests/dashboard")}>
+            <Button
+              variant="secondary"
+              onClick={() => navigate("/employee-requests/dashboard")}
+            >
               <BarChart3 size={16} />
               {tr("Xem tổng quan", "View dashboard")}
             </Button>
             <Button
               disabled={!types.length}
-              onClick={() => setImportModalOpen(true)}
+              onClick={() => {
+                setError("")
+                setImportModalOpen(true)
+              }}
             >
               <Upload size={16} />
               {tr("Nhập tệp ngày nghỉ", "Import leave file")}
@@ -688,15 +526,8 @@ export default function LeaveRecords({ own = false }: { own?: boolean }) {
           </>
         )}
       </SectionHeader>
-      {!own && <ol aria-label={tr("Quy trình nhập dữ liệu ngày nghỉ", "Leave import workflow")} className="mb-4 grid overflow-hidden rounded-md border border-slate-200 bg-white sm:grid-cols-4">
-        {[
-          tr("Chọn tệp nguồn", "Select source file"),
-          tr("Xem trước và kiểm tra", "Preview and validate"),
-          tr("Xác nhận lưu", "Confirm and save"),
-          tr("Theo dõi dữ liệu", "Review collected data"),
-        ].map((step, index) => <li key={step} className="flex items-center gap-3 border-b border-slate-100 px-4 py-3 text-sm font-semibold text-slate-700 last:border-b-0 sm:border-b-0 sm:border-r sm:last:border-r-0"><span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-orange-100 text-xs font-bold text-orange-700">{index + 1}</span>{step}</li>)}
-      </ol>}
-      {error && (
+
+      {error && !importModalOpen && !detailRecord && (
         <p role="alert" className="mb-4 rounded-md bg-red-50 p-4 text-red-800">
           {error}
         </p>
@@ -723,524 +554,71 @@ export default function LeaveRecords({ own = false }: { own?: boolean }) {
           )}
         </p>
       )}
-      {!own && (
-        <>
-          {detailRecord && (
-            <div
-              role="dialog"
-              aria-modal="true"
-              aria-labelledby="leave-detail-title"
-              className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-[1px]"
-              onMouseDown={(event) => {
-                if (event.target === event.currentTarget && !busy)
-                  setDetailRecord(null)
-              }}
-            >
-              <Card className="relative w-full max-w-md p-5 shadow-2xl sm:p-6">
-                <button
-                  type="button"
-                  aria-label={tr("Đóng", "Close")}
-                  disabled={busy}
-                  onClick={() => setDetailRecord(null)}
-                  className="absolute right-4 top-4 flex size-10 items-center justify-center rounded-md text-slate-600 hover:bg-slate-100 hover:text-slate-900 disabled:opacity-50"
-                >
-                  <X size={20} />
-                </button>
-                <div className="pr-12">
-                  <h2
-                    id="leave-detail-title"
-                    className="text-lg font-bold text-slate-950"
-                  >
-                    {tr("Chi tiết hồ sơ nghỉ", "Leave record details")}
-                  </h2>
-                  <p className="mt-1 text-sm text-slate-600">
-                    {detailRecord.employee_code ||
-                      tr("Chưa có mã nhân viên", "No employee code")}{" "}
-                    · ID {detailRecord.employee_id}
-                  </p>
-                </div>
 
-                <dl className="mt-5 grid gap-3 rounded-md bg-slate-50 p-4 text-sm sm:grid-cols-2">
-                  <div>
-                    <dt className="font-medium text-slate-600">
-                      {tr("Người ghi nhận", "Recorded by")}
-                    </dt>
-                    <dd className="mt-1 break-words font-semibold text-slate-900">
-                      {detailRecord.recorded_by ?? "—"}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt className="font-medium text-slate-600">
-                      {tr("Trạng thái", "Status")}
-                    </dt>
-                    <dd className="mt-1 font-semibold text-slate-900">
-                      {detailRecord.record_status === "ACTIVE"
-                        ? tr("Đang sử dụng", "Active")
-                        : tr("Đã hủy", "Cancelled")}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt className="font-medium text-slate-600">
-                      {tr("Ngày tạo", "Created")}
-                    </dt>
-                    <dd className="mt-1 text-slate-900">
-                      {formatDateTime(detailRecord.created_at)}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt className="font-medium text-slate-600">
-                      {tr("Cập nhật gần nhất", "Last updated")}
-                    </dt>
-                    <dd className="mt-1 text-slate-900">
-                      {formatDateTime(detailRecord.updated_at)}
-                    </dd>
-                  </div>
-                </dl>
+      <LeaveRecordDrawer
+        record={detailRecord}
+        employeeName={detailRecord ? employeeName(detailRecord) : ""}
+        employeeCode={detailRecord ? detailRecord.employee_code || employeeForRecord(detailRecord)?.employeeCode : undefined}
+        reason={detailRecord ? reasonFor(detailRecord) : ""}
+        department={detailRecord ? departmentName(detailRecord) : undefined}
+        annualTypeIds={annualTypeIds}
+        own={own}
+        error={error}
+        formatDate={formatDate}
+        leaveTypeLabel={detailMeta.label}
+        leaveTypeTone={detailMeta.tone}
+        dayCount={detailRecord ? recordDayCount(detailRecord) : 0}
+        busy={busy}
+        cancellationReason={cancellationReason}
+        onReasonChange={setCancellationReason}
+        onClose={closeDetailDrawer}
+        onCancel={() => {
+          if (detailRecord) cancelRecord(detailRecord)
+        }}
+        formatDateTime={formatDateTime}
+      />
+      <LeaveImportDialog
+        open={!own && importModalOpen}
+        busy={busy}
+        file={file}
+        preview={preview}
+        result={result}
+        types={types}
+        error={error}
+        onClose={closeImportDialog}
+        onDismissError={() => setError("")}
+        onFileChange={chooseImportFile}
+        onPreview={upload}
+        onConfirm={confirmImport}
+        onFinishPartial={finishPartialImport}
+      />
 
-                <div className="mt-5 flex justify-end border-t border-slate-100 pt-4">
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    disabled={busy}
-                    onClick={() => setDetailRecord(null)}
-                  >
-                    {tr("Đóng", "Close")}
-                  </Button>
-                </div>
-              </Card>
-            </div>
-          )}
-          {confirmRecord && (
-            <div
-              role="alertdialog"
-              aria-modal="true"
-              aria-labelledby="leave-confirm-title"
-              className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-[1px]"
-              onMouseDown={(event) => {
-                if (event.target === event.currentTarget) closeCancellationDialog()
-              }}
-            >
-              <Card className="w-full max-w-md animate-in fade-in zoom-in-95 p-5 shadow-2xl duration-200 sm:p-6">
-                <div className="flex size-11 items-center justify-center rounded-md bg-red-50 text-red-700">
-                  <AlertTriangle size={22} />
-                </div>
-                <h2
-                  id="leave-confirm-title"
-                  className="mt-4 text-lg font-bold text-slate-950"
-                >
-                  {tr("Xác nhận hủy hồ sơ nghỉ?", "Cancel this leave record?")}
-                </h2>
-                <p className="mt-2 text-sm leading-6 text-slate-600">
-                  {tr(
-                    `Hồ sơ của ${confirmRecord.employee_code || `ID ${confirmRecord.employee_id}`} (${confirmRecord.start_date} - ${confirmRecord.end_date}) sẽ chuyển sang trạng thái Đã hủy. Nếu cần sửa, hãy tạo hồ sơ mới sau khi hủy.`,
-                    `The record for ${confirmRecord.employee_code || `ID ${confirmRecord.employee_id}`} (${confirmRecord.start_date} - ${confirmRecord.end_date}) will be cancelled. Create a new record after cancellation when a correction is needed.`,
-                  )}
+      <div className="mb-4 grid gap-3 md:grid-cols-3">
+        {kpis.map(({ label, value, detail, icon: Icon, tone, badge }) => (
+          <Card key={label} className={`bg-gradient-to-br ${tone} to-white p-4 shadow-sm sm:p-5`}>
+            <div className="flex items-start justify-between gap-4">
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-slate-600">{label}</p>
+                <p className="mt-2 text-2xl font-bold tabular-nums text-slate-950">
+                  {loading ? "—" : value}
                 </p>
-                <label className="mt-4 block text-sm font-semibold text-slate-800">
-                  {tr("Lý do hủy", "Cancellation reason")}
-                  <textarea
-                    autoFocus
-                    required
-                    rows={3}
-                    maxLength={500}
-                    value={cancellationReason}
-                    onChange={(event) => setCancellationReason(event.target.value)}
-                    placeholder={tr("Ví dụ: Sai khoảng ngày nghỉ", "Example: Incorrect leave dates")}
-                    className="mt-2 min-h-24 w-full resize-y rounded-md border border-slate-300 bg-white px-3 py-2.5 text-sm font-normal text-slate-900 outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100"
-                  />
-                  <span className="mt-1 block text-xs font-medium text-slate-600">
-                    {tr("BE yêu cầu lý do để lưu dấu vết thay đổi.", "A reason is required for the audit trail.")}
-                  </span>
-                </label>
-                <div className="mt-6 flex justify-end gap-2">
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    disabled={busy}
-                    onClick={closeCancellationDialog}
-                  >
-                    {tr("Giữ lại", "Keep record")}
-                  </Button>
-                  <button
-                    type="button"
-                    disabled={busy || !cancellationReason.trim()}
-                    onClick={() => cancelRecord(confirmRecord)}
-                    className="h-10 rounded-md bg-red-600 px-4 text-sm font-semibold text-white transition hover:bg-red-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-600 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    {busy
-                      ? tr("Đang xử lý...", "Processing...")
-                      : tr("Xác nhận hủy", "Confirm cancellation")}
-                  </button>
-                </div>
-              </Card>
-            </div>
-          )}
-          {importModalOpen && (
-            <div
-              className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-[1px]"
-              onMouseDown={(event) => {
-                if (event.target === event.currentTarget && !busy)
-                  setImportModalOpen(false)
-              }}
-            >
-              <Card className="relative max-h-[calc(100vh-2rem)] w-full max-w-4xl overflow-y-auto p-5 shadow-2xl sm:p-6">
-                <button
-                  type="button"
-                  aria-label={tr("Đóng", "Close")}
-                  disabled={busy}
-                  onClick={() => setImportModalOpen(false)}
-                  className="absolute right-5 top-5 flex size-10 items-center justify-center rounded-md text-slate-600 hover:bg-slate-100 hover:text-slate-900"
-                >
-                  <X size={20} />
-                </button>
-                <h2 className="pr-12 text-base font-semibold text-slate-950">
-                  {tr(
-                    "Nhập hồ sơ nghỉ Excel / CSV",
-
-                    "Import leave records from Excel / CSV",
-                  )}
-                </h2>
-                <p className="mt-2 text-sm text-slate-600">
-                  {tr(
-                    "Tối đa 10 MiB, 10.000 dòng. leave_type phải là mã LTxxx trong danh mục dưới đây, không phải tên hay ID. Xác nhận sẽ kiểm tra lại tệp và lưu dòng hợp lệ; dòng trùng bỏ qua, lỗi/xung đột không được lưu.",
-
-                    "Up to 10 MiB and 10,000 rows. leave_type must use the actual LTxxx catalogue code, not a name or ID. Confirm revalidates the same file and saves valid rows; duplicates skip, errors and conflicts are not saved.",
-                  )}
-                </p>
-                <details className="mt-2 text-sm">
-                  <summary className="cursor-pointer font-semibold">
-                    {tr("Danh mục mã loại nghỉ", "Leave type code catalogue")}
-                  </summary>
-                  <ul>
-                    {types.map((t) => (
-                      <li key={t.id}>
-                        {t.code} · {t.name}
-                      </li>
-                    ))}
-                  </ul>
-                </details>
-                <form onSubmit={upload} className="mt-4">
-                  <label
-                    className={`flex min-h-40 cursor-pointer flex-col items-center justify-center rounded-md border-2 border-dashed px-5 py-6 text-center transition ${
-                      dragging
-                        ? "border-orange-400 bg-orange-50"
-                        : "border-slate-300 bg-slate-50 hover:border-orange-300 hover:bg-orange-50/40"
-                    } ${busy ? "cursor-not-allowed opacity-60" : ""}`}
-                    onDragOver={(event) => {
-                      event.preventDefault()
-
-                      if (!busy) setDragging(true)
-                    }}
-                    onDragLeave={() => setDragging(false)}
-                    onDrop={(event) => {
-                      event.preventDefault()
-
-                      setDragging(false)
-
-                      if (!busy)
-                        chooseImportFile(event.dataTransfer.files?.[0] || null)
-                    }}
-                  >
-                    <input
-                      type="file"
-                      accept=".xlsx,.csv"
-                      disabled={busy}
-                      className="sr-only"
-                      onChange={(event) =>
-                        chooseImportFile(event.target.files?.[0] || null)
-                      }
-                    />
-                    <Upload size={28} className="text-orange-500" />
-                    <span className="mt-2 text-sm font-semibold text-slate-800">
-                      {tr(
-                        "Kéo thả tệp vào đây hoặc bấm để chọn",
-
-                        "Drop a file here or click to browse",
-                      )}
-                    </span>
-                    <span className="mt-1 text-xs font-medium text-slate-600">
-                      {tr(
-                        "Tệp XLSX hoặc CSV · tối đa 10 MiB",
-
-                        "XLSX or CSV file · up to 10 MiB",
-                      )}
-                    </span>
-                    {file && (
-                      <span className="mt-3 inline-flex max-w-full items-center gap-2 rounded-md bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm">
-                        <FileSpreadsheet
-                          size={16}
-                          className="shrink-0 text-emerald-600"
-                        />
-                        <span className="truncate">{file.name}</span>
-                      </span>
-                    )}
-                    <a
-                      href="/templates/ERIS_Leave_Records_Template.csv"
-                      download
-                      onClick={(event) => event.stopPropagation()}
-                      className="mt-3 text-sm font-semibold text-blue-700 hover:underline"
-                    >
-                      {tr("Tải mẫu CSV", "Download CSV template")}
-                    </a>
-                  </label>
-                  <div className="mt-4 flex justify-end">
-                    <Button
-                      type="submit"
-                      disabled={busy || !file}
-                      className="disabled:bg-slate-200 disabled:text-slate-500 disabled:shadow-none"
-                    >
-                      {tr("Xem trước tệp nghỉ", "Preview leave file")}
-                    </Button>
-                  </div>
-                </form>
-                {(preview || result) && (
-                  <div className="mt-4">
-                    <p
-                      role="status"
-                      className={`rounded-md p-3 text-sm ${
-                        result && (result.conflicted || result.failed)
-                          ? "bg-amber-50 text-amber-950"
-                          : "bg-blue-50 text-blue-900"
-                      }`}
-                    >
-                      {result
-                        ? tr("Đã nhập. Mới: ", "Imported. Inserted: ") +
-                          result.inserted +
-                          " · " +
-                          tr("Bỏ qua: ", "Skipped: ") +
-                          result.skipped +
-                          " · " +
-                          tr("Xung đột: ", "Conflicts: ") +
-                          result.conflicted +
-                          " · " +
-                          tr("Lỗi: ", "Errors: ") +
-                          result.failed
-                        : tr(
-                            "Xem trước, chưa lưu. Hợp lệ: ",
-
-                            "Preview, not saved. Valid: ",
-                          ) +
-                          preview!.summary.valid +
-                          " · " +
-                          tr("Trùng: ", "Duplicates: ") +
-                          preview!.summary.duplicate +
-                          " · " +
-                          tr("Xung đột: ", "Conflicts: ") +
-                          preview!.summary.conflict +
-                          " · " +
-                          tr("Lỗi: ", "Errors: ") +
-                          preview!.summary.error}
-                    </p>
-                    <div className="mt-3 max-h-80 overflow-auto">
-                      <table className="w-full text-left text-sm">
-                        <thead>
-                          <tr>
-                            {[
-                              tr("Dòng", "Row"),
-
-                              tr("Nhân viên / loại", "Employee / type"),
-
-                              tr("Khoảng nghỉ", "Leave dates"),
-
-                              tr("Kết quả", "Outcome"),
-                            ].map((h) => (
-                              <th key={h} className="p-2">
-                                {h}
-                              </th>
-                            ))}
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {(result?.rows || preview!.rows).map((r) => (
-                            <tr key={r.row} className="border-b">
-                              <td className="p-2">{r.row}</td>
-                              <td className="p-2">
-                                {r.employee_code} · {r.leave_type}
-                              </td>
-                              <td className="p-2">
-                                {r.start_date} → {r.end_date}
-                              </td>
-                              <td className="p-2">
-                                <span className="font-semibold">
-                                  {importStatusLabel(r.status)}
-                                </span>
-                                {importMessage(r.code, r.message) && (
-                                  <span className="mt-1 block text-slate-600">
-                                    {importMessage(r.code, r.message)}
-                                  </span>
-                                )}
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                    {result && (result.conflicted > 0 || result.failed > 0) && (
-                      <div className="mt-4 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">
-                        <p className="font-semibold">
-                          {tr(
-                            `Đã lưu ${result.inserted} hồ sơ; còn ${result.conflicted + result.failed} dòng cần xử lý.`,
-
-                            `Saved ${result.inserted} records; ${result.conflicted + result.failed} rows still need attention.`,
-                          )}
-                        </p>
-                        <p className="mt-1">
-                          {tr(
-                            "Sửa dữ liệu nguồn rồi chọn lại tệp, hoặc đóng để xem các hồ sơ đã lưu.",
-                            "Correct the source data and choose the file again, or close to view saved records.",
-                          )}
-                        </p>
-                        <div className="mt-3 flex flex-wrap gap-2">
-                          <Button
-                            type="button"
-                            variant="secondary"
-                            disabled={busy}
-                            onClick={() => chooseImportFile(null)}
-                          >
-                            {tr("Chọn tệp khác", "Choose another file")}
-                          </Button>
-                          <Button
-                            type="button"
-                            disabled={busy}
-                            onClick={() => {
-                              const imported = result
-
-                              setFile(null)
-
-                              setPreview(null)
-
-                              setResult(null)
-
-                              setImportModalOpen(false)
-
-                              setNotice(
-                                tr(
-                                  `Đã lưu ${imported.inserted} hồ sơ; ${imported.conflicted + imported.failed} dòng chưa được lưu.`,
-                                  `Saved ${imported.inserted} records; ${imported.conflicted + imported.failed} rows were not saved.`,
-                                ),
-                              )
-                            }}
-                          >
-                            {tr(
-                              "Đóng và xem danh sách",
-                              "Close and view records",
-                            )}
-                          </Button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
-                {preview && !result && (
-                  <Button
-                    className="mt-3"
-                    disabled={busy || !file || preview.summary.valid === 0}
-                    onClick={() => {
-                      if (
-                        file &&
-                        window.confirm(
-                          tr(
-                            "Lưu các dòng nghỉ hợp lệ sau khi kiểm tra lại?",
-
-                            "Revalidate and save valid leave rows?",
-                          ),
-                        )
-                      )
-                        void work(async () => {
-                          const imported = await confirmLeaveFile(
-                            file,
-
-                            preview.fingerprint,
-                          )
-
-                          setRevision((v) => v + 1)
-
-                          if (imported.conflicted || imported.failed) {
-                            setResult(imported)
-
-                            return
-                          }
-
-                          setFile(null)
-
-                          setPreview(null)
-
-                          setResult(null)
-
-                          setImportModalOpen(false)
-
-                          setNotice(
-                            tr(
-                              `Nhập hồ sơ nghỉ thành công: đã lưu ${imported.inserted} hồ sơ, bỏ qua ${imported.skipped}.`,
-
-                              `Leave records imported successfully: saved ${imported.inserted}, skipped ${imported.skipped}.`,
-                            ),
-                          )
-                        })
-                    }}
-                  >
-                    {tr("Xác nhận nhập hồ sơ nghỉ", "Confirm leave import")}
-                  </Button>
-                )}
-              </Card>
-            </div>
-          )}
-        </>
-      )}
-      <Card className="overflow-hidden p-0">
-        {!own && hasAnyRecords && (
-          <section className="border-b border-slate-200 px-5 py-4">
-            <div className="mb-3 flex items-center gap-2">
-              <h2 className="text-base font-semibold text-slate-950">
-                {tr("Tổng hợp nghỉ đang có hiệu lực", "Active leave summary")}
-              </h2>
+                <p className="mt-1 text-xs font-medium text-slate-600">{detail}</p>
+              </div>
               <span
-                title={tr(
-                  "Chỉ tính các ngày giao với bộ lọc hiện tại.",
-
-                  "Counts only dates overlapping the current filters.",
-                )}
-                className="inline-flex cursor-help text-slate-500"
+                className={`flex size-10 shrink-0 items-center justify-center rounded-md ${badge}`}
               >
-                <HelpCircle size={16} />
+                <Icon size={20} />
               </span>
             </div>
-            <div className="grid divide-y divide-slate-200 sm:grid-cols-3 sm:divide-x sm:divide-y-0">
-              {[
-                [tr("Hồ sơ hợp lệ", "Valid records"), activeRecordCount],
+          </Card>
+        ))}
+      </div>
 
-                [
-                  tr("Nhân viên có nghỉ", "Employees on leave"),
-                  activeEmployeeCount,
-                ],
-
-                [tr("Tổng ngày nghỉ", "Total leave days"), activeDayCount],
-              ].map(([label, value]) => (
-                <div
-                  key={String(label)}
-                  className="px-1 py-3 sm:px-5 sm:py-1 first:pl-1"
-                >
-                  <p className="text-sm font-semibold text-slate-600">
-                    {label}
-                  </p>
-                  <p className="mt-1 text-2xl font-bold tabular-nums text-slate-950">
-                    {value ?? "—"}
-                  </p>
-                </div>
-              ))}
-            </div>
-          </section>
-        )}
-        <div
-          className={hasAnyRecords ? "border-b border-slate-200 p-5" : "hidden"}
-        >
+      <Card className="overflow-hidden p-0">
+        <div className="border-b border-slate-200 p-5">
           <form
             onSubmit={(event) => event.preventDefault()}
-            className={`grid gap-3 md:grid-cols-2 xl:items-end ${
-              own
-                ? "xl:grid-cols-[minmax(170px,1fr)_minmax(170px,1fr)_minmax(190px,1fr)_auto]"
-                : "xl:grid-cols-[minmax(220px,1.1fr)_minmax(170px,0.8fr)_minmax(170px,0.8fr)_minmax(190px,0.9fr)_auto]"
-            }`}
+            className="grid gap-3 sm:grid-cols-2 2xl:grid-cols-[minmax(200px,1.5fr)_repeat(4,minmax(130px,1fr))_auto] 2xl:items-end"
           >
             {!own && (
               <label className="min-w-0 text-sm font-medium text-slate-700">
@@ -1248,17 +626,20 @@ export default function LeaveRecords({ own = false }: { own?: boolean }) {
                 <span className="relative mt-1 block">
                   <Search
                     size={16}
-                    className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+                    className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-500"
                   />
                   <input
-                    type="number"
-                    min="1"
-                    className="h-11 w-full rounded-md border border-slate-300 bg-white pl-9 pr-3 text-sm text-slate-900 outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100"
-                    placeholder={tr("Nhập ID nhân viên", "Enter employee ID")}
-                    value={draft.employee_id || ""}
-                    onChange={(e) =>
-                      setDraft({ ...draft, employee_id: e.target.value })
-                    }
+                    type="search"
+                    className="h-11 w-full rounded-md border border-slate-300 bg-white pl-9 pr-3 text-sm text-slate-900 outline-none transition-colors duration-200 placeholder:text-slate-500 focus:border-orange-400 focus:ring-4 focus:ring-orange-100"
+                    placeholder={tr(
+                      "Tìm theo tên, mã NV hoặc lý do...",
+                      "Search by name, employee code or reason...",
+                    )}
+                    value={employeeSearch}
+                    onChange={(event) => {
+                      setEmployeeSearch(event.target.value)
+                      setOffset(0)
+                    }}
                   />
                 </span>
               </label>
@@ -1269,7 +650,9 @@ export default function LeaveRecords({ own = false }: { own?: boolean }) {
                 type="date"
                 className={control}
                 value={draft.from || ""}
-                onChange={(e) => setDraft({ ...draft, from: e.target.value })}
+                onChange={(event) =>
+                  setDraft({ ...draft, from: event.target.value })
+                }
               />
             </label>
             <label className="min-w-0 text-sm font-medium text-slate-700">
@@ -1278,47 +661,56 @@ export default function LeaveRecords({ own = false }: { own?: boolean }) {
                 type="date"
                 className={control}
                 value={draft.to || ""}
-                onChange={(e) => setDraft({ ...draft, to: e.target.value })}
+                onChange={(event) =>
+                  setDraft({ ...draft, to: event.target.value })
+                }
               />
             </label>
             <label className="min-w-0 text-sm font-medium text-slate-700">
               {tr("Trạng thái", "Status")}
-              <select
+              <SelectControl
                 className={control}
-                value={draft.record_status}
-                onChange={(e) =>
-                  setDraft({
-                    ...draft,
-
-                    record_status: e.target
-                      .value as RecordFilters["record_status"],
-                  })
-                }
+                value={unpaidOnly ? "UNPAID" : draft.record_status}
+                onChange={(event) => {
+                  const status = event.target.value
+                  setUnpaidOnly(status === "UNPAID")
+                  setDraft(previous => ({ ...previous, record_status: status === "UNPAID" ? "ACTIVE" : status as RecordFilters["record_status"] }))
+                  setOffset(0)
+                }}
               >
-                <option value="ACTIVE">{tr("Đang sử dụng", "Active")}</option>
-                <option value="CANCEL">{tr("Đã hủy", "Cancelled")}</option>
                 <option value="ALL">{tr("Tất cả", "All")}</option>
-              </select>
+                <option value="ACTIVE">{tr("Có hiệu lực", "Effective")}</option>
+                <option value="UNPAID">{tr("Nghỉ không lương", "Unpaid leave")}</option>
+                <option value="CANCEL">{tr("Đã hủy", "Cancelled")}</option>
+              </SelectControl>
             </label>
-            <button
+            <label className="min-w-0 text-sm font-medium text-slate-700">
+              {tr("Loại nghỉ", "Leave type")}
+              <SelectControl
+                className={control}
+                value={leaveTypeId}
+                onChange={(event) => {
+                  setLeaveTypeId(event.target.value)
+                  setOffset(0)
+                }}
+              >
+                <option value="">{tr("Tất cả loại nghỉ", "All leave types")}</option>
+                {types.map((type) => (
+                  <option key={type.id} value={type.id}>
+                    {leaveTypeDisplay(type.code, type.name, tr).label}
+                  </option>
+                ))}
+              </SelectControl>
+            </label>
+            <Button
               type="button"
+              variant="secondary"
               disabled={loading}
-              onClick={() => {
-                setNotice("")
-
-                const initial = { record_status: "ACTIVE" } as RecordFilters
-
-                setDraft(initial)
-
-                setFilters(initial)
-
-                setOffset(0)
-              }}
-              className="inline-flex h-11 items-center justify-center gap-2 rounded-md px-3 text-sm font-semibold text-slate-600 hover:bg-slate-100 hover:text-slate-900 disabled:opacity-50"
+              onClick={resetFilters}
             >
               <RotateCcw size={16} />
               {tr("Đặt lại", "Reset")}
-            </button>
+            </Button>
             {invalid && (
               <p
                 role="alert"
@@ -1328,7 +720,17 @@ export default function LeaveRecords({ own = false }: { own?: boolean }) {
               </p>
             )}
           </form>
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            {([
+              ["month", tr("Tháng này", "This month")],
+              ["quarter", tr("Quý này", "This quarter")],
+              ["year", tr(`Năm ${year}`, `Year ${year}`)],
+            ] as const).map(([period, label]) => (
+              <Button key={period} type="button" variant="secondary" size="sm" onClick={() => setPeriod(period)}>{label}</Button>
+            ))}
+          </div>
         </div>
+
         <section className="p-5">
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <div>
@@ -1343,206 +745,138 @@ export default function LeaveRecords({ own = false }: { own?: boolean }) {
               </p>
             </div>
             <span className="rounded-md bg-slate-100 px-3 py-1.5 text-sm font-semibold text-slate-700">
-              {rows.length} {tr("hồ sơ trên trang", "records on this page")}
+              {visibleRows.length} {tr("hồ sơ trên trang", "records on this page")}
             </span>
           </div>
+
           {loading ? (
-            <p role="status">{tr("Đang tải…", "Loading…")}</p>
-          ) : (
-            <>
-              <div
-                className={
-                  hasAnyRecords
-                    ? "overflow-x-auto lg:overflow-visible"
-                    : "hidden"
-                }
-              >
-                <table className="w-full whitespace-nowrap text-left text-sm">
-                  <thead className="bg-slate-50">
-                    <tr>
-                      <th className="p-3 text-xs font-bold uppercase tracking-wide text-slate-600">
-                        <button
-                          type="button"
-                          title={tr(
-                            "Sắp xếp dữ liệu trên trang",
-                            "Sort records on this page",
-                          )}
-                          onClick={() => toggleSort("employee")}
-                          className="inline-flex items-center gap-1.5 hover:text-slate-950"
-                        >
-                          {tr("Nhân viên", "Employee")} {sortIcon("employee")}
-                        </button>
-                      </th>
-                      <th className="p-3 text-xs font-bold uppercase tracking-wide text-slate-600">
-                        {tr("Loại nghỉ", "Leave type")}
-                      </th>
-                      <th className="p-3 text-xs font-bold uppercase tracking-wide text-slate-600">
-                        <button
-                          type="button"
-                          title={tr(
-                            "Sắp xếp dữ liệu trên trang",
-                            "Sort records on this page",
-                          )}
-                          onClick={() => toggleSort("dates")}
-                          className="inline-flex items-center gap-1.5 hover:text-slate-950"
-                        >
-                          {tr("Ngày nghỉ", "Leave dates")} {sortIcon("dates")}
-                        </button>
-                      </th>
-                      <th className="p-3 text-xs font-bold uppercase tracking-wide text-slate-600">
-                        {tr("Lý do", "Reason")}
-                      </th>
-                      <th className="p-3 text-xs font-bold uppercase tracking-wide text-slate-600">
-                        {tr("Trạng thái", "Status")}
-                      </th>
-                      <th className="w-44 p-3 text-right text-xs font-bold uppercase tracking-wide text-slate-600">
-                        {tr("Thao tác", "Actions")}
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {sortedRows.map((r) => (
-                      <tr
-                        key={r.id}
-                        className="border-b border-slate-200 align-middle transition-colors hover:bg-orange-50/40"
+            <p role="status" className="py-10 text-center text-slate-600">
+              {tr("Đang tải…", "Loading…")}
+            </p>
+          ) : visibleRows.length ? (
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[1100px] table-fixed text-left text-sm">
+                <colgroup><col className="w-[220px]" /><col className="w-40" /><col className="w-[264px]" /><col /><col className="w-[140px]" /><col className="w-[106px]" /></colgroup>
+                <thead className="bg-slate-50">
+                  <tr>
+                    <th className="p-3 text-xs font-bold uppercase tracking-wide text-slate-600">
+                      <button
+                        type="button"
+                        onClick={() => toggleSort("employee")}
+                        className="inline-flex items-center gap-1.5 transition-colors hover:text-slate-950 focus-visible:outline-2 focus-visible:outline-orange-500"
                       >
-                        <td className="p-3 font-bold text-slate-950">
-                          {r.employee_code || r.employee_id}
-                        </td>
+                        {tr("Nhân viên", "Employee")} {sortIcon("employee")}
+                      </button>
+                    </th>
+                    <th className="p-3 text-xs font-bold uppercase tracking-wide text-slate-600">
+                      {tr("Loại nghỉ", "Leave type")}
+                    </th>
+                    <th className="p-3 text-xs font-bold uppercase tracking-wide text-slate-600">
+                      <button
+                        type="button"
+                        onClick={() => toggleSort("dates")}
+                        className="inline-flex items-center gap-1.5 transition-colors hover:text-slate-950 focus-visible:outline-2 focus-visible:outline-orange-500"
+                      >
+                        {tr("Ngày nghỉ", "Leave dates")} {sortIcon("dates")}
+                      </button>
+                    </th>
+                    <th className="p-3 text-xs font-bold uppercase tracking-wide text-slate-600">
+                      {tr("Lý do", "Reason")}
+                    </th>
+                    <th className="p-3 text-xs font-bold uppercase tracking-wide text-slate-600">
+                      {tr("Trạng thái", "Status")}
+                    </th>
+                    <th className="p-3 text-right text-xs font-bold uppercase tracking-wide text-slate-600">
+                      {tr("Thao tác", "Actions")}
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {visibleRows.map(record => {
+                    const profile = employeeForRecord(record)
+                    const meta = metaFor(record)
+                    const name = employeeName(record)
+                    const reason = reasonFor(record)
+                    const department = departmentName(record)
+                    const avatarTone = ["bg-slate-100 text-slate-700", "bg-indigo-100 text-indigo-800", "bg-teal-100 text-teal-800", "bg-sky-100 text-sky-800", "bg-purple-100 text-purple-800"][(profile?.departmentId || 0) % 5]
+                    return (
+                      <tr key={record.id} className="border-b border-slate-100 align-top hover:bg-slate-50">
                         <td className="p-3">
-                          {r.leave_type} · {r.leave_type_name}
-                        </td>
-                        <td className="p-3">
-                          <span className="font-medium text-slate-900">
-                            {r.start_date} → {r.end_date}
-                          </span>
-                          <span className="ml-2 text-xs font-semibold text-slate-500">
-                            ({calendarDaysInFilter(r)} {tr("ngày", "days")})
-                          </span>
-                        </td>
-                        <td className="max-w-xs whitespace-normal break-words p-3">
-                          {r.reason || "—"}
-                        </td>
-                        <td className="p-3">
-                          <span
-                            className={`inline-flex h-6 items-center rounded-md border px-2 text-xs font-semibold ${
-                              r.record_status === "ACTIVE"
-                                ? "border-emerald-300 bg-emerald-50 text-emerald-800"
-                                : "border-slate-300 bg-slate-100 text-slate-700"
-                            }`}
-                          >
-                            {r.record_status === "ACTIVE"
-                              ? tr("Đang sử dụng", "Active")
-                              : tr("Đã hủy", "Cancelled")}
-                          </span>
-                        </td>
-                        <td className="w-44 p-3 text-right">
-                          {!own && (
-                            <div className="inline-flex min-w-36 items-center justify-end gap-2">
-                              <RowActionsMenu
-                                disabled={busy}
-                                moreLabel={tr(
-                                  "Mở thao tác khác",
-                                  "Open more actions",
-                                )}
-                                detailLabel={tr("Xem chi tiết", "View details")}
-                                toggleLabel={
-                                  r.record_status === "ACTIVE"
-                                    ? tr("Hủy hồ sơ", "Cancel record")
-                                    : undefined
-                                }
-                                destructive={r.record_status === "ACTIVE"}
-                                onDetail={() => setDetailRecord(r)}
-                                onToggle={
-                                  r.record_status === "ACTIVE"
-                                    ? () => {
-                                        setCancellationReason("")
-                                        setConfirmRecord(r)
-                                      }
-                                    : undefined
-                                }
-                              />
+                          <div className="flex min-w-0 items-center gap-2.5">
+                            <span aria-hidden="true" className={`grid size-9 shrink-0 place-items-center rounded-full text-xs font-semibold ${avatarTone}`}>{employeeInitials(record)}</span>
+                            <div className="min-w-0">
+                              <p className="wrap-break-word font-semibold leading-5 text-slate-950">{name || tr("Chưa có tên nhân viên", "Employee name unavailable")}</p>
+                              <p className="mt-0.5 wrap-break-word text-xs text-slate-600">{[record.employee_code || profile?.employeeCode, department].filter(Boolean).join(" · ")}</p>
                             </div>
-                          )}
+                          </div>
+                        </td>
+                        <td className="p-3"><span className={`inline-flex rounded-full border px-2 py-1 text-xs font-semibold ${meta.tone}`}>{meta.label}</span></td>
+                        <td className="p-3">
+                          <p className="flex items-start gap-1.5 font-medium tabular-nums text-slate-900"><CalendarDays size={14} className="mt-0.5 shrink-0 text-slate-500" aria-hidden="true" /><span>{formatDate(record.start_date)} → {formatDate(record.end_date)}</span></p>
+                          <span className="mt-1 inline-flex rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-700">{recordDayCount(record)} {tr("ngày lịch", "calendar days")}</span>
+                        </td>
+                        <td className="p-3"><p title={reason} className="line-clamp-2 wrap-break-word leading-5 text-slate-700">{reason}</p></td>
+                        <td className="p-3">
+                          <span className={`inline-flex rounded-full border px-2 py-1 text-xs font-semibold ${record.record_status === "ACTIVE" ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-slate-200 bg-slate-100 text-slate-700"}`}>
+                            {record.record_status === "ACTIVE" ? tr("Có hiệu lực", "Effective") : tr("Đã hủy", "Cancelled")}
+                          </span>
+                          {meta.kind === "UNPAID" && <p className="mt-1 text-xs text-slate-600">{tr("Không hưởng lương", "Unpaid")}</p>}
+                        </td>
+                        <td className="p-3 text-right">
+                          <Button type="button" size="sm" variant="secondary" className="h-8 min-h-8 whitespace-nowrap px-2 text-xs hover:border-orange-300 hover:bg-orange-50"
+                            disabled={busy} onClick={() => { setError(""); setCancellationReason(""); setDetailRecord(record) }}>
+                            {tr("Xem chi tiết", "View details")}
+                          </Button>
                         </td>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              {!rows.length && (
-                <div className="flex flex-col items-center justify-center py-12 text-center">
-                  <span className="flex size-12 items-center justify-center rounded-md bg-slate-100 text-slate-500">
-                    <Inbox size={23} />
-                  </span>
-                  <p className="mt-3 text-sm font-semibold text-slate-800">
-                    {hasAnyRecords
-                      ? tr(
-                          "Chưa có hồ sơ trong bộ lọc này.",
-
-                          "No records match these filters.",
-                        )
-                      : tr(
-                          "Chưa có hồ sơ nghỉ nào.",
-
-                          "No leave records yet.",
-                        )}
-                  </p>
-                  <p className="mt-1 text-sm font-medium text-slate-600">
-                    {hasAnyRecords
-                      ? tr(
-                          "Hãy thay đổi điều kiện lọc để tìm lại.",
-
-                          "Change the filters to search again.",
-                        )
-                      : own
-                        ? tr(
-                            "Hồ sơ nghỉ sẽ xuất hiện tại đây khi được ghi nhận.",
-
-                            "Leave records will appear here once recorded.",
-                          )
-                        : tr(
-                            "Sử dụng nút Nhập tệp ngày nghỉ để bắt đầu thu thập dữ liệu.",
-
-                            "Use Import leave file to start collecting data.",
-                          )}
-                  </p>
-                </div>
-              )}
-            </>
-          )}
-          {hasAnyRecords && (
-            <div className="mt-4 flex flex-col gap-3 border-t border-slate-200 pt-4 sm:flex-row sm:items-center sm:justify-between">
-              <p className="text-sm font-medium text-slate-600">
-                {tr("Hiển thị", "Showing")} {pageStart} - {pageEnd}
-                {knownTotal !== null && (
-                  <>
-                    {" "}
-                    {tr("trên tổng", "of")} {knownTotal}
-                  </>
-                )}{" "}
-                {tr("hồ sơ", "records")}
-              </p>
-              <div className="flex justify-end gap-2">
-                <Button
-                  variant="secondary"
-                  disabled={loading || !offset}
-                  onClick={() => setOffset(Math.max(0, offset - 20))}
-                >
-                  {tr("Trước", "Previous")}
-                </Button>
-                <span className="flex min-w-10 items-center justify-center rounded-md bg-slate-100 px-3 text-sm font-semibold text-slate-700">
-                  {offset / 20 + 1}
-                </span>
-                <Button
-                  variant="secondary"
-                  disabled={loading || rows.length < 20}
-                  onClick={() => setOffset(offset + 20)}
-                >
-                  {tr("Trang sau", "Next page")}
-                </Button>
-              </div>
+                    )
+                  })}
+                </tbody>
+              </table>
             </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center py-12 text-center">
+              <span className="flex size-12 items-center justify-center rounded-md bg-slate-100 text-slate-500">
+                <Inbox size={23} />
+              </span>
+              <p className="mt-3 text-sm font-semibold text-slate-800">
+                {hasAnyRecords
+                  ? tr(
+                      "Chưa có hồ sơ trong bộ lọc này.",
+                      "No records match these filters.",
+                    )
+                  : tr("Chưa có hồ sơ nghỉ nào.", "No leave records yet.")}
+              </p>
+              <p className="mt-1 text-sm font-medium text-slate-600">
+                {hasAnyRecords
+                  ? tr(
+                      "Hãy thay đổi điều kiện lọc để tìm lại.",
+                      "Change the filters to search again.",
+                    )
+                  : own
+                    ? tr(
+                        "Hồ sơ nghỉ sẽ xuất hiện tại đây khi được ghi nhận.",
+                        "Leave records will appear here once recorded.",
+                      )
+                    : tr(
+                        "Sử dụng nút Nhập tệp ngày nghỉ để bắt đầu thu thập dữ liệu.",
+                        "Use Import leave file to start collecting data.",
+                      )}
+              </p>
+            </div>
+          )}
+
+          {!loading && (hasAnyRecords || rows.length > 0) && (
+            <nav aria-label={tr("Phân trang hồ sơ", "Leave record pagination")} className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 pt-4">
+              <p className="text-sm text-slate-700">{tr("Hiển thị", "Showing")} {pageStart} – {pageEnd} {tr("trong tổng số", "of")} {sortedRows.length} {tr("hồ sơ", "records")}</p>
+              <div className="flex flex-wrap items-center gap-2">
+                <Button variant="secondary" size="sm" disabled={currentPage === 1} onClick={() => setOffset(0)}>{tr("Đầu", "First")}</Button>
+                <Button variant="secondary" size="sm" disabled={currentPage === 1} onClick={() => setOffset(pageOffset - PAGE_SIZE)}>{tr("Trước", "Previous")}</Button>
+                <span className="rounded-md bg-slate-100 px-3 py-2 text-sm font-semibold tabular-nums text-slate-700">{tr("Trang", "Page")} {currentPage} / {pageCount}</span>
+                <Button variant="secondary" size="sm" disabled={currentPage === pageCount} onClick={() => setOffset(pageOffset + PAGE_SIZE)}>{tr("Sau", "Next")}</Button>
+                <Button variant="secondary" size="sm" disabled={currentPage === pageCount} onClick={() => setOffset((pageCount - 1) * PAGE_SIZE)}>{tr("Cuối", "Last")}</Button>
+              </div>
+            </nav>
           )}
         </section>
       </Card>

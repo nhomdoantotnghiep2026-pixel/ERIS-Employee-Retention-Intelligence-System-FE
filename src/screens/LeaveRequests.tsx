@@ -1,3 +1,4 @@
+import { SelectControl } from "../components/ui/select-control"
 import { useAutoDismissState } from '../hooks/useAutoDismissState';
 import { useEffect, useState, type FormEvent } from 'react';
 import { AppShell } from '../components/AppShell';
@@ -142,18 +143,18 @@ export default function LeaveRequests({ own }: {own: boolean}) {
         </div>
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-[minmax(12rem,0.9fr)_minmax(12rem,0.9fr)_minmax(18rem,1.5fr)]">
           <label className="block min-w-0 text-xs font-semibold text-slate-600">{t('Leave period')}
-            <select value={periodFilter} onChange={event => { if (isLeavePeriodFilter(event.target.value)) setPeriodFilter(event.target.value); }} className="mt-1.5 h-11 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm font-normal text-slate-700 outline-none focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
+            <SelectControl value={periodFilter} onChange={event => { if (isLeavePeriodFilter(event.target.value)) setPeriodFilter(event.target.value); }} className="mt-1.5 h-11 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm font-normal text-slate-700 outline-none focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
               <option value="ALL">{t('All periods')}</option>
               <option value="PAST">{t('Past')}</option>
               <option value="CURRENT">{t('Currently on leave')}</option>
               <option value="UPCOMING">{t('Upcoming')}</option>
-            </select>
+            </SelectControl>
           </label>
           <label className="block min-w-0 text-xs font-semibold text-slate-600">{t('Request status')}
-            <select value={requestStatusFilter} onChange={event => setRequestStatusFilter(event.target.value)} className="mt-1.5 h-11 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm font-normal text-slate-700 outline-none focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
+            <SelectControl value={requestStatusFilter} onChange={event => setRequestStatusFilter(event.target.value)} className="mt-1.5 h-11 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm font-normal text-slate-700 outline-none focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
               <option value="ALL">{t('All statuses')}</option>
               {requestStatuses.map(status => <option key={status} value={status}>{labels[status] || status}</option>)}
-            </select>
+            </SelectControl>
           </label>
           <label className="block min-w-0 text-xs font-semibold text-slate-600 sm:col-span-2 xl:col-span-1">{t('Search requests')}
             <span className="relative mt-1.5 block">

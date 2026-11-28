@@ -1,3 +1,4 @@
+import { SelectControl } from "./ui/select-control"
 import { useEffect, useState } from 'react';
 
 import { BriefcaseBusiness, GraduationCap, Plus, Trash2 } from 'lucide-react';
@@ -168,7 +169,7 @@ function EducationCard({ value, index, dateOfBirth, disabled, removable, text, o
 
       <label className={labelClass}>{text('Trình độ', 'Education level')}<RequiredMark />
 
-        <select required className={inputClass} value={value.educationLevel} disabled={disabled}
+        <SelectControl required className={inputClass} value={value.educationLevel} disabled={disabled}
 
           onChange={event => onChange({ ...value, educationLevel: event.target.value, institutionRefId: '' })}>
 
@@ -182,7 +183,7 @@ function EducationCard({ value, index, dateOfBirth, disabled, removable, text, o
 
           <option value="PhD">{text('Tiến sĩ', 'Doctorate')}</option>
 
-        </select>
+        </SelectControl>
 
       </label>
 

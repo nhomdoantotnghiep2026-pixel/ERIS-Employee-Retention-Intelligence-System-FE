@@ -1,8 +1,9 @@
+import { SelectControl } from "./ui/select-control"
 import { useAutoDismissState } from '../hooks/useAutoDismissState';
 import { useEffect, useMemo, useState, type FormEvent } from "react"
 import { Button } from "./ui"
 import { useLanguage } from "../context/LanguageContext"
-import { listEmployeeProfiles, type EmployeeProfile } from "../services/api"
+import { listDepartments, listEmployeeProfiles, type EmployeeProfile } from "../services/api"
 import {
   attendanceMessage,
   confirmAttendanceReconcile,
@@ -27,6 +28,8 @@ export default function AttendanceReconcile({ onSaved, onBusyChange }: Attendanc
   const [employees, setEmployees] = useState<EmployeeProfile[]>([])
   const [selectedEmployeeIds, setSelectedEmployeeIds] = useState<number[]>([])
   const [employeeSearch, setEmployeeSearch] = useState("")
+  const [departmentId, setDepartmentId] = useState("")
+  const [departments, setDepartments] = useState<Array<{ id: number; name: string }>>([])
   const [employeesLoading, setEmployeesLoading] = useState(true)
   const [preview, setPreview] = useState<ReconcilePreview | null>(null)
   const [ack, setAck] = useState(false)
@@ -59,16 +62,20 @@ export default function AttendanceReconcile({ onSaved, onBusyChange }: Attendanc
       .finally(() => {
         if (!controller.signal.aborted) setEmployeesLoading(false)
       })
+    void listDepartments(controller.signal, { limit: 1000 })
+      .then((response) => { if (!controller.signal.aborted) setDepartments(response.data) })
+      .catch(() => undefined)
     return () => controller.abort()
   }, [])
 
   const filteredEmployees = useMemo(() => {
     const term = employeeSearch.trim().toLocaleLowerCase(language === "vi" ? "vi" : "en")
-    if (!term) return employees
-    return employees.filter((employee) =>
-      `${employee.employeeCode} ${employee.fullName}`.toLocaleLowerCase(language === "vi" ? "vi" : "en").includes(term),
-    )
-  }, [employeeSearch, employees, language])
+    return employees.filter((employee) => {
+      const matchesDepartment = !departmentId || String(employee.departmentId) === departmentId
+      const matchesSearch = !term || `${employee.employeeCode} ${employee.fullName}`.toLocaleLowerCase(language === "vi" ? "vi" : "en").includes(term)
+      return matchesDepartment && matchesSearch
+    })
+  }, [departmentId, employeeSearch, employees, language])
 
   const scope = (): ReconcileScope => ({
     from,
@@ -128,12 +135,12 @@ export default function AttendanceReconcile({ onSaved, onBusyChange }: Attendanc
     <div>
       <div className="pr-12">
         <h2 className="text-lg font-semibold text-slate-950">
-          {tr("Đối soát ngày nghỉ và ngày lễ", "Reconcile leave and holidays")}
+          {tr("Bù công ngày lễ & Khớp đơn nghỉ phép", "Holiday adjustment & leave matching")}
         </h2>
         <p className="mt-1 text-sm font-medium text-slate-600">
           {tr(
-            "Chỉ tạo bản ghi ngày lễ hoặc nghỉ phép trong phạm vi HR chọn; hệ thống không tự suy ra vắng mặt.",
-            "Only create holiday or leave records for the HR-selected scope; absence is never inferred.",
+            "Hệ thống tự động kiểm tra những ngày nhân viên không phát sinh quẹt thẻ. Tự động bù ngày công chuẩn nếu trùng ngày Lễ Quốc Gia hoặc nhân viên đã có Đơn nghỉ phép được duyệt.",
+            "The system checks days without attendance punches and prepares standard work credit for public holidays or approved leave.",
           )}
         </p>
       </div>
@@ -150,16 +157,16 @@ export default function AttendanceReconcile({ onSaved, onBusyChange }: Attendanc
         <fieldset className="md:col-span-2">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <legend className="text-sm font-semibold text-slate-800">{tr("Nhân viên cần đối soát", "Employees to reconcile")}</legend>
-            <span className="text-sm font-semibold text-orange-700">
-              {tr(`Đã chọn ${selectedEmployeeIds.length}/100`, `${selectedEmployeeIds.length}/100 selected`)}
+            <span className="rounded-full bg-orange-50 px-3 py-1 text-sm font-semibold text-orange-700">
+              {tr(`Đã chọn: ${selectedEmployeeIds.length} / ${employees.length} nhân sự`, `Selected: ${selectedEmployeeIds.length} / ${employees.length} employees`)}
             </span>
           </div>
-          <input
-            className={control}
-            placeholder={tr("Tìm theo tên hoặc mã nhân viên", "Search by name or employee code")}
-            value={employeeSearch}
-            onChange={(event) => setEmployeeSearch(event.target.value)}
-          />
+          <div className="mt-2 grid gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(220px,0.45fr)_auto_auto]">
+            <input className="h-11 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none focus:border-orange-400 focus:ring-4 focus:ring-orange-100" placeholder={tr("Tìm theo tên hoặc mã nhân viên", "Search by name or employee code")} value={employeeSearch} onChange={(event) => setEmployeeSearch(event.target.value)} />
+            <SelectControl className="h-11 rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none focus:border-orange-400 focus:ring-4 focus:ring-orange-100" value={departmentId} onChange={(event) => setDepartmentId(event.target.value)}><option value="">{tr("Tất cả phòng ban", "All departments")}</option>{departments.map(department => <option key={department.id} value={department.id}>{department.name}</option>)}</SelectControl>
+            <Button type="button" variant="secondary" onClick={() => { setSelectedEmployeeIds(current => Array.from(new Set([...current, ...filteredEmployees.map(employee => employee.id)]))); setPreview(null) }}>{tr("Chọn tất cả", "Select all")}</Button>
+            <Button type="button" variant="secondary" disabled={!selectedEmployeeIds.length} onClick={() => { setSelectedEmployeeIds([]); setPreview(null) }}>{tr("Bỏ chọn", "Clear")}</Button>
+          </div>
           <div className="mt-2 max-h-56 overflow-y-auto rounded-md border border-slate-200 bg-slate-50/60 p-2">
             {employeesLoading ? (
               <p className="p-3 text-sm font-medium text-slate-600">{tr("Đang tải nhân viên...", "Loading employees...")}</p>
@@ -172,7 +179,6 @@ export default function AttendanceReconcile({ onSaved, onBusyChange }: Attendanc
                       <input
                         type="checkbox"
                         checked={checked}
-                        disabled={!checked && selectedEmployeeIds.length >= 100}
                         onChange={(event) => {
                           setSelectedEmployeeIds((current) => event.target.checked ? [...current, employee.id] : current.filter((id) => id !== employee.id))
                           setPreview(null)
@@ -201,9 +207,9 @@ export default function AttendanceReconcile({ onSaved, onBusyChange }: Attendanc
       {preview && (
         <div className="mt-5">
           <div className="grid gap-2 sm:grid-cols-3">
-            <p className="rounded-md bg-emerald-50 p-3 font-semibold text-emerald-800">{tr("Sẽ tạo", "Prepared")}: {preview.summary.prepared}</p>
-            <p className="rounded-md bg-slate-50 p-3 font-semibold text-slate-700">{tr("Giữ nguyên", "Kept")}: {preview.summary.kept}</p>
-            <p className="rounded-md bg-red-50 p-3 font-semibold text-red-800">{tr("Không thể xử lý", "Errors")}: {preview.summary.errors}</p>
+            <p className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 font-semibold text-emerald-800">{tr("Bù công ngày lễ/nghỉ phép", "Holiday/leave credit")}: {preview.summary.prepared} {tr("ngày", "days")}</p>
+            <p className="rounded-xl border border-slate-200 bg-slate-50 p-3 font-semibold text-slate-700">{tr("Đã có dữ liệu chấm công", "Attendance already exists")}: {preview.summary.kept} {tr("ngày", "days")}</p>
+            <p className="rounded-xl border border-amber-200 bg-amber-50 p-3 font-semibold text-amber-800">{tr("Vắng không phép / Chưa rõ lý do", "Unexcused / unknown absence")}: {preview.summary.errors} {tr("ngày", "days")}</p>
           </div>
 
           <div className="mt-3 max-h-72 overflow-auto rounded-md border border-slate-200">

@@ -51,7 +51,7 @@ const benefits = [
   {
     icon: UserCog,
     title: 'Không gian theo vai trò',
-    description: 'HR, Data/AI, System Admin và Employee chỉ thấy đúng chức năng được cấp quyền.',
+    description: 'HR, Admin và Employee chỉ thấy đúng chức năng được cấp quyền.',
   },
   {
     icon: ShieldCheck,
@@ -83,6 +83,27 @@ const organizationTypes = [
   { icon: Landmark, label: 'Tài chính' },
   { icon: Store, label: 'Bán lẻ' },
   { icon: Globe2, label: 'Đội ngũ đa quốc gia' },
+];
+
+const heroJourney = [
+  {
+    icon: Database,
+    step: '01',
+    title: 'Dữ liệu nhân sự',
+    description: 'Hồ sơ, chấm công và khảo sát',
+  },
+  {
+    icon: BrainCircuit,
+    step: '02',
+    title: 'Phân tích tín hiệu',
+    description: 'Điểm rủi ro và yếu tố tác động',
+  },
+  {
+    icon: ShieldCheck,
+    step: '03',
+    title: 'HR ra quyết định',
+    description: 'Ưu tiên và theo dõi hành động',
+  },
 ];
 
 function AnimatedMetric({ target, suffix = '', pad = 0, delay = 0, label }: { target: number; suffix?: string; pad?: number; delay?: number; label: string }) {
@@ -133,6 +154,66 @@ function AnimatedMetric({ target, suffix = '', pad = 0, delay = 0, label }: { ta
         {display}
       </motion.span>
     </span>
+  );
+}
+
+function HeroJourneyStrip() {
+  const { t } = useLanguage();
+
+  return (
+    <motion.section
+      initial={{ opacity: 0, y: 24 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.55, delay: 0.72, ease: [0.16, 1, 0.3, 1] }}
+      aria-labelledby="hero-journey-title"
+      className="mt-9 w-full max-w-4xl"
+    >
+      <h2 id="hero-journey-title" className="sr-only">
+        {t('Từ dữ liệu đến hành động giữ chân')}
+      </h2>
+      <ol className="grid gap-3 sm:grid-cols-3">
+        {heroJourney.map((item, index) => {
+          const Icon = item.icon;
+          return (
+            <motion.li
+              key={item.step}
+              initial={{ opacity: 0, y: 18, scale: 0.96 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              transition={{
+                type: 'spring',
+                stiffness: 130,
+                damping: 18,
+                delay: 0.78 + index * 0.09,
+              }}
+              className="relative flex min-h-[92px] items-center gap-3 rounded-[18px] border border-white/90 bg-white/80 p-4 text-left shadow-[0_12px_35px_rgba(71,85,105,0.10)] backdrop-blur-xl"
+            >
+              <span className="grid size-11 shrink-0 place-items-center rounded-xl border border-orange-100 bg-orange-50 text-orange-700">
+                <Icon size={20} aria-hidden="true" />
+              </span>
+              <span className="min-w-0">
+                <span className="block font-mono text-[11px] font-bold tracking-[0.12em] text-orange-600">
+                  {item.step}
+                </span>
+                <strong className="mt-0.5 block text-sm font-bold text-slate-950">
+                  {t(item.title)}
+                </strong>
+                <span className="mt-1 block text-xs leading-5 text-slate-600">
+                  {t(item.description)}
+                </span>
+              </span>
+              {index < heroJourney.length - 1 && (
+                <span
+                  aria-hidden="true"
+                  className="absolute -right-2.5 top-1/2 z-10 hidden size-5 -translate-y-1/2 place-items-center rounded-full border border-slate-200 bg-white text-slate-400 shadow-sm sm:grid"
+                >
+                  <ChevronRight size={13} />
+                </span>
+              )}
+            </motion.li>
+          );
+        })}
+      </ol>
+    </motion.section>
   );
 }
 
@@ -204,6 +285,7 @@ export default function Landing() {
           </Link>
           </motion.div>
           <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.6, delay: 0.65 }} className="mt-5 flex items-center gap-2 text-sm font-medium text-slate-500"><ShieldCheck size={17} className="text-emerald-600" /> {t("AI hỗ trợ phân tích · HR quyết định cuối cùng")}</motion.p>
+          <HeroJourneyStrip />
         </div>
 
         <LandingProductPreview />

@@ -2,10 +2,11 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from '
 import { restoreSession, SESSION_EXPIRED_EVENT } from '../services/api';
 import { useAutoDismissState } from '../hooks/useAutoDismissState';
 import { useLanguage } from './LanguageContext';
+import { roleLifecycle, type RoleLifecycle, type UserRole } from '../domain/roleContract.ts';
 
-export type UserRole = 'HR' | 'Data / AI Analyst' | 'System Administrator' | 'Employee / ESS';
+export type { ActiveUserRole, LegacyUserRole, UserRole } from '../domain/roleContract.ts';
 
-interface RoleUser {
+export interface RoleUser {
   name: string;
   initials: string;
   role: UserRole;
@@ -13,14 +14,19 @@ interface RoleUser {
   workspace?: 'management' | 'employee';
   email: string;
   available?: boolean;
+  lifecycle: RoleLifecycle;
 }
 
 export const ROLE_USERS: RoleUser[] = [
-  { name: 'ERIS Administrator', initials: 'EA', role: 'System Administrator', email: 'nhomdoantotnghiep2026@gmail.com' },
-  { name: 'HR Account 1', initials: 'H1', role: 'HR', email: 'kn1234444@gmail.com' },
-  { name: 'Data Analyst (chưa có tài khoản)', initials: 'DA', role: 'Data / AI Analyst', email: 'analyst@eris.com', available: false },
-  { name: 'Employee (chưa có tài khoản)', initials: 'EE', role: 'Employee / ESS', email: 'employee@eris.com', available: false },
+  { name: 'ERIS Administrator', initials: 'EA', role: 'System Administrator', email: 'nhomdoantotnghiep2026@gmail.com', lifecycle: roleLifecycle('System Administrator') },
+  { name: 'HR Account 1', initials: 'H1', role: 'HR', email: 'kn1234444@gmail.com', lifecycle: roleLifecycle('HR') },
+  // Compatibility-only actor. It remains in fixtures and legacy tests but is not a supported sign-in role.
+  { name: 'Data Analyst (chưa có tài khoản)', initials: 'DA', role: 'Data / AI Analyst', email: 'analyst@eris.com', available: false, lifecycle: roleLifecycle('Data / AI Analyst') },
+  { name: 'Employee (chưa có tài khoản)', initials: 'EE', role: 'Employee / ESS', email: 'employee@eris.com', available: false, lifecycle: roleLifecycle('Employee / ESS') },
 ];
+
+export const ACTIVE_ROLE_USERS = ROLE_USERS.filter(user => user.lifecycle === 'active');
+export const LEGACY_ROLE_USERS = ROLE_USERS.filter(user => user.lifecycle === 'legacy');
 
 interface RoleContextValue {
   user: RoleUser;
@@ -38,7 +44,7 @@ export function RoleProvider({ children }: { children: ReactNode }) {
       const stored = sessionStorage.getItem('eris-user');
       const parsed = stored ? JSON.parse(stored) as RoleUser : null;
       if (!parsed?.email || !parsed.role || !parsed.name) return null;
-      return parsed;
+      return { ...parsed, lifecycle: roleLifecycle(parsed.role) };
     } catch {
       return null;
     }

@@ -1,3 +1,4 @@
+import type { UnifiedAnalyzeRequest, UnifiedAnalyzeResponse } from "../components/ai-workspace/unifiedContract";
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || '/api').replace(/\/$/, '');
 const BACKEND_ROOT_URL = API_BASE_URL.replace(/\/api$/, '');
 const ADMIN_API_BASE_URL = (import.meta.env.VITE_ADMIN_API_BASE_URL || '').replace(/\/$/, '');
@@ -512,6 +513,8 @@ export interface ApiUser {
   roleName?: string;
   roleId?: number;
   status: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface ApiEmployee {
@@ -528,7 +531,7 @@ export interface EmployeeProfile {
   id: number; employeeCode: string; fullName: string; email: string;
   phone: string | null; dateOfBirth: string | null; gender: string | null;
   address: string | null; departmentId: number; positionId: number; hireDate: string;
-  employmentType: string | null; employmentStatus: string; currentSalary: string | number | null;
+  employmentType: string | null; employmentStatus: string; currentSalary: string | number | null; workScheduleId?: number | null;
   educations?: EmployeeEducation[];
   workExperiences?: EmployeeWorkExperience[];
   distanceFromHomeKm: number | null;
@@ -766,10 +769,24 @@ export interface AuditLogDetail extends AuditLogEntry {
 export const listAuditLogs = (signal?: AbortSignal) => request<{ data: AuditLogEntry[] }>('/audit-logs', { signal, cache: 'no-store' });
 export const getAuditLog = (id: number, signal?: AbortSignal) => request<{ data: AuditLogDetail }>(`/audit-logs/${id}`, { signal, cache: 'no-store' });
 
-export type AiEmployee = { id: number; employeeCode: string; fullName: string };
-export type AiSnapshot = { employee: AiEmployee; snapshotId: number | null; capturedAt: string; snapshotDate?: string; features: Record<string, string | number>; provenance: Record<string, string>; missingFeatures: string[]; invalidFeatures?: string[]; issues: string[]; ready: boolean; warning?: string };
+export type AiEmployee = {
+  id: number;
+  employeeCode: string;
+  fullName: string;
+  departmentId?: number | null;
+  departmentName?: string | null;
+  positionId?: number | null;
+  positionName?: string | null;
+  hireDate?: string | null;
+  employmentType?: string | null;
+  employmentStatus?: string | null;
+  currentSalary?: string | number | null;
+};
+export type AiSnapshot = { employee: AiEmployee; snapshotId: number | null; capturedAt: string; snapshotDate?: string; period?: { start: string; end: string } | null; features: Record<string, string | number>; provenance: Record<string, string>; missingFeatures: string[]; invalidFeatures?: string[]; issues: string[]; ready: boolean; warning?: string };
 export type AiModelOutput = { model_id: string; score: number; contributions: Record<string, number>; schema_version?: string; validation_status?: string; demo_mode?: boolean; base_value?: number; riskLevel?: string | null; risk_level?: string | null };
-export type AiPrediction = { saved: boolean; predictionId?: number; snapshotId?: number; createdAt?: string; preview: AiSnapshot; model: AiModelOutput; warning: string };
+export type AiPolicyEvidence = { id?: string; source?: string; survey_id?: number; submitted_at?: string; question_text?: string; answer_value?: unknown; comment?: string | null; category?: string; month?: string; recordedDays?: number; statusCounts?: Record<string, number>; workingMinutes?: number; overtimeMinutes?: number; lateMinutes?: number; earlyMinutes?: number; feature?: string; value?: unknown; impact?: number; [key: string]: unknown };
+export type AiUnifiedPolicyAnalysis = { provider: string; model?: string; generatedAt?: string; requiresHrReview: boolean; autoApplied: boolean; noRecommendationReason?: string | null; selection?: { employeeId: number; from: string; to: string; surveyIds?: number[]; includeAttendance?: boolean } | null; recommendations: Array<{ policy: { id: string | number; code?: string; name: string; description?: string | null }; reason: string; evidence: AiPolicyEvidence[]; hrVerification: string }> };
+export type AiPrediction = { saved: boolean; predictionId?: number; snapshotId?: number; createdAt?: string; preview: AiSnapshot; model: AiModelOutput; warning: string; policyAnalysis?: AiUnifiedPolicyAnalysis };
 type AiModelResponse = { data: { model_id: string; warning: string } };
 let aiModelRequest: Promise<AiModelResponse> | null = null;
 export const getAiModel = () => {
@@ -785,11 +802,12 @@ export const listAiSnapshots = (id: number) => request<{ data: AiSnapshot[] }>(`
 export const getAiSnapshot = (id: number, snapshotId: number) => request<{ data: AiSnapshot }>(`/ai/employees/${id}/snapshots/${snapshotId}`);
 export type AiBatchResult = { total: number; succeeded: number; failed: number; warning: string; results: Array<{ employeeId: number; success: boolean; data?: AiPrediction; status?: number; message?: string }> };
 export const predictAiBatch = (employees: Array<{ employeeId: number; snapshotId: number; save: boolean }>) => request<{ data: AiBatchResult }>('/ai/predict-batch', { method: 'POST', body: JSON.stringify({ employees }) });
-export const previewAiEmployee = (id: number, body: { vndPerUsd?: number; supplementalFeatures?: Record<string, string | number> }) => request<{ data: AiSnapshot }>(`/ai/employees/${id}/preview`, { method: 'POST', body: JSON.stringify(body) });
+export const previewAiEmployee = (id: number, body: { periodStart?: string; periodEnd?: string; vndPerUsd?: number; supplementalFeatures?: Record<string, string | number> }) => request<{ data: AiSnapshot }>(`/ai/employees/${id}/preview`, { method: 'POST', body: JSON.stringify(body) });
 export const predictAiEmployee = (id: number, snapshotId: number, save: boolean) => request<{ data: AiPrediction }>(`/ai/employees/${id}/predict`, { method: 'POST', body: JSON.stringify({ snapshotId, save }) });
+export const analyzeAiEmployee = (id: number, body: UnifiedAnalyzeRequest) => request<{ data: UnifiedAnalyzeResponse }>(`/ai/employees/${id}/analyze`, { method: 'POST', body: JSON.stringify(body) });
 export type AiResultHistoryItem = { predictionId: number; snapshotId: number; createdAt: string };
-export const listAiEmployeeResults = (id: number) => request<{ data: AiResultHistoryItem[] }>(`/ai/employees/${id}/results`, { cache: 'no-store' });
-export const getAiResult = (id: number) => request<{ data: AiPrediction }>(`/ai/results/${id}`);
+export const listAiEmployeeResults = (id: number, signal?: AbortSignal) => request<{ data: AiResultHistoryItem[] }>(`/ai/employees/${id}/results`, { signal, cache: 'no-store' });
+export const getAiResult = (id: number, signal?: AbortSignal) => request<{ data: AiPrediction }>(`/ai/results/${id}`, { signal });
 export interface AiPolicyRecommendations {
   predictionId: number;
   warning: string;
@@ -912,7 +930,16 @@ export function resetPassword(email: string, otp: string, newPassword: string) {
   });
 }
 
-export type EmployeeAccountCandidate = { id: number; employeeCode: string; fullName: string; email: string };
+export type EmployeeAccountCandidate = {
+  id: number;
+  employeeCode: string;
+  fullName: string;
+  email: string;
+  departmentId?: number | null;
+  departmentName?: string | null;
+  positionName?: string | null;
+  createdAt?: string | null;
+};
 
 export async function listEmployeeAccountCandidates(signal?: AbortSignal) {
   const result = await request<{ data: EmployeeAccountCandidate[] }>('/employees/account-candidates', { cache: 'no-store', signal });
@@ -1173,7 +1200,7 @@ export function importEmployees(file: File, choices: ImportInstitutionChoice[] =
 export interface WorkSchedule { id: number; name: string; shift_type: string | null; attendance_policy?: Record<string, number>; start_time: string; end_time: string; break_start: string | null; break_end: string | null; working_days: number[]; status: 'ACTIVE' | 'INACTIVE' }
 export type WorkScheduleInput = Omit<WorkSchedule, 'id'>;
 export interface ScheduleAssignment extends Omit<WorkSchedule, 'id'> { employee_id: number; work_schedule_id: number }
-export const listWorkSchedules = () => request<{data: WorkSchedule[]}>('/work-schedules', {cache: 'no-store'});
+export const listWorkSchedules = (signal?: AbortSignal) => request<{data: WorkSchedule[]}>('/work-schedules', {signal, cache: 'no-store'});
 export const createWorkSchedule = (input: WorkScheduleInput) => request<{data: WorkSchedule}>('/work-schedules', {method: 'POST', body: JSON.stringify(input)});
 export const createIndividualSchedule = (input: WorkScheduleInput & {employee_id: number}) => request('/work-schedules/individual', {method: 'POST', body: JSON.stringify(input)});
 export const updateWorkSchedule = (id: number, input: Partial<WorkScheduleInput>) => request('/work-schedules/' + id, {method: 'PATCH', body: JSON.stringify(input)});

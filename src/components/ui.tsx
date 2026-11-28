@@ -1,3 +1,4 @@
+import { SelectControl } from "./ui/select-control"
 import { type ReactNode, type ButtonHTMLAttributes, useEffect } from 'react';
 import { useLanguage } from '../context/LanguageContext';
 
@@ -145,10 +146,10 @@ export function Tabs({ tabs, active, onChange }: { tabs: string[]; active: strin
 export function EmptyState({ icon, title, description }: { icon?: ReactNode; title: string; description?: string }) {
   const { t } = useLanguage();
   return (
-    <div className="flex flex-col items-center justify-center py-12 text-center">
-      {icon && <div className="mb-3 text-gray-300">{icon}</div>}
-      <div className="text-sm font-medium text-gray-600 mb-1">{t(title)}</div>
-      {description && <div className="text-[13px] text-gray-400 max-w-xs">{t(description)}</div>}
+    <div role="status" className="flex flex-col items-center justify-center py-12 text-center">
+      {icon && <div className="mb-3 text-slate-500" aria-hidden="true">{icon}</div>}
+      <div className="mb-1 text-sm font-semibold text-slate-800">{t(title)}</div>
+      {description && <div className="max-w-xs text-[13px] leading-5 text-slate-600">{t(description)}</div>}
     </div>
   );
 }
@@ -243,16 +244,15 @@ export function Input({ placeholder, value, onChange, icon, className = '', aria
 export function Select({ value, onChange, options, placeholder, className = '', ariaLabel }: { value: string; onChange: (v: string) => void; options: string[]; placeholder?: string; className?: string; ariaLabel?: string }) {
   const { t } = useLanguage();
   return (
-    <select
+    <SelectControl
       value={value}
       aria-label={t(ariaLabel || placeholder || 'Select option')}
       onChange={e => onChange(e.target.value)}
       className={`h-11 border border-slate-300 bg-white px-3 text-base text-slate-700 focus:outline-none focus:ring-2 focus:ring-orange-100 focus:border-[#F97316] cursor-pointer sm:h-10 sm:text-[13px] ${className}`}
-      style={{ borderRadius: '10px' }}
     >
       {placeholder && <option value="">{t(placeholder)}</option>}
       {options.map(o => <option key={o} value={o}>{t(o)}</option>)}
-    </select>
+    </SelectControl>
   );
 }
 

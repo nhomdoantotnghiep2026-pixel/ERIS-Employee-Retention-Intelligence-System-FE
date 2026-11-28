@@ -32,7 +32,15 @@ export interface ImportedAttendance {
   record_status: "ACTIVE" | "CANCEL"
   attendance_status?: string
   work_schedule_id?: Id
-  record_fingerprint?: string
+  scheduled_shift?: {
+    source: "SNAPSHOT" | "CATALOG"
+    shift_type: string | null
+    start_time: string
+    end_time: string
+    break_start: string | null
+    break_end: string | null
+  } | null
+  cancelled_by_name?: string | null
   cancellation_reason?: string | null
   cancelled_at?: string | null
   cancelled_by?: Id | null
@@ -62,6 +70,7 @@ export interface PreviewRow {
   working_minutes?: number
   late_mins?: number
   early_mins?: number
+  overtime_minutes?: number
   outside_shift_minutes?: number
   issues: ImportIssue[]
   validation_status: string
@@ -77,7 +86,7 @@ export interface ConfirmResult {
   skipped: number
   excluded: number
   skipped_invalid?: number
-  rows: unknown[]
+  rows: Array<{ excel_row: number; action: "INSERT" | "SKIP"; attendance_id?: Id }>
 }
 export interface AttendanceBatch {
   status: string
@@ -120,15 +129,16 @@ export const fetchAttendanceAudit = (id: Id, offset = 0) =>
     root + "/" + id + "/audit-logs?limit=20&offset=" + offset,
     { cache: "no-store" },
   )
-export const cancelAttendance = (row: ImportedAttendance, reason: string) =>
+export const fetchCancelledAttendance = (filters: RecordFilters, signal?: AbortSignal) =>
+  request<{ data: ImportedAttendance[]; limit: number; offset: number }>(root + "/cancellations" + query(filters), { signal, cache: "no-store" })
+export const fetchCancelledAttendanceDetail = (id: Id) =>
+  request<{ data: ImportedAttendance }>(root + "/cancellations/" + id, { cache: "no-store" })
+export const cancelAttendance = (row: Pick<ImportedAttendance, "id">, reason: string) =>
   request<{ data: ImportedAttendance }>(
     root + "/" + row.id + "/cancel",
     {
       method: "PATCH",
-      body: JSON.stringify({
-        expected_fingerprint: row.record_fingerprint,
-        reason: reason.trim(),
-      }),
+      body: JSON.stringify({ reason: reason.trim() }),
     },
   )
 const importBody = (file: File, options: object) => {
@@ -187,6 +197,8 @@ export function attendanceMessage(error: unknown, fallback: string) {
         "Đợt nhập đã được xác nhận. Tải lại để xem kết quả đã lưu.",
       UNRESOLVED_ROWS:
         "Cần xử lý hoặc loại các dòng lỗi và chọn ngày ca còn mơ hồ.",
+      INVALID_PREVIEW: "Bản xem trước đã hết hạn hoặc không còn hợp lệ. Hãy kiểm tra lại tệp trước khi lưu.",
+      NO_VALID_ROWS: "Không còn dòng hợp lệ để thêm mới. Hãy kiểm tra lại tệp và lựa chọn bỏ qua.",
       WARNINGS_UNCONFIRMED: "Cần đọc và xác nhận cảnh báo trước khi lưu.",
       FILE_CHANGED: "Tệp đã thay đổi. Hãy tạo bản xem trước mới.",
       LEGACY_RECORD:
