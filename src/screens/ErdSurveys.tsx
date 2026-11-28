@@ -93,7 +93,7 @@ const dateWithZone = (date: string, endOfDay = false) =>
 const ratingLabels = [
   "Rất không hài lòng",
   "Không hài lòng",
-  "Không hài lòng cũng không bất mãn",
+  "Bình thường",
   "Hài lòng",
   "Rất hài lòng",
 ]
@@ -3313,9 +3313,8 @@ function EmployeeSurveyForm({
                             : "border-slate-200 bg-white text-slate-600 hover:bg-orange-50"
                         }`}
                       >
-                        <span className="block text-base">{score}</span>
-                        <span className="mt-1 block text-xs font-medium">
-                          {label}
+                        <span className="block text-sm font-semibold">
+                          {label === "Không hài lòng cũng không bất mãn" ? "Bình thường" : label}
                         </span>
                       </button>
                     )
