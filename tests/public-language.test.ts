@@ -12,6 +12,13 @@ import { PUBLIC_TOPICS } from '../src/data/publicTopics.ts';
 const files = ['src/screens/Landing.tsx', 'src/screens/Login.tsx', 'src/screens/ForgotPassword.tsx', 'src/components/LandingProductPreview.tsx', 'src/components/PublicHeader.tsx', 'src/components/PublicFooter.tsx', 'src/screens/PublicDetail.tsx', 'src/data/publicTopics.ts'];
 const vietnamese = /[À-ỹ]/;
 
+test('password reset starts masked and keeps native input types in every language', () => {
+  const source = readFileSync('src/screens/ForgotPassword.tsx', 'utf8');
+  assert.match(source, /\[showPassword, setShowPassword\] = useState\(false\)/);
+  assert.match(source, /type=\{showPassword \? 'text' : 'password'\}/);
+  assert.match(source, /setShowPassword\(value => !value\)/);
+});
+
 test('public Vietnamese copy has complete English translations, including login errors and image descriptions', () => {
   const missing = new Set<string>();
   for (const file of files) {

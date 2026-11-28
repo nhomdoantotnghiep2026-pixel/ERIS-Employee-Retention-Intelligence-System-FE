@@ -253,12 +253,18 @@ function ProfileSignals({ result }: { result: AnalysisResult }) {
     {survey.length > 0 && <section className="rounded-2xl border border-slate-200 bg-slate-50/50 p-5"><h3 className="font-semibold">{tr("Phản hồi gần đây của nhân viên")}</h3><div className="mt-3 grid gap-3">{survey.map((item, index) => <SurveyQuote key={String(item.id ?? index)} evidence={item} />)}</div></section>}
   </div>
 }
-function SignalGroup({ title, tone, items, result }: { title: string; tone: "risk" | "anchor"; items: string[]; result: AnalysisResult }) {
+function SignalGroup({ title, description, tone, items, features }: {
+  title: string
+  description: string
+  tone: "risk" | "anchor"
+  items: [string, number][]
+  features: AnalysisResult["preview"]["features"]
+}) {
   const tr = useAiTr()
   const reduceMotion = useReducedMotion()
   return <section className={`rounded-2xl border p-5 ${tone === "risk" ? "border-amber-200/80 bg-amber-50/20" : "border-emerald-200/80 bg-emerald-50/25"}`}>
     <div className="flex items-start justify-between gap-3"><div className="flex items-start gap-3"><span className={`grid size-10 place-items-center rounded-xl ${tone === "risk" ? "bg-orange-100 text-orange-600" : "bg-emerald-100 text-emerald-700"}`}>{tone === "risk" ? <AlertTriangle className="size-5" /> : <ShieldCheck className="size-5" />}</span><div><h3 className="font-semibold">{title}</h3><p className="mt-1 text-sm text-slate-600">{description}</p></div></div><span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${tone === "risk" ? "bg-amber-100 text-amber-800" : "bg-emerald-100 text-emerald-800"}`}>{items.length} {tr("tín hiệu")}</span></div>
-    {items.length ? <motion.div className="mt-4 grid gap-3" initial="hidden" animate="show" variants={{ hidden: {}, show: { transition: { staggerChildren: reduceMotion ? 0 : .06 } } }}>{items.map(([key]) => <motion.article key={key} variants={{ hidden: { opacity: reduceMotion ? 1 : 0, y: reduceMotion ? 0 : 12 }, show: { opacity: 1, y: 0 } }} transition={{ duration: reduceMotion ? 0 : .22 }} className={`rounded-xl border p-4 shadow-sm transition-all duration-150 hover:-translate-y-0.5 hover:shadow-md motion-reduce:hover:translate-y-0 ${tone === "risk" ? "border-rose-200/70 border-l-4 border-l-rose-500 bg-rose-50/40" : "border-emerald-200/70 border-l-4 border-l-emerald-500 bg-emerald-50/40"}`}><div className="flex items-center gap-3"><span className={`grid size-10 place-items-center rounded-xl ${tone === "risk" ? "bg-orange-100 text-orange-600" : "bg-emerald-100 text-emerald-700"}`}><SignalIcon feature={key} /></span><div><p className="font-semibold">{tr(featureLabel(key))}</p><p className="text-xs font-medium text-slate-600">{displayFeature(key, features[key], tr)}</p></div></div><p className="mt-3 text-sm leading-6 text-slate-600">{signalText(key, features[key], tone, tr)}</p></motion.article>)}</motion.div> : <p className="mt-4 rounded-xl bg-white p-4 text-sm text-slate-600">{tr("Chưa ghi nhận tín hiệu phù hợp trong nhóm này.")}</p>}
+    {items.length ? <motion.div className="mt-4 grid gap-3" initial="hidden" animate="show" variants={{ hidden: {}, show: { transition: { staggerChildren: reduceMotion ? 0 : .06 } } }}>{items.map(([key]) => <motion.article key={key} variants={{ hidden: { opacity: reduceMotion ? 1 : 0, y: reduceMotion ? 0 : 12 }, show: { opacity: 1, y: 0 } }} transition={{ duration: reduceMotion ? 0 : .22 }} className={`rounded-xl border p-4 shadow-sm transition-all duration-150 hover:-translate-y-0.5 hover:shadow-md motion-reduce:hover:translate-y-0 ${tone === "risk" ? "border-rose-200/70 border-l-4 border-l-rose-500 bg-rose-50/40" : "border-emerald-200/70 border-l-4 border-l-emerald-500 bg-emerald-50/40"}`}><div className="flex items-center gap-3"><span className={`grid size-10 place-items-center rounded-xl ${tone === "risk" ? "bg-orange-100 text-orange-600" : "bg-emerald-100 text-emerald-700"}`}><SignalIcon feature={key} /></span><div><p className="font-semibold">{tr(featureLabel(key))}</p><p className="text-xs font-medium text-slate-600">{displayFeature(key, features[key], tr)}</p></div></div><p className="mt-3 text-sm leading-6 text-slate-600">{signalObservation(key, features[key], tr)}</p></motion.article>)}</motion.div> : <p className="mt-4 rounded-xl bg-white p-4 text-sm text-slate-600">{tr("Chưa ghi nhận tín hiệu phù hợp trong nhóm này.")}</p>}
   </section>
 }
 function SignalIcon({ feature }: { feature: string }) { if (/Overtime|Work_Hours/.test(feature)) return <Clock3 className="size-5" />; if (/Hire_Date|Years/.test(feature)) return <CalendarDays className="size-5" />; if (/Department/.test(feature)) return <Building2 className="size-5" />; if (/Satisfaction/.test(feature)) return <HeartHandshake className="size-5" />; return <Sparkles className="size-5" /> }
@@ -291,12 +297,32 @@ function PreviousSessionModal({ result, onClose }: { result: AnalysisResult; onC
 
 function ProfileContext({ snapshot }: { snapshot: AiSnapshot | AnalysisResult["preview"] | null }) {
   const tr = useAiTr()
-  const f = snapshot?.features ?? {}, satisfaction = Number(f.Employee_Satisfaction_Score), overtime = Number(f.Overtime_Hours)
-  const activeSegments = Number.isFinite(satisfaction) ? Math.max(0, Math.min(5, Math.round(satisfaction))) : 0
-  const satisfactionLabel = !Number.isFinite(satisfaction) ? "—" : satisfaction >= 4.5 ? tr("Rất tích cực") : satisfaction >= 3 ? tr("Trung bình khá") : satisfaction >= 2 ? tr("Cần lưu ý") : tr("Cần quan tâm")
+  const f = snapshot?.features ?? {}, overtime = Number(f.Overtime_Hours)
+  const rawSatisfaction = f.Employee_Satisfaction_Score
+  const satisfaction = typeof rawSatisfaction === "number" || (typeof rawSatisfaction === "string" && rawSatisfaction.trim())
+    ? Number(rawSatisfaction)
+    : NaN
+  const hasSatisfaction = Number.isFinite(satisfaction) && satisfaction >= 0 && satisfaction <= 5
+  const scoreLabel = hasSatisfaction ? String(satisfaction) : "—"
+  const satisfactionLabel = !hasSatisfaction ? "—" : satisfaction >= 4.5 ? tr("Rất tích cực") : satisfaction >= 3 ? tr("Trung bình khá") : satisfaction >= 2 ? tr("Cần lưu ý") : tr("Cần quan tâm")
   const groups = [{ title: tr("Thời gian làm việc & Tăng ca"), keys: ["Work_Hours_Per_Week", "Overtime_Hours", "Sick_Days"] }, { title: tr("Hồ sơ & Hợp đồng"), keys: ["Monthly_Salary", "Department", "Years_At_Company", "Hire_Date", "Education_Level", "Age", "Gender", "Promotions"] }]
   return <section className={`${card} p-5`}><h3 className="font-semibold">{tr("Dữ liệu hồ sơ đang dùng")}</h3>{snapshot ? <div className="mt-4 space-y-4">
-    <section className="rounded-xl border border-slate-200 bg-slate-50 p-4"><h4 className="text-xs font-bold uppercase tracking-wider text-slate-600">{tr("Sức khỏe & Gắn kết")}</h4><p className="mt-2 text-sm font-medium text-slate-700">{tr("Mức độ hài lòng công việc")}</p><div className="mt-1 flex items-baseline justify-between gap-2"><span className="text-2xl font-bold tabular-nums">{Number.isFinite(satisfaction) ? satisfaction.toFixed(1) : "—"} <small className="text-sm font-medium text-slate-600">/ 5</small></span><span className="rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-800">{satisfactionLabel}</span></div><div className="mt-3 grid grid-cols-5 gap-1.5" aria-label={tr("Mức hài lòng {score} trên 5", { score: Number.isFinite(satisfaction) ? satisfaction.toFixed(1) : tr("chưa có") })}>{[1, 2, 3, 4, 5].map(segment => <span key={segment} className={`h-2 rounded-full transition-colors duration-300 ${segment <= activeSegments ? segment < 3 ? "bg-amber-400" : "bg-orange-500" : "bg-slate-200"}`} />)}</div></section>
+    <section className="rounded-xl border border-slate-200 bg-slate-50 p-4"><h4 className="text-xs font-bold uppercase tracking-wider text-slate-600">{tr("Sức khỏe & Gắn kết")}</h4><p className="mt-2 text-sm font-medium text-slate-700">{tr("Mức độ hài lòng công việc")}</p><div className="mt-1 flex items-baseline justify-between gap-2"><span className="text-2xl font-bold tabular-nums">{hasSatisfaction ? scoreLabel : "—"} <small className="text-sm font-medium text-slate-600">/ 5</small></span><span className="rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-800">{satisfactionLabel}</span></div><div className="mt-3 grid grid-cols-5 gap-1.5"
+      role={hasSatisfaction ? "meter" : undefined}
+      aria-label={tr("Mức độ hài lòng công việc")}
+      aria-valuemin={hasSatisfaction ? 0 : undefined}
+      aria-valuemax={hasSatisfaction ? 5 : undefined}
+      aria-valuenow={hasSatisfaction ? satisfaction : undefined}
+      aria-valuetext={hasSatisfaction ? tr("Mức hài lòng {score} trên 5", { score: scoreLabel }) : undefined}
+      aria-hidden={!hasSatisfaction || undefined}>
+      {[0, 1, 2, 3, 4].map(segment => {
+        const fill = hasSatisfaction ? Math.max(0, Math.min(1, satisfaction - segment)) * 100 : 0
+        return <span key={segment} className="h-2 overflow-hidden rounded-full bg-slate-200">
+          <span className="block h-full w-full bg-linear-to-r from-amber-400 via-amber-500 to-orange-600"
+            style={{ backgroundSize: "500% 100%", backgroundPosition: `${segment * 25}% center`, clipPath: `inset(0 ${100 - fill}% 0 0)` }} />
+        </span>
+      })}
+    </div></section>
     {groups.map(group => <section key={group.title} className="rounded-xl border border-slate-200 bg-white p-4"><h4 className="text-xs font-bold uppercase tracking-wider text-slate-600">{group.title}</h4><div className="mt-2 grid grid-cols-2 gap-x-4">{group.keys.map(key => <div key={key} className="min-w-0 border-b border-slate-100 py-2.5"><p className="text-xs text-slate-600">{tr(featureLabel(key))}</p><p className="mt-1 break-words text-sm font-semibold text-slate-900">{f[key] === undefined || f[key] === null || f[key] === "" ? "—" : displayFeature(key, f[key], tr)}</p>{key === "Overtime_Hours" && Number.isFinite(overtime) && overtime > 30 && <span className="mt-1 inline-flex rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-800">{tr("Cần đối soát")}</span>}</div>)}</div></section>)}
   </div> : <p className="mt-4 text-sm text-slate-600">{tr("Đang nạp hồ sơ nhân viên…")}</p>}</section>
 }

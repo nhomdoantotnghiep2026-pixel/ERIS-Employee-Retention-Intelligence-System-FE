@@ -54,7 +54,7 @@ function RecommendationCard({ item, number }: { item: AiUnifiedPolicyAnalysis["r
 }
 
 
-function EvidenceCard({ evidence }: { evidence: AiPolicyEvidence }) {
+export function EvidenceCard({ evidence }: { evidence: AiPolicyEvidence }) {
   const tr = useAiTr()
   const { language } = useLanguage()
   const source = String(evidence.source || "EVIDENCE").toUpperCase()

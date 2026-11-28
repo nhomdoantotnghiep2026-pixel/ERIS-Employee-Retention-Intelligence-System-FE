@@ -1,11 +1,11 @@
-import { useEffect, useRef, useState, type DragEvent } from 'react';
+import { useRef, useState, type DragEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { AlertTriangle, ArrowLeft, Check, Download, Eye, FileCheck2, FileSpreadsheet, UploadCloud, X } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, Check, Download, FileSpreadsheet, UploadCloud } from 'lucide-react';
 import { AppShell } from '../components/AppShell';
 import { Card } from '../components/ui';
 import { Button } from '../components/ui/button';
 import { importEmployees, previewEmployeeImport, getApiErrorMessage, type ImportInstitutionChoice, type EmployeeImportPreview, type EmployeeImportResponse } from '../services/api';
-import EmployeeImportPreviewCard from '../components/EmployeeImportPreviewCard';
+import { EmployeeImportGrid, summarizeImport } from '../components/EmployeeImportGrid';
 import { useLanguage } from '../context/LanguageContext';
 
 export default function EmployeeImport() {
@@ -18,11 +18,11 @@ export default function EmployeeImport() {
   const [pending, setPending] = useState<'preview' | 'upload' | null>(null);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
-  const [previewOpen, setPreviewOpen] = useState(false);
   const [preview, setPreview] = useState<EmployeeImportPreview | null>(null);
   const [institutionChoices, setInstitutionChoices] = useState<ImportInstitutionChoice[]>([]);
-  const unresolved = preview?.results.some(row => row.institutions?.some(school => school.status === 'NEEDS_SELECTION' && !institutionChoices.some(choice => choice.row === row.row && choice.educationIndex === school.educationIndex))) ?? false;
   const [result, setResult] = useState<EmployeeImportResponse | null>(null);
+  const summary = summarizeImport(preview, institutionChoices);
+  const step = result ? 3 : pending === 'upload' ? 2 : file ? 1 : 0;
 
   function selectFile(nextFile: File | null) {
     if (pending) return;
@@ -31,7 +31,6 @@ export default function EmployeeImport() {
     setResult(null);
     setPreview(null);
     setInstitutionChoices([]);
-    setPreviewOpen(false);
     if (!nextFile) {
       setFile(null);
       return;
@@ -47,6 +46,7 @@ export default function EmployeeImport() {
       return;
     }
     setFile(nextFile);
+    void showPreview(nextFile);
   }
 
   function dropFile(event: DragEvent<HTMLDivElement>) {
@@ -55,14 +55,13 @@ export default function EmployeeImport() {
     selectFile(event.dataTransfer.files?.[0] || null);
   }
 
-  async function showPreview() {
-    if (!file || pending || result) return;
+  async function showPreview(nextFile: File) {
     setPending('preview');
     setInstitutionChoices([]);
     setError('');
     setPreview(null);
     try {
-      setPreview(await previewEmployeeImport(file));
+      setPreview(await previewEmployeeImport(nextFile));
     } catch (cause) {
       const message = getApiErrorMessage(cause, text('Không thể xem trước tệp Excel.', 'Could not preview the Excel file.'));
       setPreview({ total: 0, valid: 0, failed: 0, results: [], fileIssues: [{
@@ -73,12 +72,11 @@ export default function EmployeeImport() {
       }] });
     } finally {
       setPending(null);
-      setPreviewOpen(true);
     }
   }
 
   async function upload() {
-    if (!file || pending || !(preview && (preview.valid || preview.pending)) || unresolved || result) return;
+    if (!file || pending || !summary.ready || summary.unresolved || preview?.fileIssues?.length || result) return;
     setPending('upload');
     setMessage('');
     setError('');
@@ -117,6 +115,24 @@ export default function EmployeeImport() {
         </Button>
       </header>
 
+      <input
+        ref={fileInputRef}
+        id="employee-file-upload"
+        type="file"
+        accept=".xlsx"
+        disabled={Boolean(pending)}
+        className="sr-only"
+        onChange={event => { selectFile(event.target.files?.[0] || null); event.currentTarget.value = ''; }}
+      />
+
+      <ol aria-label={text('Tiến trình nhập nhân viên', 'Employee import progress')} className="mb-5 grid grid-cols-2 gap-2 sm:grid-cols-4">
+        {[text('Chọn tệp Excel', 'Choose Excel file'), text('Xem trước & đối soát', 'Preview and validate'), text('Xác nhận tạo hồ sơ', 'Confirm creation'), text('Hoàn tất & xem danh sách', 'Finish and view employees')].map((label, index) =>
+          <li key={label} aria-current={step === index ? 'step' : undefined} className={`flex items-center gap-2 rounded-lg border px-3 py-2.5 text-xs font-semibold sm:text-sm ${step === index ? 'border-orange-200 bg-orange-50 text-orange-800' : 'border-slate-200 bg-white text-slate-700'}`}>
+            <span className={`grid size-6 shrink-0 place-items-center rounded-full ${index < step ? 'bg-emerald-50 text-emerald-800' : 'bg-slate-100'}`}>{index < step ? <Check size={14} aria-hidden="true"/> : index + 1}</span>{label}
+          </li>)}
+      </ol>
+      {error && <p role="alert" className="mb-4 flex items-start gap-2 rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800"><AlertTriangle size={17} className="mt-0.5 shrink-0"/>{error}</p>}
+      {!file && (
       <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_340px]">
         <Card className="p-5 sm:p-7">
           <div
@@ -133,41 +149,11 @@ export default function EmployeeImport() {
             <p className="mt-2 text-sm font-medium text-slate-600">{text('Tối đa 5 MB và 200 dòng nhân viên.', 'Maximum 5 MB and 200 employee rows.')}</p>
             <p className="mt-1 text-sm text-slate-600">{text('Bạn cũng có thể kéo và thả tệp vào khu vực này.', 'You can also drag and drop a file into this area.')}</p>
 
-            <input
-              ref={fileInputRef}
-              id="employee-file-upload"
-              type="file"
-              accept=".xlsx"
-              disabled={Boolean(pending)}
-              className="sr-only"
-              onChange={event => { selectFile(event.target.files?.[0] || null); event.currentTarget.value = ''; }}
-            />
             <Button type="button" size="lg" className="mt-6 h-11 rounded-md !bg-orange-600 px-5 !text-white hover:!bg-orange-700" disabled={Boolean(pending)} onClick={() => fileInputRef.current?.click()}>
               <UploadCloud />{text('Chọn tệp', 'Choose file')}
             </Button>
           </div>
 
-          {file && <div className="mt-4 flex flex-col gap-4 rounded-md border border-slate-200 bg-white p-4 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex min-w-0 items-center gap-3">
-              <span className="flex size-10 shrink-0 items-center justify-center rounded-md bg-emerald-50 text-emerald-700"><FileCheck2 size={21}/></span>
-              <div className="min-w-0">
-                <p className="truncate text-sm font-semibold text-slate-900">{file.name}</p>
-                <p className="mt-0.5 text-sm font-medium text-slate-600">{(file.size / 1024 / 1024).toFixed(2)} MB</p>
-              </div>
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <Button type="button" variant="ghost" size="icon" className="rounded-md text-slate-600 hover:bg-slate-100" aria-label={text('Bỏ tệp đã chọn', 'Remove selected file')} disabled={Boolean(pending)} onClick={() => selectFile(null)}><X/></Button>
-              {!result && <Button type="button" size="lg" variant="outline" className="h-11 rounded-md" disabled={Boolean(pending)} onClick={() => void showPreview()}>
-                <Eye />{pending === 'preview' ? text('Đang kiểm tra...', 'Checking...') : text('Xem trước', 'Preview')}
-              </Button>}
-              {Boolean(preview && (preview.valid || preview.pending)) && <Button type="button" size="lg" className="h-11 rounded-md !bg-orange-600 px-4 !text-white hover:!bg-orange-700" disabled={Boolean(pending) || unresolved} onClick={() => void upload()}>
-                <UploadCloud />{pending === 'upload' ? text('Đang tạo nhân viên...', 'Creating employees...') : text('Tải lên và tạo nhân viên', 'Upload and create employees')}
-              </Button>}
-            </div>
-          </div>}
-
-          {message && <p role="status" className="mt-4 flex items-start gap-2 rounded-md border border-emerald-200 bg-emerald-50 p-4 text-sm font-medium text-emerald-800"><Check className="mt-0.5 shrink-0" size={17}/>{message}</p>}
-          {error && <p role="alert" className="mt-4 flex items-start gap-2 rounded-md border border-red-200 bg-red-50 p-4 text-sm font-medium text-red-800"><AlertTriangle className="mt-0.5 shrink-0" size={17}/>{error}</p>}
         </Card>
 
         <Card className="p-5 sm:p-6">
@@ -190,19 +176,24 @@ export default function EmployeeImport() {
           </ul>
         </Card>
       </div>
-
-      {preview && <Card className="mt-5 flex flex-wrap items-center justify-between gap-3 p-4 sm:p-5">
-        <p role="status" className="text-sm font-medium text-slate-700">{preview.fileIssues?.length
-          ? text('Chưa thể hoàn tất kiểm tra tệp.', 'Workbook validation could not finish.')
-          : text(`${preview.total - preview.failed} dòng qua kiểm tra cấu trúc, ${preview.failed} dòng có lỗi.${unresolved ? " Cần chọn trường trước khi nhập." : ""}`, `${preview.valid} valid rows, ${preview.failed} failed rows.`)}</p>
-        <Button type="button" variant="outline" onClick={() => setPreviewOpen(true)}>
-          <Eye />{text('Xem chi tiết kiểm tra', 'View validation details')}
-        </Button>
-      </Card>}
-      <ImportPreviewDialog preview={preview} open={previewOpen} choices={institutionChoices} onChoose={(choice) => setInstitutionChoices(current => [...current.filter(item => item.row !== choice.row || item.educationIndex !== choice.educationIndex), choice])} onClose={() => setPreviewOpen(false)} text={text} />
+      )}
+      {file && <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5">
+        <div className="flex min-w-0 flex-wrap items-center gap-2 text-sm">
+          <FileSpreadsheet size={20} className="shrink-0 text-emerald-700" aria-hidden="true"/>
+          <strong className="min-w-0 [overflow-wrap:anywhere]">{file.name}</strong>
+          <span className="text-xs text-slate-600">{(file.size / 1024 / 1024).toFixed(2)} MB</span>
+          {(preview || result) && <span className="rounded-md bg-white px-2 py-1 text-xs font-semibold text-slate-700">{text(`Đã đọc ${(preview ?? result)?.total} dòng`, `Read ${(preview ?? result)?.total} rows`)}</span>}
+        </div>
+        <Button type="button" variant="outline" disabled={Boolean(pending)} onClick={() => fileInputRef.current?.click()}>{text('Đổi tệp khác', 'Choose another file')}</Button>
+      </div>}
+      {pending === 'preview' && <p role="status" className="rounded-xl border border-slate-200 bg-white p-5 text-sm text-slate-700">{text('Đang đọc và kiểm tra tệp Excel…', 'Reading and validating the Excel file…')}</p>}
+      {preview && <EmployeeImportGrid preview={preview} choices={institutionChoices} summary={summary} uploading={pending === 'upload'} text={text}
+        onChangeFile={() => fileInputRef.current?.click()} onUpload={() => void upload()}
+        onChoose={choice => setInstitutionChoices(current => [...current.filter(item => item.row !== choice.row || item.educationIndex !== choice.educationIndex), choice])} />}
 
       {result && <Card className="mt-5 p-5 sm:p-6">
-        <div><h2 className="text-lg font-semibold text-slate-950">{text('Kết quả nhập dữ liệu', 'Import results')}</h2><p className="mt-1 text-sm font-medium text-slate-600">{text('Kiểm tra trạng thái xử lý của từng dòng.', 'Review the processing status of every row.')}</p></div>
+        <div className="flex flex-wrap items-center justify-between gap-3"><h2 className="text-lg font-semibold text-slate-950">{text('Kết quả nhập dữ liệu', 'Import results')}</h2><Button type="button" variant="outline" onClick={() => navigate('/employees')}>{text('Xem danh sách nhân viên', 'View employee list')}</Button></div>
+        {message && <p role="status" className="mt-3 text-sm text-slate-700">{message}</p>}
         <div className="mt-5 grid gap-3 sm:grid-cols-3">
           <ResultMetric label={text('Tổng dòng', 'Total rows')} value={result.total} tone="text-slate-950"/>
           <ResultMetric label={text('Tạo thành công', 'Created')} value={result.created} tone="text-emerald-700"/>
@@ -217,51 +208,6 @@ export default function EmployeeImport() {
       </Card>}
     </section>
   </AppShell>;
-}
-
-function ImportPreviewDialog({ preview, open, onClose, text, choices, onChoose }: {
-  preview: EmployeeImportPreview | null;
-  choices: ImportInstitutionChoice[];
-  onChoose: (choice: ImportInstitutionChoice) => void;
-  open: boolean;
-  onClose: () => void;
-  text: (vi: string, en: string) => string;
-}) {
-  const dialog = useRef<HTMLDialogElement>(null);
-  useEffect(() => {
-    const node = dialog.current;
-    if (!node) return;
-    if (open && !node.open) node.showModal();
-    if (!open && node.open) node.close();
-  }, [open]);
-
-  return <dialog ref={dialog} onClose={onClose} aria-labelledby="employee-import-preview-title"
-    className="m-auto max-h-[80vh] w-[calc(100%-2rem)] max-w-4xl overflow-hidden rounded-xl border border-slate-200 bg-white p-0 text-slate-900 shadow-2xl backdrop:bg-slate-950/55">
-    <div className="flex max-h-[80vh] flex-col">
-      <header className="flex shrink-0 items-start justify-between gap-3 border-b border-slate-100 p-4 sm:p-6">
-        <div>
-          <h2 id="employee-import-preview-title" className="text-lg font-semibold">{text('Chi tiết kiểm tra Excel','Excel validation details')}</h2>
-          <p className="mt-1 text-sm leading-6 text-slate-600">{text(
-            `Đã đọc ${preview?.total ?? 0} dòng nhân sự. Xem hồ sơ, lỗi dữ liệu và đối chiếu bằng cấp bên dưới.`,
-            `Read ${preview?.total ?? 0} employee rows. Review profiles, data errors and education matches below.`)}</p>
-        </div>
-        <Button type="button" variant="ghost" size="icon" autoFocus onClick={() => dialog.current?.close()}
-          aria-label={text('Đóng chi tiết kiểm tra','Close validation details')}><X/></Button>
-      </header>
-      <div tabIndex={0} role="region" aria-label={text('Danh sách hồ sơ xem trước','Employee preview list')}
-        className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain p-4 motion-safe:scroll-smooth focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-orange-500 sm:p-6">
-        {!!preview?.fileIssues?.length && <div className="space-y-2 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">
-          <h3 className="font-semibold">{text('Cần kiểm tra cấu trúc tệp','Review workbook structure')}</h3>
-          {preview.fileIssues.map((issue,index) => <p key={index} className="break-words">{[issue.sheet,issue.cell || issue.field].filter(Boolean).join(' · ')}{issue.sheet || issue.cell || issue.field ? ': ' : ''}{issue.message}</p>)}
-        </div>}
-        {preview?.results.map(row => <EmployeeImportPreviewCard key={row.row} row={row} choices={choices} onChoose={onChoose} text={text}/>)}
-        {!preview?.results.length && !preview?.fileIssues?.length && <p className="text-sm text-slate-600">{text('Chưa có dòng nhân sự để hiển thị.','No employee rows to display.')}</p>}
-      </div>
-      <footer className="flex shrink-0 justify-end border-t border-slate-100 px-4 py-3 sm:px-6">
-        <Button type="button" variant="outline" onClick={() => dialog.current?.close()}>{text('Đóng','Close')}</Button>
-      </footer>
-    </div>
-  </dialog>;
 }
 
 function ResultMetric({ label, value, tone }: { label: string; value: number; tone: string }) {
