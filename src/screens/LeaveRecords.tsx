@@ -1,15 +1,12 @@
 import { SelectControl } from "../components/ui/select-control"
 import {
   useEffect,
-  useLayoutEffect,
-  useRef,
+  useMemo,
   useState,
   type FormEvent,
 } from "react"
-import { createPortal } from "react-dom"
 import { useNavigate } from "react-router-dom"
 import {
-  AlertTriangle,
   ArrowDown,
   ArrowUp,
   ArrowUpDown,
@@ -17,9 +14,7 @@ import {
   CalendarCheck2,
   CalendarDays,
   Clock3,
-  Eye,
   Inbox,
-  MoreHorizontal,
   RotateCcw,
   Search,
   Upload,
@@ -29,15 +24,15 @@ import { AppShell } from "../components/AppShell"
 import LeaveImportDialog from "../components/leave/LeaveImportDialog"
 import LeaveRecordDrawer from "../components/leave/LeaveRecordDrawer"
 import { Button, Card, SectionHeader } from "../components/ui"
+import { useRole } from "../context/RoleContext"
 import { useLanguage } from "../context/LanguageContext"
 import { useAutoDismissFeedback } from "../hooks/useAutoDismissState"
-import { listEmployeeProfiles, type EmployeeProfile } from "../services/api"
+import { listDepartments, listEmployeeProfiles, type EmployeeProfile } from "../services/api"
 import {
   attendanceMessage,
   cancelLeaveRecord,
   confirmLeaveFile,
   fetchLeaveRecords,
-  fetchLeaveSummary,
   fetchLeaveTypes,
   previewLeaveFile,
   type LeaveImportResult,
@@ -47,144 +42,40 @@ import {
   type RecordFilters,
 } from "../services/attendance"
 
-const PAGE_SIZE = 20
+import { displayLeaveReason, leaveCalendarDays, leaveTypeDisplay } from "../utils/leaveRecordDisplay"
+
+const PAGE_SIZE = 25
 const control =
   "mt-1 h-11 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none transition-colors duration-200 focus:border-orange-400 focus:ring-4 focus:ring-orange-100"
 
-interface LeaveSummaryItem {
-  employee_id: number
-  leave_type_id: number
-  records: number
-  total_days: number | null
-  total_hours: null
-}
-
-function RowActionsMenu({
-  disabled,
-  detailLabel,
-  cancelLabel,
-  moreLabel,
-  onDetail,
-  onCancel,
-}: {
-  disabled: boolean
-  detailLabel: string
-  cancelLabel?: string
-  moreLabel: string
-  onDetail: () => void
-  onCancel?: () => void
-}) {
-  const [open, setOpen] = useState(false)
-  const [position, setPosition] = useState({ top: 0, left: 0 })
-  const buttonRef = useRef<HTMLButtonElement>(null)
-  const menuRef = useRef<HTMLDivElement>(null)
-
-  useLayoutEffect(() => {
-    if (!open || !buttonRef.current) return
-    const rect = buttonRef.current.getBoundingClientRect()
-    const menuHeight = 104
-    const openAbove = window.innerHeight - rect.bottom < menuHeight + 16
-    setPosition({
-      top: openAbove ? Math.max(8, rect.top - menuHeight - 6) : rect.bottom + 6,
-      left: Math.max(8, Math.min(window.innerWidth - 216, rect.right - 208)),
-    })
-  }, [open])
-
-  useEffect(() => {
-    if (!open) return
-    const close = () => setOpen(false)
-    const closeOutside = (event: MouseEvent) => {
-      const target = event.target as Node
-      if (
-        !buttonRef.current?.contains(target) &&
-        !menuRef.current?.contains(target)
-      ) {
-        setOpen(false)
-      }
-    }
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setOpen(false)
-    }
-    window.addEventListener("resize", close)
-    window.addEventListener("scroll", close, true)
-    document.addEventListener("mousedown", closeOutside)
-    document.addEventListener("keydown", closeOnEscape)
-    return () => {
-      window.removeEventListener("resize", close)
-      window.removeEventListener("scroll", close, true)
-      document.removeEventListener("mousedown", closeOutside)
-      document.removeEventListener("keydown", closeOnEscape)
-    }
-  }, [open])
-
-  return (
-    <>
-      <button
-        ref={buttonRef}
-        type="button"
-        disabled={disabled}
-        aria-label={moreLabel}
-        aria-haspopup="menu"
-        aria-expanded={open}
-        onClick={() => setOpen((value) => !value)}
-        className="flex size-9 items-center justify-center rounded-md border border-slate-300 bg-white text-slate-700 transition-colors duration-200 hover:border-orange-300 hover:bg-orange-50 hover:text-orange-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-500 disabled:opacity-50"
-      >
-        <MoreHorizontal size={18} />
-      </button>
-      {open &&
-        createPortal(
-          <div
-            ref={menuRef}
-            role="menu"
-            style={{ top: position.top, left: position.left }}
-            className="fixed z-[120] w-52 animate-in fade-in zoom-in-95 rounded-md border border-slate-200 bg-white p-1.5 text-left shadow-xl duration-150"
-          >
-            <button
-              type="button"
-              role="menuitem"
-              onClick={() => {
-                setOpen(false)
-                onDetail()
-              }}
-              className="flex h-10 w-full items-center gap-2 rounded-md px-3 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-orange-500"
-            >
-              <Eye size={16} /> {detailLabel}
-            </button>
-            {cancelLabel && onCancel && (
-              <button
-                type="button"
-                role="menuitem"
-                onClick={() => {
-                  setOpen(false)
-                  onCancel()
-                }}
-                className="flex h-10 w-full items-center gap-2 rounded-md px-3 text-sm font-semibold text-red-700 transition-colors hover:bg-red-50 focus-visible:outline-2 focus-visible:outline-red-500"
-              >
-                <AlertTriangle size={16} /> {cancelLabel}
-              </button>
-            )}
-          </div>,
-          document.body,
-        )}
-    </>
-  )
+async function loadLeaveRows(filters: RecordFilters, own: boolean, signal: AbortSignal) {
+  // The API returns offsets without a total. Gather the selected date range for filtering and exact page counts.
+  const records: LeaveRecord[] = []
+  let limit = PAGE_SIZE
+  for (;;) {
+    const page = await fetchLeaveRecords({ ...filters, limit, offset: records.length }, own, signal)
+    records.push(...page.data)
+    if (page.data.length < (page.limit || limit)) return records
+    limit = 200
+  }
 }
 
 export default function LeaveRecords({ own = false }: { own?: boolean }) {
   const { language } = useLanguage()
+  const { user } = useRole()
   const navigate = useNavigate()
   const tr = (vi: string, en: string) => (language === "vi" ? vi : en)
   const initialFilters: RecordFilters = { record_status: "ACTIVE" }
 
   const [types, setTypes] = useState<LeaveType[]>([])
   const [rows, setRows] = useState<LeaveRecord[]>([])
-  const [filterRows, setFilterRows] = useState<LeaveRecord[]>([])
-  const [employees, setEmployees] = useState<EmployeeProfile[]>([])
-  const [summary, setSummary] = useState<LeaveSummaryItem[]>([])
+  const [employees, setEmployees] = useState<EmployeeProfile[] | null>(null)
+  const [departments, setDepartments] = useState<{ id: number; name: string }[]>([])
   const [filters, setFilters] = useState<RecordFilters>(initialFilters)
   const [draft, setDraft] = useState<RecordFilters>(initialFilters)
   const [employeeSearch, setEmployeeSearch] = useState("")
   const [leaveTypeId, setLeaveTypeId] = useState("")
+  const [unpaidOnly, setUnpaidOnly] = useState(false)
   const [file, setFile] = useState<File | null>(null)
   const [preview, setPreview] = useState<LeavePreview | null>(null)
   const [result, setResult] = useState<LeaveImportResult | null>(null)
@@ -198,7 +89,6 @@ export default function LeaveRecords({ own = false }: { own?: boolean }) {
   const [offset, setOffset] = useState(0)
   const [revision, setRevision] = useState(0)
   const [loading, setLoading] = useState(true)
-  const [clientRowsLoading, setClientRowsLoading] = useState(false)
   const [busy, setBusy] = useState(false)
   const [hasAnyRecords, setHasAnyRecords] = useState<boolean | null>(null)
   const {
@@ -207,8 +97,6 @@ export default function LeaveRecords({ own = false }: { own?: boolean }) {
     setError,
     setMessage: setNotice,
   } = useAutoDismissFeedback()
-
-  const needsClientFiltering = Boolean(employeeSearch.trim() || leaveTypeId)
 
   useEffect(() => {
     let live = true
@@ -234,16 +122,14 @@ export default function LeaveRecords({ own = false }: { own?: boolean }) {
   useEffect(() => {
     if (own) return
     const controller = new AbortController()
-    void listEmployeeProfiles(
-      { page: 1, limit: 1000, employmentStatus: "ACTIVE" },
-      controller.signal,
-    )
-      .then((response) => {
-        if (!controller.signal.aborted) setEmployees(response.data)
-      })
-      .catch(() => {
-        if (!controller.signal.aborted) setEmployees([])
-      })
+    void Promise.allSettled([
+      listEmployeeProfiles({ limit: Number.MAX_SAFE_INTEGER }, controller.signal),
+      listDepartments(controller.signal, { limit: Number.MAX_SAFE_INTEGER }),
+    ]).then(([staff, teams]) => {
+      if (controller.signal.aborted) return
+      if (staff.status === "fulfilled") setEmployees(staff.value.data)
+      if (teams.status === "fulfilled") setDepartments(teams.value.data)
+    })
     return () => controller.abort()
   }, [own, revision])
 
@@ -251,103 +137,39 @@ export default function LeaveRecords({ own = false }: { own?: boolean }) {
     const controller = new AbortController()
     setLoading(true)
     setRows([])
-    setSummary([])
     setError("")
-    void fetchLeaveRecords(
-      { ...filters, limit: PAGE_SIZE, offset },
-      own,
-      controller.signal,
-    )
-      .then((response) => {
-        if (!controller.signal.aborted) setRows(response.data)
-      })
+    void loadLeaveRows(filters, own, controller.signal)
+      .then((data) => { if (!controller.signal.aborted) setRows(data) })
       .catch((reason) => {
-        if (!controller.signal.aborted) {
-          setError(
-            attendanceMessage(
-              reason,
-              tr("Không tải được hồ sơ nghỉ.", "Could not load leave records."),
-            ),
-          )
-        }
+        if (!controller.signal.aborted) setError(attendanceMessage(reason, tr("Không tải được hồ sơ nghỉ.", "Could not load leave records.")))
       })
-      .finally(() => {
-        if (!controller.signal.aborted) setLoading(false)
-      })
-
-    if (!own) {
-      void fetchLeaveSummary(filters, controller.signal)
-        .then((response) => {
-          if (!controller.signal.aborted) setSummary(response.data)
-        })
-        .catch(() => {
-          if (!controller.signal.aborted) setSummary([])
-        })
-    }
-
-    void fetchLeaveRecords(
-      { record_status: "ALL", limit: 1, offset: 0 },
-      own,
-      controller.signal,
-    )
-      .then((response) => {
-        if (!controller.signal.aborted) setHasAnyRecords(response.data.length > 0)
-      })
-      .catch(() => undefined)
+      .finally(() => { if (!controller.signal.aborted) setLoading(false) })
     return () => controller.abort()
-  }, [filters, offset, revision, own])
+  }, [filters, revision, own])
 
   useEffect(() => {
-    if (!needsClientFiltering) {
-      setFilterRows([])
-      setClientRowsLoading(false)
-      return
-    }
     const controller = new AbortController()
-    setClientRowsLoading(true)
-    void fetchLeaveRecords(
-      { ...filters, limit: 1000, offset: 0 },
-      own,
-      controller.signal,
-    )
-      .then((response) => {
-        if (!controller.signal.aborted) setFilterRows(response.data)
-      })
-      .catch((reason) => {
-        if (!controller.signal.aborted) {
-          setError(
-            attendanceMessage(
-              reason,
-              tr(
-                "Không tải được dữ liệu để lọc.",
-                "Could not load records for filtering.",
-              ),
-            ),
-          )
-        }
-      })
-      .finally(() => {
-        if (!controller.signal.aborted) setClientRowsLoading(false)
-      })
+    void fetchLeaveRecords({ record_status: "ALL", limit: 1, offset: 0 }, own, controller.signal)
+      .then(({ data }) => { if (!controller.signal.aborted) setHasAnyRecords(data.length > 0) })
+      .catch(() => undefined)
     return () => controller.abort()
-  }, [filters, needsClientFiltering, own, revision])
+  }, [revision, own])
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
       if (draft.from && draft.to && draft.from > draft.to) return
-      setFilters({ ...draft })
+      setFilters(current => current.from === draft.from && current.to === draft.to && current.record_status === draft.record_status ? current : draft)
       setOffset(0)
     }, 350)
     return () => window.clearTimeout(timer)
   }, [draft])
 
   useEffect(() => {
-    if (!importModalOpen && !detailRecord) return
+    if (!importModalOpen) return
     const previousOverflow = document.body.style.overflow
     const closeOnEscape = (event: KeyboardEvent) => {
       if (event.key !== "Escape" || busy) return
-      if (detailRecord) closeDetailDrawer()
-      else closeImportDialog()
+      closeImportDialog()
     }
     document.body.style.overflow = "hidden"
     document.addEventListener("keydown", closeOnEscape)
@@ -355,7 +177,7 @@ export default function LeaveRecords({ own = false }: { own?: boolean }) {
       document.body.style.overflow = previousOverflow
       document.removeEventListener("keydown", closeOnEscape)
     }
-  }, [importModalOpen, detailRecord, cancellationReason, file, preview, busy])
+  }, [importModalOpen, file, preview, busy])
 
   async function work(action: () => Promise<void>) {
     if (busy) return
@@ -507,75 +329,42 @@ export default function LeaveRecords({ own = false }: { own?: boolean }) {
   }
 
   const invalid = Boolean(draft.from && draft.to && draft.from > draft.to)
-  const employeeById = new Map(
-    employees.map((employee) => [employee.id, employee]),
-  )
-  const normalizedSearch = employeeSearch
-    .trim()
-    .toLocaleLowerCase(language === "vi" ? "vi-VN" : "en-US")
-  const employeeForRecord = (record: LeaveRecord) =>
-    employeeById.get(record.employee_id)
-  const employeeName = (record: LeaveRecord) =>
-    employeeForRecord(record)?.fullName || ""
-  const recordMatchesSearch = (record: LeaveRecord) => {
-    if (!normalizedSearch) return true
-    const profile = employeeForRecord(record)
-    const searchable = `${record.employee_code || ""} ${profile?.employeeCode || ""} ${profile?.fullName || ""}`
-      .toLocaleLowerCase(language === "vi" ? "vi-VN" : "en-US")
-    return searchable.includes(normalizedSearch)
+  const employeeById = useMemo(() => new Map(employees?.map(employee => [employee.id, employee])), [employees])
+  const departmentsById = useMemo(() => new Map(departments.map(team => [team.id, team.name])), [departments])
+  const typeById = useMemo(() => new Map(types.map(type => [type.id, type])), [types])
+  const metaFor = (record: LeaveRecord) => {
+    const type = typeById.get(record.leave_type_id)
+    return leaveTypeDisplay(record.leave_type || type?.code, record.leave_type_name || type?.name, tr)
   }
-  const sourceRows = needsClientFiltering ? filterRows : rows
-  const filteredRows = sourceRows.filter(
-    (record) =>
-      (!leaveTypeId || String(record.leave_type_id) === leaveTypeId) &&
-      recordMatchesSearch(record),
-  )
-  const matchingEmployeeIds = new Set(
-    filteredRows.map((record) => record.employee_id),
-  )
-  const scopedSummary = summary.filter(
-    (item) =>
-      (!leaveTypeId || String(item.leave_type_id) === leaveTypeId) &&
-      (!normalizedSearch || matchingEmployeeIds.has(item.employee_id)),
-  )
-  const summaryRecordCount = scopedSummary.reduce(
-    (total, item) => total + Number(item.records || 0),
-    0,
-  )
-  const summaryHasDayCount = scopedSummary.some(
-    (item) => item.total_days !== null,
-  )
-  const summaryDayCount = scopedSummary.reduce(
-    (total, item) => total + Number(item.total_days ?? 0),
-    0,
-  )
-
-  const recordDayCount = (record: LeaveRecord) => {
-    const start = new Date(`${record.start_date}T00:00:00Z`).getTime()
-    const end = new Date(`${record.end_date}T00:00:00Z`).getTime()
-    return Math.max(1, Math.floor((end - start) / 86_400_000) + 1)
+  const employeeForRecord = (record: LeaveRecord) => employeeById.get(record.employee_id)
+  const employeeName = (record: LeaveRecord) => employeeForRecord(record)?.fullName || (own ? user.name : "")
+  const departmentName = (record: LeaveRecord) => departmentsById.get(employeeForRecord(record)?.departmentId ?? -1)
+  const reasonFor = (record: LeaveRecord) => displayLeaveReason(record.reason, metaFor(record).kind === "ANNUAL", tr)
+  const searchable = (value: string) => value.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase().replace(/đ/g, "d")
+  const query = searchable(employeeSearch.trim())
+  const filteredRows = rows.filter(record => {
+    if (leaveTypeId && String(record.leave_type_id) !== leaveTypeId) return false
+    if (unpaidOnly && metaFor(record).kind !== "UNPAID") return false
+    if (!query) return true
+    return searchable(`${employeeName(record)} ${record.employee_code || employeeForRecord(record)?.employeeCode || ""} ${reasonFor(record)}`).includes(query)
+  })
+  const activeRows = filteredRows.filter(record => record.record_status === "ACTIVE")
+  const peopleOnLeave = new Set(activeRows.map(record => record.employee_id))
+  const employeeCount = employees?.filter(employee => employee.employmentStatus === "ACTIVE").length
+  const activePeopleOnLeave = [...peopleOnLeave].filter(id => employeeById.get(id)?.employmentStatus === "ACTIVE").length
+  const activeDayCount = activeRows.reduce((days, record) => days + leaveCalendarDays(record, filters.from, filters.to), 0)
+  const average = (value: number) => value.toLocaleString(language, { minimumFractionDigits: 1, maximumFractionDigits: 1 })
+  const recordDayCount = leaveCalendarDays
+  const [year, month] = new Intl.DateTimeFormat("sv-SE", {
+    timeZone: "Asia/Ho_Chi_Minh", year: "numeric", month: "2-digit", day: "2-digit",
+  }).format(new Date()).split("-").map(Number)
+  const setPeriod = (period: "month" | "quarter" | "year") => {
+    const startMonth = period === "year" ? 0 : period === "quarter" ? Math.floor((month - 1) / 3) * 3 : month - 1
+    const months = period === "year" ? 12 : period === "quarter" ? 3 : 1
+    const from = new Date(Date.UTC(year, startMonth, 1)).toISOString().slice(0, 10)
+    const to = new Date(Date.UTC(year, startMonth + months, 0)).toISOString().slice(0, 10)
+    setDraft(previous => ({ ...previous, from, to }))
   }
-  const activeRows = filteredRows.filter(
-    (record) => record.record_status === "ACTIVE",
-  )
-  const activeRecordCount = own
-    ? activeRows.length
-    : needsClientFiltering
-      ? activeRows.length
-      : summaryRecordCount
-  const activeEmployeeCount = own
-    ? new Set(activeRows.map((record) => record.employee_id)).size
-    : scopedSummary.length
-      ? new Set(scopedSummary.map((item) => item.employee_id)).size
-      : new Set(activeRows.map((record) => record.employee_id)).size
-  const activeDayCount =
-    !own && !needsClientFiltering && summaryHasDayCount
-      ? summaryDayCount
-      : activeRows.reduce(
-          (total, record) => total + recordDayCount(record),
-          0,
-        )
-
   const formatDate = (value: string) => {
     const date = new Date(`${value}T00:00:00Z`)
     return Number.isNaN(date.getTime())
@@ -597,21 +386,6 @@ export default function LeaveRecords({ own = false }: { own?: boolean }) {
           timeStyle: "short",
           timeZone: "Asia/Ho_Chi_Minh",
         }).format(date)
-  }
-  const leaveTypeMeta = (record: LeaveRecord) => {
-    const type = types.find((item) => item.id === record.leave_type_id)
-    const code = (record.leave_type || type?.code || "LEAVE").toUpperCase()
-    const label = record.leave_type_name || type?.name || code
-    const tone = code.includes("SICK")
-      ? "border-rose-200 bg-rose-50 text-rose-700"
-      : code.includes("ANNUAL")
-        ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-        : code.includes("PERSONAL")
-          ? "border-blue-200 bg-blue-50 text-blue-700"
-          : code.includes("MATERNITY") || code.includes("PATERNITY")
-            ? "border-violet-200 bg-violet-50 text-violet-700"
-            : "border-slate-200 bg-slate-100 text-slate-700"
-    return { code, label: `${code} · ${label}`, tone }
   }
   const employeeInitials = (record: LeaveRecord) => {
     const name = employeeName(record)
@@ -639,24 +413,17 @@ export default function LeaveRecords({ own = false }: { own?: boolean }) {
       }) * (sort.direction === "asc" ? 1 : -1)
     )
   })
-  const visibleRows = needsClientFiltering
-    ? sortedRows.slice(offset, offset + PAGE_SIZE)
-    : sortedRows
-  const pageStart = visibleRows.length ? offset + 1 : 0
-  const pageEnd = offset + visibleRows.length
-  const knownTotal = needsClientFiltering
-    ? filteredRows.length
-    : filters.record_status === "ACTIVE"
-      ? activeRecordCount
-      : null
-  const hasNextPage = needsClientFiltering
-    ? offset + PAGE_SIZE < filteredRows.length
-    : rows.length >= PAGE_SIZE
-  const detailMeta = detailRecord
-    ? leaveTypeMeta(detailRecord)
-    : { label: "", tone: "" }
+  const pageCount = Math.max(1, Math.ceil(sortedRows.length / PAGE_SIZE))
+  const currentPage = Math.min(Math.floor(offset / PAGE_SIZE) + 1, pageCount)
+  const pageOffset = (currentPage - 1) * PAGE_SIZE
+  const visibleRows = sortedRows.slice(pageOffset, pageOffset + PAGE_SIZE)
+  const pageStart = visibleRows.length ? pageOffset + 1 : 0
+  const pageEnd = pageOffset + visibleRows.length
+  const detailMeta = detailRecord ? metaFor(detailRecord) : { label: "", tone: "" }
+  const annualTypeIds = types.filter(type => leaveTypeDisplay(type.code, type.name, tr).kind === "ANNUAL").map(type => type.id).join(",")
 
   const toggleSort = (key: "employee" | "dates") => {
+    setOffset(0)
     setSort((current) =>
       current.key === key
         ? {
@@ -680,30 +447,36 @@ export default function LeaveRecords({ own = false }: { own?: boolean }) {
     setFilters(initialFilters)
     setEmployeeSearch("")
     setLeaveTypeId("")
+    setUnpaidOnly(false)
     setOffset(0)
   }
 
   const kpis = [
     {
       label: tr("Hồ sơ hợp lệ", "Valid records"),
-      value: activeRecordCount,
-      detail: tr("Đang có hiệu lực", "Currently active"),
+      value: activeRows.length,
+      detail: tr("Hồ sơ đang có hiệu lực", "Effective records"),
       icon: CalendarCheck2,
-      tone: "bg-emerald-50 text-emerald-700",
+      tone: "border-emerald-200/60 from-emerald-50/70",
+      badge: "bg-emerald-100 text-emerald-800",
     },
     {
-      label: tr("Nhân viên có nghỉ", "Employees on leave"),
-      value: activeEmployeeCount,
-      detail: tr("Trong phạm vi đang lọc", "Within current filters"),
+      label: tr("Nhân viên nghỉ", "Employees on leave"),
+      value: `${peopleOnLeave.size} ${tr("nhân sự", "employees")}`,
+      detail: employeeCount
+        ? tr(`${average(activePeopleOnLeave / employeeCount * 100)}% trong ${employeeCount} nhân sự đang làm việc`, `${average(activePeopleOnLeave / employeeCount * 100)}% of ${employeeCount} active employees`)
+        : tr("Trong phạm vi đang lọc", "Within current filters"),
       icon: Users,
-      tone: "bg-blue-50 text-blue-700",
+      tone: "border-blue-200/60 from-blue-50/70",
+      badge: "bg-blue-100 text-blue-800",
     },
     {
       label: tr("Tổng ngày nghỉ", "Total leave days"),
-      value: activeDayCount,
-      detail: tr("Cộng dồn theo khoảng ngày", "Cumulative leave duration"),
+      value: `${activeDayCount} ${tr("ngày lịch", "calendar days")}`,
+      detail: tr(`Trung bình ${average(peopleOnLeave.size ? activeDayCount / peopleOnLeave.size : 0)} ngày lịch/người có nghỉ`, `Average ${average(peopleOnLeave.size ? activeDayCount / peopleOnLeave.size : 0)} calendar days per employee on leave`),
       icon: Clock3,
-      tone: "bg-orange-50 text-orange-700",
+      tone: "border-amber-200/60 from-amber-50/70",
+      badge: "bg-amber-100 text-amber-800",
     },
   ]
 
@@ -754,7 +527,7 @@ export default function LeaveRecords({ own = false }: { own?: boolean }) {
         )}
       </SectionHeader>
 
-      {error && !importModalOpen && (
+      {error && !importModalOpen && !detailRecord && (
         <p role="alert" className="mb-4 rounded-md bg-red-50 p-4 text-red-800">
           {error}
         </p>
@@ -783,8 +556,15 @@ export default function LeaveRecords({ own = false }: { own?: boolean }) {
       )}
 
       <LeaveRecordDrawer
-        record={!own ? detailRecord : null}
+        record={detailRecord}
         employeeName={detailRecord ? employeeName(detailRecord) : ""}
+        employeeCode={detailRecord ? detailRecord.employee_code || employeeForRecord(detailRecord)?.employeeCode : undefined}
+        reason={detailRecord ? reasonFor(detailRecord) : ""}
+        department={detailRecord ? departmentName(detailRecord) : undefined}
+        annualTypeIds={annualTypeIds}
+        own={own}
+        error={error}
+        formatDate={formatDate}
         leaveTypeLabel={detailMeta.label}
         leaveTypeTone={detailMeta.tone}
         dayCount={detailRecord ? recordDayCount(detailRecord) : 0}
@@ -814,18 +594,18 @@ export default function LeaveRecords({ own = false }: { own?: boolean }) {
       />
 
       <div className="mb-4 grid gap-3 md:grid-cols-3">
-        {kpis.map(({ label, value, detail, icon: Icon, tone }) => (
-          <Card key={label} className="p-4 sm:p-5">
+        {kpis.map(({ label, value, detail, icon: Icon, tone, badge }) => (
+          <Card key={label} className={`bg-gradient-to-br ${tone} to-white p-4 shadow-sm sm:p-5`}>
             <div className="flex items-start justify-between gap-4">
               <div className="min-w-0">
                 <p className="text-sm font-semibold text-slate-600">{label}</p>
                 <p className="mt-2 text-2xl font-bold tabular-nums text-slate-950">
-                  {loading || clientRowsLoading ? "—" : value}
+                  {loading ? "—" : value}
                 </p>
                 <p className="mt-1 text-xs font-medium text-slate-600">{detail}</p>
               </div>
               <span
-                className={`flex size-10 shrink-0 items-center justify-center rounded-md ${tone}`}
+                className={`flex size-10 shrink-0 items-center justify-center rounded-md ${badge}`}
               >
                 <Icon size={20} />
               </span>
@@ -838,11 +618,7 @@ export default function LeaveRecords({ own = false }: { own?: boolean }) {
         <div className="border-b border-slate-200 p-5">
           <form
             onSubmit={(event) => event.preventDefault()}
-            className={`grid gap-3 md:grid-cols-2 xl:items-end ${
-              own
-                ? "xl:grid-cols-[minmax(160px,1fr)_minmax(160px,1fr)_minmax(180px,1fr)_minmax(190px,1fr)_auto]"
-                : "xl:grid-cols-[minmax(230px,1.25fr)_minmax(150px,0.8fr)_minmax(150px,0.8fr)_minmax(170px,0.85fr)_minmax(190px,0.95fr)_auto]"
-            }`}
+            className="grid gap-3 sm:grid-cols-2 2xl:grid-cols-[minmax(200px,1.5fr)_repeat(4,minmax(130px,1fr))_auto] 2xl:items-end"
           >
             {!own && (
               <label className="min-w-0 text-sm font-medium text-slate-700">
@@ -856,8 +632,8 @@ export default function LeaveRecords({ own = false }: { own?: boolean }) {
                     type="search"
                     className="h-11 w-full rounded-md border border-slate-300 bg-white pl-9 pr-3 text-sm text-slate-900 outline-none transition-colors duration-200 placeholder:text-slate-500 focus:border-orange-400 focus:ring-4 focus:ring-orange-100"
                     placeholder={tr(
-                      "Tìm theo tên hoặc mã EMP...",
-                      "Search by name or employee code...",
+                      "Tìm theo tên, mã NV hoặc lý do...",
+                      "Search by name, employee code or reason...",
                     )}
                     value={employeeSearch}
                     onChange={(event) => {
@@ -894,18 +670,18 @@ export default function LeaveRecords({ own = false }: { own?: boolean }) {
               {tr("Trạng thái", "Status")}
               <SelectControl
                 className={control}
-                value={draft.record_status}
-                onChange={(event) =>
-                  setDraft({
-                    ...draft,
-                    record_status: event.target
-                      .value as RecordFilters["record_status"],
-                  })
-                }
+                value={unpaidOnly ? "UNPAID" : draft.record_status}
+                onChange={(event) => {
+                  const status = event.target.value
+                  setUnpaidOnly(status === "UNPAID")
+                  setDraft(previous => ({ ...previous, record_status: status === "UNPAID" ? "ACTIVE" : status as RecordFilters["record_status"] }))
+                  setOffset(0)
+                }}
               >
-                <option value="ACTIVE">{tr("Đang sử dụng", "Active")}</option>
-                <option value="CANCEL">{tr("Đã hủy", "Cancelled")}</option>
                 <option value="ALL">{tr("Tất cả", "All")}</option>
+                <option value="ACTIVE">{tr("Có hiệu lực", "Effective")}</option>
+                <option value="UNPAID">{tr("Nghỉ không lương", "Unpaid leave")}</option>
+                <option value="CANCEL">{tr("Đã hủy", "Cancelled")}</option>
               </SelectControl>
             </label>
             <label className="min-w-0 text-sm font-medium text-slate-700">
@@ -921,7 +697,7 @@ export default function LeaveRecords({ own = false }: { own?: boolean }) {
                 <option value="">{tr("Tất cả loại nghỉ", "All leave types")}</option>
                 {types.map((type) => (
                   <option key={type.id} value={type.id}>
-                    {type.code} · {type.name}
+                    {leaveTypeDisplay(type.code, type.name, tr).label}
                   </option>
                 ))}
               </SelectControl>
@@ -929,7 +705,7 @@ export default function LeaveRecords({ own = false }: { own?: boolean }) {
             <Button
               type="button"
               variant="secondary"
-              disabled={loading || clientRowsLoading}
+              disabled={loading}
               onClick={resetFilters}
             >
               <RotateCcw size={16} />
@@ -944,6 +720,15 @@ export default function LeaveRecords({ own = false }: { own?: boolean }) {
               </p>
             )}
           </form>
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            {([
+              ["month", tr("Tháng này", "This month")],
+              ["quarter", tr("Quý này", "This quarter")],
+              ["year", tr(`Năm ${year}`, `Year ${year}`)],
+            ] as const).map(([period, label]) => (
+              <Button key={period} type="button" variant="secondary" size="sm" onClick={() => setPeriod(period)}>{label}</Button>
+            ))}
+          </div>
         </div>
 
         <section className="p-5">
@@ -964,13 +749,14 @@ export default function LeaveRecords({ own = false }: { own?: boolean }) {
             </span>
           </div>
 
-          {loading || clientRowsLoading ? (
+          {loading ? (
             <p role="status" className="py-10 text-center text-slate-600">
               {tr("Đang tải…", "Loading…")}
             </p>
           ) : visibleRows.length ? (
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[960px] text-left text-sm">
+              <table className="w-full min-w-[1020px] table-fixed text-left text-sm">
+                <colgroup><col className="w-[220px]" /><col className="w-40" /><col className="w-[200px]" /><col /><col className="w-[140px]" /><col className="w-[106px]" /></colgroup>
                 <thead className="bg-slate-50">
                   <tr>
                     <th className="p-3 text-xs font-bold uppercase tracking-wide text-slate-600">
@@ -1000,104 +786,48 @@ export default function LeaveRecords({ own = false }: { own?: boolean }) {
                     <th className="p-3 text-xs font-bold uppercase tracking-wide text-slate-600">
                       {tr("Trạng thái", "Status")}
                     </th>
-                    {!own && (
-                      <th className="w-24 p-3 text-right text-xs font-bold uppercase tracking-wide text-slate-600">
-                        {tr("Thao tác", "Actions")}
-                      </th>
-                    )}
+                    <th className="p-3 text-right text-xs font-bold uppercase tracking-wide text-slate-600">
+                      {tr("Thao tác", "Actions")}
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
-                  {visibleRows.map((record) => {
+                  {visibleRows.map(record => {
                     const profile = employeeForRecord(record)
-                    const meta = leaveTypeMeta(record)
+                    const meta = metaFor(record)
+                    const name = employeeName(record)
+                    const reason = reasonFor(record)
+                    const department = departmentName(record)
+                    const avatarTone = ["bg-slate-100 text-slate-700", "bg-indigo-100 text-indigo-800", "bg-teal-100 text-teal-800", "bg-sky-100 text-sky-800", "bg-purple-100 text-purple-800"][(profile?.departmentId || 0) % 5]
                     return (
-                      <tr
-                        key={record.id}
-                        className="border-b border-slate-200 align-middle transition-colors duration-150 hover:bg-orange-50/40"
-                      >
+                      <tr key={record.id} className="border-b border-slate-100 align-middle hover:bg-slate-50">
                         <td className="p-3">
-                          <div className="flex items-center gap-3">
-                            <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-orange-100 text-xs font-bold text-orange-800">
-                              {employeeInitials(record)}
-                            </span>
+                          <div className="flex min-w-0 items-center gap-2.5">
+                            <span aria-hidden="true" className={`grid size-9 shrink-0 place-items-center rounded-full text-xs font-semibold ${avatarTone}`}>{employeeInitials(record)}</span>
                             <div className="min-w-0">
-                              <p className="max-w-52 truncate font-semibold text-slate-950">
-                                {profile?.fullName ||
-                                  tr("Chưa có tên nhân viên", "Employee name unavailable")}
-                              </p>
-                              <p className="text-xs font-medium text-slate-600">
-                                {record.employee_code || profile?.employeeCode || `ID ${record.employee_id}`}
-                              </p>
+                              <p className="wrap-break-word font-semibold leading-5 text-slate-950">{name || tr("Chưa có tên nhân viên", "Employee name unavailable")}</p>
+                              <p className="mt-0.5 wrap-break-word text-xs text-slate-600">{[record.employee_code || profile?.employeeCode, department].filter(Boolean).join(" · ")}</p>
                             </div>
                           </div>
                         </td>
+                        <td className="p-3"><span className={`inline-flex rounded-full border px-2 py-1 text-xs font-semibold ${meta.tone}`}>{meta.label}</span></td>
                         <td className="p-3">
-                          <span
-                            className={`inline-flex rounded-full border px-2 py-1 text-xs font-bold ${meta.tone}`}
-                          >
-                            {meta.label}
-                          </span>
+                          <p className="flex items-center gap-1.5 whitespace-nowrap font-medium tabular-nums text-slate-900"><CalendarDays size={14} className="shrink-0 text-slate-500" aria-hidden="true" /> {formatDate(record.start_date)} → {formatDate(record.end_date)}</p>
+                          <span className="mt-1 inline-flex rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-700">{recordDayCount(record)} {tr("ngày lịch", "calendar days")}</span>
                         </td>
-                        <td className="p-3 font-medium text-slate-900">
-                          <span className="inline-flex items-center gap-1.5">
-                            <CalendarDays size={15} className="text-slate-500" />
-                            {formatDate(record.start_date)} → {formatDate(record.end_date)}
-                          </span>
-                          <span className="ml-2 text-xs font-semibold text-slate-600">
-                            · {recordDayCount(record)} {tr("ngày", "days")}
-                          </span>
-                        </td>
-                        <td className="max-w-xs p-3">
-                          <p
-                            title={record.reason || undefined}
-                            className="max-w-xs truncate text-slate-700"
-                          >
-                            {record.reason || "—"}
-                          </p>
-                        </td>
+                        <td className="p-3"><p title={reason} className="line-clamp-2 wrap-break-word leading-5 text-slate-700">{reason}</p></td>
                         <td className="p-3">
-                          <span
-                            className={`inline-flex rounded-full border px-2 py-1 text-xs font-semibold ${
-                              record.record_status === "ACTIVE"
-                                ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-                                : "border-slate-200 bg-slate-100 text-slate-700"
-                            }`}
-                          >
-                            {record.record_status === "ACTIVE"
-                              ? tr("Đang sử dụng", "Active")
-                              : tr("Đã hủy", "Cancelled")}
+                          <span className={`inline-flex rounded-full border px-2 py-1 text-xs font-semibold ${record.record_status === "ACTIVE" ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-slate-200 bg-slate-100 text-slate-700"}`}>
+                            {record.record_status === "ACTIVE" ? tr("Có hiệu lực", "Effective") : tr("Đã hủy", "Cancelled")}
                           </span>
+                          {meta.kind === "UNPAID" && <p className="mt-1 text-xs text-slate-600">{tr("Không hưởng lương", "Unpaid")}</p>}
                         </td>
-                        {!own && (
-                          <td className="w-24 p-3 text-right">
-                            <RowActionsMenu
-                              disabled={busy}
-                              moreLabel={tr(
-                                "Mở thao tác khác",
-                                "Open more actions",
-                              )}
-                              detailLabel={tr("Xem chi tiết", "View details")}
-                              cancelLabel={
-                                record.record_status === "ACTIVE"
-                                  ? tr("Hủy hồ sơ", "Cancel record")
-                                  : undefined
-                              }
-                              onDetail={() => {
-                                setCancellationReason("")
-                                setDetailRecord(record)
-                              }}
-                              onCancel={
-                                record.record_status === "ACTIVE"
-                                  ? () => {
-                                      setCancellationReason("")
-                                      setDetailRecord(record)
-                                    }
-                                  : undefined
-                              }
-                            />
-                          </td>
-                        )}
+                        <td className="p-3 text-right">
+                          <Button type="button" size="sm" variant="secondary" className="h-8 min-h-8 whitespace-nowrap px-2 text-xs hover:border-orange-300 hover:bg-orange-50"
+                            disabled={busy} onClick={() => { setError(""); setCancellationReason(""); setDetailRecord(record) }}>
+                            {tr("Xem chi tiết", "View details")}
+                          </Button>
+                        </td>
                       </tr>
                     )
                   })}
@@ -1136,38 +866,17 @@ export default function LeaveRecords({ own = false }: { own?: boolean }) {
             </div>
           )}
 
-          {hasAnyRecords && (
-            <div className="mt-4 flex flex-col gap-3 border-t border-slate-200 pt-4 sm:flex-row sm:items-center sm:justify-between">
-              <p className="text-sm font-medium text-slate-600">
-                {tr("Hiển thị", "Showing")} {pageStart} - {pageEnd}
-                {knownTotal !== null && (
-                  <>
-                    {" "}
-                    {tr("trên tổng", "of")} {knownTotal}
-                  </>
-                )}{" "}
-                {tr("hồ sơ", "records")}
-              </p>
-              <div className="flex justify-end gap-2">
-                <Button
-                  variant="secondary"
-                  disabled={loading || clientRowsLoading || !offset}
-                  onClick={() => setOffset(Math.max(0, offset - PAGE_SIZE))}
-                >
-                  {tr("Trước", "Previous")}
-                </Button>
-                <span className="flex min-w-10 items-center justify-center rounded-md bg-slate-100 px-3 text-sm font-semibold text-slate-700">
-                  {offset / PAGE_SIZE + 1}
-                </span>
-                <Button
-                  variant="secondary"
-                  disabled={loading || clientRowsLoading || !hasNextPage}
-                  onClick={() => setOffset(offset + PAGE_SIZE)}
-                >
-                  {tr("Trang sau", "Next page")}
-                </Button>
+          {!loading && (hasAnyRecords || rows.length > 0) && (
+            <nav aria-label={tr("Phân trang hồ sơ", "Leave record pagination")} className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 pt-4">
+              <p className="text-sm text-slate-700">{tr("Hiển thị", "Showing")} {pageStart} – {pageEnd} {tr("trong tổng số", "of")} {sortedRows.length} {tr("hồ sơ", "records")}</p>
+              <div className="flex flex-wrap items-center gap-2">
+                <Button variant="secondary" size="sm" disabled={currentPage === 1} onClick={() => setOffset(0)}>{tr("Đầu", "First")}</Button>
+                <Button variant="secondary" size="sm" disabled={currentPage === 1} onClick={() => setOffset(pageOffset - PAGE_SIZE)}>{tr("Trước", "Previous")}</Button>
+                <span className="rounded-md bg-slate-100 px-3 py-2 text-sm font-semibold tabular-nums text-slate-700">{tr("Trang", "Page")} {currentPage} / {pageCount}</span>
+                <Button variant="secondary" size="sm" disabled={currentPage === pageCount} onClick={() => setOffset(pageOffset + PAGE_SIZE)}>{tr("Sau", "Next")}</Button>
+                <Button variant="secondary" size="sm" disabled={currentPage === pageCount} onClick={() => setOffset((pageCount - 1) * PAGE_SIZE)}>{tr("Cuối", "Last")}</Button>
               </div>
-            </div>
+            </nav>
           )}
         </section>
       </Card>

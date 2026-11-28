@@ -1,27 +1,21 @@
 import { SelectControl } from "../components/ui/select-control"
 import { useDeferredValue, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { AlertTriangle, ArrowRight, BarChart3, CalendarCheck2, CalendarRange, Clock3, Download, FileSpreadsheet, History, Inbox, RotateCcw, Search, Upload, UserRound, X, } from "lucide-react";
+import { AlertTriangle, BarChart3, CalendarCheck2, CalendarRange, Clock3, Download, FileSpreadsheet, Inbox, RotateCcw, Search, Upload, X, } from "lucide-react";
 import { AppShell } from "../components/AppShell";
 import { Button, Card, SectionHeader } from "../components/ui";
 import { downloadAttendanceTemplate } from "../utils/attendanceTemplate";
 import AttendanceImport, { type AttendanceImportStage, } from "../components/AttendanceImport";
+import AttendanceDetail, { attendanceInitials, attendanceState, displayTime, durationLabel, recordedSchedule } from "../components/AttendanceDetail";
 import AttendanceReconcile from "../components/AttendanceReconcile";
 import { useLanguage } from "../context/LanguageContext";
 import { useAutoDismissFeedback } from "../hooks/useAutoDismissState";
-import { listDepartments, listEmployeeProfiles, listWorkSchedules, type EmployeeProfile, } from "../services/api";
-import { fetchAttendance, fetchAttendanceDetail, fetchAttendanceAudit, cancelAttendance, attendanceMessage, type ImportedAttendance, type AttendanceAudit, type RecordFilters, } from "../services/attendance";
+import { getPositionById, listDepartments, listEmployeeProfiles, listWorkSchedules, type EmployeeProfile, } from "../services/api";
+import { fetchAttendance, fetchAttendanceDetail, fetchCancelledAttendance, fetchCancelledAttendanceDetail, fetchAttendanceAudit, cancelAttendance, attendanceMessage, type ImportedAttendance, type AttendanceAudit, type RecordFilters, } from "../services/attendance";
 const control = "mt-1 h-11 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100";
-const displayTime = (value: string | null) => value?.slice(11, 16) || "—";
 const workDayFormat = {
     vi: new Intl.DateTimeFormat("vi-VN", { weekday: "short", day: "2-digit", month: "2-digit", year: "numeric", timeZone: "UTC" }),
     en: new Intl.DateTimeFormat("en-GB", { weekday: "short", day: "2-digit", month: "2-digit", year: "numeric", timeZone: "UTC" }),
-};
-const durationLabel = (value: number) => {
-    const minutes = Math.max(0, Number(value) || 0);
-    const hours = Math.floor(minutes / 60);
-    const remainder = minutes % 60;
-    return remainder ? `${hours}h ${remainder}m` : `${hours.toFixed(1)}h`;
 };
 const isoDate = (date: Date) => [date.getFullYear(), date.getMonth() + 1, date.getDate()].map(value => String(value).padStart(2, "0")).join("-");
 const getWeekRange = (anchor = new Date()) => {
@@ -52,26 +46,27 @@ function matchesEvent(row: ImportedAttendance, filter: EventFilter) {
     if (filter === "LATE") return row.late_mins > 0;
     if (filter === "EARLY") return row.early_mins > 0;
     if (filter === "OVERTIME") return row.overtime_minutes > 0;
-    if (filter === "INCOMPLETE") return Boolean(row.check_in) !== Boolean(row.check_out);
+    if (filter === "INCOMPLETE") return (!row.check_in || !row.check_out) && !["ABSENT", "HOLIDAY", "ON_LEAVE"].includes(row.attendance_status ?? "");
     return Boolean(row.check_in && row.check_out && !row.late_mins && !row.early_mins);
 }
-async function loadAttendanceRange(filters: RecordFilters, own: boolean, signal: AbortSignal) {
-    const records: ImportedAttendance[] = [];
-    const limit = 200;
-    for (let offset = 0; ; offset += limit) {
-        const { data } = await fetchAttendance({ ...filters, limit, offset }, own, signal);
-        records.push(...data);
-        if (data.length < limit) return records;
-    }
+async function loadAttendanceRange(filters: RecordFilters, own: boolean, signal: AbortSignal, firstLimit = 200) {
+    const read = async (cancelled: boolean) => {
+        const records: ImportedAttendance[] = [];
+        let limit = firstLimit;
+        for (let offset = 0; ; offset = records.length) {
+            const query = { ...filters, limit, offset };
+            const response = cancelled ? await fetchCancelledAttendance(query, signal) : await fetchAttendance(query, own, signal);
+            records.push(...response.data);
+            if (response.data.length < (response.limit || limit)) return records;
+            limit = 200;
+        }
+    };
+    if (!own && filters.record_status === "CANCEL") return read(true);
+    if (own || filters.record_status !== "ALL") return read(false);
+    const [active, cancelled] = await Promise.all([read(false), read(true)]);
+    return [...active, ...cancelled].sort((a, b) => b.work_date.localeCompare(a.work_date) ||
+        String(b.id).localeCompare(String(a.id), undefined, { numeric: true }));
 }
-type AuditValueMap = Record<string, unknown>;
-const asAuditValueMap = (value: unknown): AuditValueMap => value !== null && typeof value === "object" && !Array.isArray(value)
-    ? value as AuditValueMap
-    : {};
-const auditFieldKeys = (log: AttendanceAudit) => Array.from(new Set([
-    ...Object.keys(asAuditValueMap(log.old_values)),
-    ...Object.keys(asAuditValueMap(log.new_values)),
-]));
 export default function AttendanceWorkspace({ own = false, }: {
     own?: boolean;
 }) {
@@ -91,6 +86,10 @@ export default function AttendanceWorkspace({ own = false, }: {
     const [offset, setOffset] = useState(0), [pageSize, setPageSize] = useState(25), [revision, setRevision] = useState(0), [loading, setLoading] = useState(true), [busy, setBusy] = useState(false);
     const { error, message: notice, setError, setMessage: setNotice, } = useAutoDismissFeedback();
     const [logError, setLogError] = useState("");
+    const [logsLoading, setLogsLoading] = useState(false);
+    const [schedule, setSchedule] = useState<ReturnType<typeof recordedSchedule>>(null);
+    const [detailError, setDetailError] = useState("");
+    const [position, setPosition] = useState("");
     const [reason, setReason] = useState("");
     const [importOpen, setImportOpen] = useState(false);
     const recordsHeading = useRef<HTMLHeadingElement>(null);
@@ -116,7 +115,7 @@ export default function AttendanceWorkspace({ own = false, }: {
         setLoading(true);
         setError("");
         setRows([]);
-        void loadAttendanceRange(filters, own, c.signal)
+        void loadAttendanceRange(filters, own, c.signal, pageSize)
             .then((response) => {
             if (!c.signal.aborted)
                 setRows(response);
@@ -129,14 +128,19 @@ export default function AttendanceWorkspace({ own = false, }: {
             if (!c.signal.aborted)
                 setLoading(false);
         });
-        void fetchAttendance({ record_status: "ALL", limit: 1, offset: 0 }, own, c.signal)
-            .then((response) => {
-            if (!c.signal.aborted)
-                setHasAnyRecords(response.data.length > 0);
-        })
-            .catch(() => undefined);
         return () => c.abort();
-    }, [filters, revision, own]);
+    }, [filters, revision, own, pageSize]);
+    useEffect(() => {
+        const c = new AbortController();
+        const probe = { limit: 1, offset: 0 };
+        void Promise.allSettled([
+            fetchAttendance(probe, own, c.signal),
+            ...(own ? [] : [fetchCancelledAttendance(probe, c.signal)]),
+        ]).then((results) => {
+            if (!c.signal.aborted) setHasAnyRecords(results.some((result) => result.status === "fulfilled" && result.value.data.length > 0));
+        });
+        return () => c.abort();
+    }, [revision, own]);
     useEffect(() => {
         if (own)
             return;
@@ -195,36 +199,35 @@ export default function AttendanceWorkspace({ own = false, }: {
         return () => controller.abort();
     }, [own, filters.from, filters.to, revision]);
     useEffect(() => {
+        if (!selected || own || selected.record_status === "CANCEL") return;
         let live = true;
         setLogs([]);
         setLogError("");
-        if (selected && !own)
-            void fetchAttendanceAudit(selected.id, logOffset)
-                .then((r) => {
-                if (live)
-                    setLogs(r.data);
+        setLogsLoading(true);
+        void fetchAttendanceAudit(selected.id, logOffset)
+            .then((result) => {
+                if (!live) return;
+                setLogs(result.data);
+                const originalSchedule = recordedSchedule(result.data);
+                if (originalSchedule) setSchedule(originalSchedule);
             })
-                .catch((e) => {
-                if (live)
-                    setLogError(attendanceMessage(e, tr("Không tải được lịch sử thay đổi.", "Could not load audit history.")));
-            });
-        return () => {
-            live = false;
-        };
+            .catch((e) => {
+                if (live) setLogError(attendanceMessage(e, tr("Không tải được lịch sử thao tác.", "Could not load activity history.")));
+            })
+            .finally(() => { if (live) setLogsLoading(false); });
+        return () => { live = false; };
     }, [selected, logOffset, own]);
+
     useEffect(() => {
-        if (!importOpen && !reconcileOpen && !selected)
+        if (!importOpen && !reconcileOpen)
             return;
         const previousOverflow = document.body.style.overflow;
         document.body.style.overflow = "hidden";
         const closeOnEscape = (event: KeyboardEvent) => {
             if (event.key !== "Escape" || event.defaultPrevented || busy || importBusy || reconcileBusy)
                 return;
-            if (selected && reason.trim())
-                return;
             setImportOpen(false);
             setReconcileOpen(false);
-            setSelected(null);
         };
         window.addEventListener("keydown", closeOnEscape);
         return () => {
@@ -234,11 +237,9 @@ export default function AttendanceWorkspace({ own = false, }: {
     }, [
         importOpen,
         reconcileOpen,
-        selected,
         busy,
         importBusy,
         reconcileBusy,
-        reason,
     ]);
     async function open(row: ImportedAttendance) {
         if (busy)
@@ -246,7 +247,12 @@ export default function AttendanceWorkspace({ own = false, }: {
         setBusy(true);
         setError("");
         try {
-            const r = await fetchAttendanceDetail(row.id);
+            const r = await (row.record_status === "CANCEL" ? fetchCancelledAttendanceDetail(row.id) : fetchAttendanceDetail(row.id));
+            setDetailError("");
+            setSchedule(null);
+            setLogs([]);
+            setLogError("");
+            setLogsLoading(!own && r.data.record_status !== "CANCEL");
             setSelected(r.data);
             setLogOffset(0);
             setReason("");
@@ -260,12 +266,10 @@ export default function AttendanceWorkspace({ own = false, }: {
     }
     async function save(e: FormEvent) {
         e.preventDefault();
-        if (!selected || busy || !reason.trim())
-            return;
-        if (!window.confirm(tr("Xác nhận hủy bản ghi này? Sau đó cần nhập lại nếu muốn thay thế.", "Cancel this record? Import a replacement afterward if needed.")))
+        if (own || selected?.record_status !== "ACTIVE" || busy || !reason.trim())
             return;
         setBusy(true);
-        setError("");
+        setDetailError("");
         setNotice("");
         try {
             await cancelAttendance(selected, reason);
@@ -274,22 +278,22 @@ export default function AttendanceWorkspace({ own = false, }: {
             setRevision((v) => v + 1);
         }
         catch (e) {
-            setError(attendanceMessage(e, tr("Không lưu được. Tải lại bản ghi để kiểm tra.", "Could not save. Reload the record to review.")));
+            setDetailError(attendanceMessage(e, tr("Không hủy được bản ghi. Vui lòng thử lại.", "Could not cancel the record. Please try again.")));
         }
         finally {
             setBusy(false);
         }
     }
     const invalid = !!(draft.from && draft.to && draft.from > draft.to);
-    const employeeDepartment = useMemo(() => new Map(employees.map(employee => [employee.employeeCode, employee.departmentId])), [employees]);
+    const employeeByCode = useMemo(() => new Map(employees.map(employee => [employee.employeeCode, employee])), [employees]);
     const directoryRows = useMemo(() => {
         const normalize = (value: string) => value.toLocaleLowerCase(language === "vi" ? "vi-VN" : "en-US");
         const query = normalize(deferredSearch.trim());
         return rows.filter(row =>
-            (!departmentId || String(employeeDepartment.get(row.employee_code) ?? "") === departmentId)
+            (!departmentId || String(employeeByCode.get(row.employee_code)?.departmentId ?? "") === departmentId)
             && (!query || normalize(`${row.employee_code} ${row.full_name}`).includes(query)),
         );
-    }, [rows, deferredSearch, departmentId, employeeDepartment, language]);
+    }, [rows, deferredSearch, departmentId, employeeByCode, language]);
     const filteredRows = useMemo(() => directoryRows.filter(row => matchesEvent(row, eventFilter)), [directoryRows, eventFilter]);
     const eventCounts = useMemo(() => eventFilters.map(event => directoryRows.filter(row => matchesEvent(row, event)).length), [directoryRows]);
     const filteredRowCount = filteredRows.length;
@@ -299,8 +303,8 @@ export default function AttendanceWorkspace({ own = false, }: {
     const visibleRows = useMemo(() => filteredRows.slice(pageOffset, pageOffset + pageSize), [filteredRows, pageOffset, pageSize]);
     const hasNextPage = currentPage < pageCount;
     const filteredPeriodRows = useMemo(() => rows.filter(row =>
-        row.record_status === "ACTIVE" && (!departmentId || String(employeeDepartment.get(row.employee_code) ?? "") === departmentId)
-    ), [rows, departmentId, employeeDepartment]);
+        row.record_status === "ACTIVE" && (!departmentId || String(employeeByCode.get(row.employee_code)?.departmentId ?? "") === departmentId)
+    ), [rows, departmentId, employeeByCode]);
     const punctuality = useMemo(() => {
         const completed = filteredPeriodRows.filter(row => row.check_in && row.check_out);
         return completed.length ? completed.filter(row => matchesEvent(row, "ON_TIME")).length / completed.length * 100 : null;
@@ -311,7 +315,7 @@ export default function AttendanceWorkspace({ own = false, }: {
         review: metrics.review + Number(Boolean(row.late_mins || row.early_mins || matchesEvent(row, "INCOMPLETE"))),
     }), { worked: 0, overtime: 0, review: 0 }), [filteredPeriodRows]);
     const filteredPreviousRows = departmentId
-        ? previousPeriodRows.filter((row) => String(employeeDepartment.get(row.employee_code) || "") ===
+        ? previousPeriodRows.filter((row) => String(employeeByCode.get(row.employee_code)?.departmentId || "") ===
             departmentId)
         : previousPeriodRows;
     const previousOnTimeRate = filteredPreviousRows.length
@@ -322,98 +326,19 @@ export default function AttendanceWorkspace({ own = false, }: {
         : null;
     const pageStart = visibleRows.length ? pageOffset + 1 : 0;
     const pageEnd = pageOffset + visibleRows.length;
-    const attendanceState = (row: ImportedAttendance) => {
-        if (row.record_status === "CANCEL")
-            return {
-                label: tr("Đã hủy", "Cancelled"),
-                tone: "border-slate-300 bg-slate-100 text-slate-700",
-            };
-        if (row.attendance_status === "ABSENT")
-            return {
-                label: tr("Vắng mặt", "Absent"),
-                tone: "border-rose-200 bg-rose-50 text-rose-700",
-            };
-        if (row.late_mins || row.early_mins)
-            return {
-                label: tr("Chờ giải trình / bù công", "Awaiting explanation / adjustment"),
-                tone: "border-amber-200 bg-amber-50 text-amber-800",
-            };
-        return {
-            label: tr("Đã chốt công", "Attendance finalized"),
-            tone: "border-emerald-200 bg-emerald-50 text-emerald-700",
-        };
-    };
-    const formatAuditTime = (value?: string) => value
-        ? new Date(value).toLocaleString(language === "vi" ? "vi-VN" : "en-US", {
-            dateStyle: "medium",
-            timeStyle: "short",
-            timeZone: "Asia/Ho_Chi_Minh",
-        })
-        : "—";
-    const auditFieldLabel = (field: string) => {
-        const labels: Record<string, [
-            string,
-            string
-        ]> = {
-            check_in: ["Giờ vào", "Check-in"],
-            check_out: ["Giờ ra", "Check-out"],
-            working_minutes: ["Thời lượng công", "Working time"],
-            late_mins: ["Đi muộn", "Late time"],
-            early_mins: ["Về sớm", "Early leave"],
-            overtime_minutes: ["Tăng ca", "Overtime"],
-            attendance_status: ["Trạng thái ngày công", "Attendance status"],
-            record_status: ["Trạng thái bản ghi", "Record status"],
-            cancellation_reason: ["Lý do hủy", "Cancellation reason"],
-            work_date: ["Ngày công", "Work date"],
-        };
-        const known = labels[field];
-        if (known)
-            return tr(known[0], known[1]);
-        return field
-            .replace(/_/g, " ")
-            .replace(/\b\w/g, (letter: string) => letter.toUpperCase());
-    };
-    const formatAuditValue = (value: unknown, field?: string): string => {
-        if (value === null || value === undefined || value === "")
-            return "—";
-        if (typeof value === "boolean")
-            return value ? tr("Có", "Yes") : tr("Không", "No");
-        if (typeof value === "number" && field && /(_minutes|_mins)$/.test(field))
-            return durationLabel(value);
-        if (Array.isArray(value))
-            return (value.map((item) => formatAuditValue(item, field)).join(", ") || "—");
-        if (typeof value === "object") {
-            return (Object.entries(value as AuditValueMap)
-                .map(([key, nested]) => `${auditFieldLabel(key)}: ${formatAuditValue(nested, key)}`)
-                .join(" · ") || "—");
-        }
-        const text = String(value);
-        if (/^\d{4}-\d{2}-\d{2}T/.test(text))
-            return formatAuditTime(text);
-        return text;
-    };
-    const auditAction = (action: string) => {
-        const normalized = action.toUpperCase();
-        if (normalized.includes("CANCEL"))
-            return {
-                label: tr("Đã hủy", "Cancelled"),
-                tone: "border-rose-200 bg-rose-50 text-rose-700",
-            };
-        if (normalized.includes("CREATE") || normalized.includes("IMPORT"))
-            return {
-                label: tr("Đã tạo", "Created"),
-                tone: "border-emerald-200 bg-emerald-50 text-emerald-700",
-            };
-        if (normalized.includes("UPDATE"))
-            return {
-                label: tr("Đã cập nhật", "Updated"),
-                tone: "border-blue-200 bg-blue-50 text-blue-700",
-            };
-        return {
-            label: action,
-            tone: "border-slate-200 bg-slate-100 text-slate-700",
-        };
-    };
+    const selectedEmployee = selected ? employeeByCode.get(selected.employee_code) : undefined;
+    const selectedDepartment = departments.find((department) => department.id === selectedEmployee?.departmentId)?.name;
+    const positionId = selectedEmployee?.positionId;
+    useEffect(() => {
+        setPosition("");
+        if (!positionId) return;
+        const controller = new AbortController();
+        void getPositionById(positionId, controller.signal).then((result) => {
+            if (!controller.signal.aborted) setPosition(result.name);
+        }).catch(() => undefined);
+        return () => controller.abort();
+    }, [positionId]);
+
     const periodLabel = filters.from && filters.to
         ? `${formatShortDate(filters.from)} – ${formatShortDate(filters.to)}`
         : "—";
@@ -545,195 +470,11 @@ export default function AttendanceWorkspace({ own = false, }: {
             }}/>
           </Card>
         </div>)}
-      {selected && (<div className="fixed inset-0 z-[80] bg-slate-950/40 backdrop-blur-[1px]" role="dialog" aria-modal="true" aria-labelledby="attendance-detail-title" onMouseDown={(event) => {
-                if (event.target === event.currentTarget && !busy && !reason.trim())
-                    setSelected(null);
-            }}>
-          <Card className="absolute inset-y-0 right-0 flex w-full max-w-2xl flex-col overflow-y-auto rounded-none border-0 p-0 shadow-2xl animate-in slide-in-from-right duration-200">
-            <div className="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-slate-200 bg-white/95 px-5 py-4 backdrop-blur sm:px-6">
-              <div className="min-w-0">
-                <p className="text-xs font-bold uppercase tracking-[0.08em] text-slate-600">
-                  {selected.employee_code} · {selected.work_date}
-                </p>
-                <h2 id="attendance-detail-title" className="mt-1 truncate text-xl font-bold text-slate-950">
-                  {selected.full_name}
-                </h2>
-              </div>
-              <button type="button" aria-label={tr("Đóng chi tiết", "Close details")} disabled={busy} onClick={() => setSelected(null)} className="flex size-10 shrink-0 items-center justify-center rounded-md text-slate-600 transition-colors duration-200 hover:bg-slate-100 hover:text-slate-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-500 disabled:opacity-50">
-                <X size={19}/>
-              </button>
-            </div>
-            <div className="space-y-5 px-5 py-5 sm:px-6">
-              <section aria-label={tr("Tóm tắt bản ghi", "Record summary")} className="grid gap-3 rounded-md border border-slate-200 bg-slate-50 p-4 sm:grid-cols-2">
-                <div>
-                  <p className="text-xs font-semibold text-slate-600">
-                    {tr("Giờ vào / ra", "Check-in / out")}
-                  </p>
-                  <p className="mt-1 font-semibold text-slate-950">
-                    {displayTime(selected.check_in)}{" "}
-                    <ArrowRight className="mx-1 inline size-3.5 text-slate-400" aria-hidden="true"/>{" "}
-                    {displayTime(selected.check_out)}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs font-semibold text-slate-600">
-                    {tr("Thời lượng công", "Working time")}
-                  </p>
-                  <p className="mt-1 font-semibold text-slate-950">
-                    {durationLabel(selected.working_minutes)} ·{" "}
-                    {durationLabel(selected.overtime_minutes)} OT
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs font-semibold text-slate-600">
-                    {tr("Trạng thái ngày công", "Attendance status")}
-                  </p>
-                  <p className="mt-1 font-semibold text-slate-950">
-                    {selected.attendance_status || "—"}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs font-semibold text-slate-600">
-                    {tr("Trạng thái bản ghi", "Record status")}
-                  </p>
-                  <p className="mt-1 font-semibold text-slate-950">
-                    {selected.record_status === "ACTIVE"
-                ? tr("Đang sử dụng", "Active")
-                : tr("Đã hủy", "Cancelled")}
-                  </p>
-                </div>
-              </section>
-              {selected.record_status === "CANCEL" && (<div className="rounded-md border border-rose-200 bg-rose-50 p-4 text-sm text-rose-900">
-                  <p className="font-semibold">
-                    {tr("Bản ghi đã hủy", "Cancelled record")}
-                  </p>
-                  <p className="mt-1 leading-6">
-                    {selected.cancellation_reason || "—"}
-                  </p>
-                  <p className="mt-2 text-xs text-rose-800">
-                    {tr("Người hủy", "Cancelled by")}:{" "}
-                    {String(selected.cancelled_by ?? "—")} ·{" "}
-                    {formatAuditTime(selected.cancelled_at || undefined)}
-                  </p>
-                </div>)}
-              {!own && selected.record_status === "ACTIVE" && (<form onSubmit={save} className="rounded-md border border-slate-200 p-4">
-                  <fieldset disabled={busy} className="space-y-3">
-                    <div className="flex items-start gap-2 rounded-md bg-amber-50 p-3 text-sm text-amber-950">
-                      <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden="true"/>
-                      <p>
-                        {tr("Nếu giờ vào/ra sai, hãy hủy bản ghi rồi nhập lại dữ liệu chính xác.", "If timestamps are incorrect, cancel this record and import the corrected data.")}
-                      </p>
-                    </div>
-                    <label className="block text-sm font-semibold text-slate-700">
-                      {tr("Lý do hủy", "Cancellation reason")}{" "}
-                      <span className="text-rose-600">*</span>
-                      <textarea className="mt-2 min-h-24 w-full resize-y rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition-colors duration-200 placeholder:text-slate-400 focus:border-orange-400 focus:ring-4 focus:ring-orange-100" required maxLength={1000} value={reason} onChange={(e) => setReason(e.target.value)} placeholder={tr("Nêu rõ lý do để lưu vào lịch sử kiểm tra", "Explain the reason for the audit history")}/>
-                    </label>
-                    {!reason.trim() && (<p className="text-xs font-medium text-slate-600">
-                        {tr("Bắt buộc nhập lý do trước khi hủy.", "A reason is required before cancellation.")}
-                      </p>)}
-                    <Button variant="danger" type="submit" disabled={!reason.trim() || !selected.record_fingerprint}>
-                      {tr("Hủy bản ghi", "Cancel record")}
-                    </Button>
-                  </fieldset>
-                </form>)}
-              {!own && (<section aria-labelledby="attendance-audit-title" className="border-t border-slate-200 pt-5">
-                  <div className="flex items-center gap-2">
-                    <span className="flex size-9 items-center justify-center rounded-md bg-slate-100 text-slate-700">
-                      <History size={17} aria-hidden="true"/>
-                    </span>
-                    <div>
-                      <h3 id="attendance-audit-title" className="font-bold text-slate-950">
-                        {tr("Lịch sử thay đổi", "Audit history")}
-                      </h3>
-                      <p className="text-xs text-slate-600">
-                        {tr("Theo dõi ai đã thay đổi dữ liệu và thay đổi nội dung nào.", "See who changed the record and what was updated.")}
-                      </p>
-                    </div>
-                  </div>
-                  {logError && (<p role="alert" className="mt-3 rounded-md bg-red-50 p-3 text-sm text-red-700">
-                      {logError}
-                    </p>)}
-                  <ul className="relative mt-4 space-y-4 before:absolute before:bottom-4 before:left-[17px] before:top-4 before:w-px before:bg-slate-200">
-                    {logs.map((log) => {
-                    const action = auditAction(log.action);
-                    const before = asAuditValueMap(log.old_values);
-                    const after = asAuditValueMap(log.new_values);
-                    const changes = auditFieldKeys(log).filter((field) => JSON.stringify(before[field]) !==
-                        JSON.stringify(after[field]));
-                    const actorName = typeof log.actor_name === "string"
-                        ? log.actor_name
-                        : typeof log.actor_full_name === "string"
-                            ? log.actor_full_name
-                            : tr("Người dùng hệ thống", "System user");
-                    return (<li key={String(log.id)} className="relative pl-11">
-                          <span className="absolute left-0 top-1 flex size-9 items-center justify-center rounded-full border-4 border-white bg-slate-100 text-slate-700">
-                            <UserRound size={14} aria-hidden="true"/>
-                          </span>
-                          <article className="rounded-md border border-slate-200 bg-white p-4 shadow-sm">
-                            <div className="flex flex-wrap items-start justify-between gap-2">
-                              <div>
-                                <p className="font-semibold text-slate-950">
-                                  {actorName}
-                                </p>
-                                <p className="mt-0.5 text-xs text-slate-600">
-                                  {tr("Mã người thực hiện", "Actor ID")}:{" "}
-                                  {String(log.actor_id ?? "—")}
-                                </p>
-                              </div>
-                              <div className="text-right">
-                                <span className={`inline-flex rounded-full border px-2 py-1 text-xs font-bold ${action.tone}`}>
-                                  {action.label}
-                                </span>
-                                <p className="mt-1 text-xs text-slate-600">
-                                  {formatAuditTime(log.occurred_at)}
-                                </p>
-                              </div>
-                            </div>
-                            {log.reason && (<p className="mt-3 rounded-md bg-slate-50 px-3 py-2 text-sm text-slate-700">
-                                <span className="font-semibold">
-                                  {tr("Lý do", "Reason")}:
-                                </span>{" "}
-                                {log.reason}
-                              </p>)}
-                            {changes.length > 0 && (<dl className="mt-3 space-y-2">
-                                {changes.map((field) => (<div key={field} className="rounded-md border border-slate-200 bg-slate-50 p-3">
-                                    <dt className="text-xs font-bold text-slate-700">
-                                      {auditFieldLabel(field)}
-                                    </dt>
-                                    <dd className="mt-1 flex flex-wrap items-center gap-2 text-sm">
-                                      <span className="rounded-md bg-white px-2 py-1 text-slate-700 ring-1 ring-slate-200">
-                                        {formatAuditValue(before[field], field)}
-                                      </span>
-                                      <ArrowRight size={14} className="text-slate-400" aria-hidden="true"/>
-                                      <span className="rounded-md bg-blue-50 px-2 py-1 font-medium text-blue-800 ring-1 ring-blue-100">
-                                        {formatAuditValue(after[field], field)}
-                                      </span>
-                                    </dd>
-                                  </div>))}
-                              </dl>)}
-                            {!changes.length && (<p className="mt-3 text-sm text-slate-600">
-                                {tr("Không có thay đổi trường dữ liệu được ghi nhận.", "No field-level changes were recorded.")}
-                              </p>)}
-                          </article>
-                        </li>);
-                })}
-                  </ul>
-                  {!logs.length && !logError && (<p className="mt-4 rounded-md bg-slate-50 p-4 text-sm text-slate-600">
-                      {tr("Chưa có lịch sử thay đổi.", "No audit history yet.")}
-                    </p>)}
-                  <div className="mt-4 flex gap-2">
-                    <Button variant="secondary" disabled={!logOffset} onClick={() => setLogOffset(Math.max(0, logOffset - 20))}>
-                      {tr("Trước", "Previous")}
-                    </Button>
-                    <Button variant="secondary" disabled={logs.length < 20} onClick={() => setLogOffset(logOffset + 20)}>
-                      {tr("Trang sau", "Next page")}
-                    </Button>
-                  </div>
-                </section>)}
-            </div>
-          </Card>
-        </div>)}
+      {selected && <AttendanceDetail key={String(selected.id)} row={selected}
+        department={selectedDepartment} position={position} schedule={schedule} own={own}
+        busy={busy} reason={reason} error={detailError} logs={logs} logsLoading={logsLoading}
+        logError={logError} logOffset={logOffset} tr={tr} onReason={setReason} onLogOffset={setLogOffset}
+        onClose={() => setSelected(null)} onCancelRecord={save} />}
       <Card className="p-5">
         <form className="-mx-5 -mt-5 mb-5 border-b border-slate-200 bg-slate-50/70 p-4 sm:p-5" onSubmit={(event) => {
             event.preventDefault();
@@ -892,15 +633,18 @@ export default function AttendanceWorkspace({ own = false, }: {
           </button>)}
         </div>
         {loading ? (<p role="status">{tr("Đang tải…", "Loading…")}</p>) : (<>
-            <div className={hasAnyRecords ? "max-h-[65vh] overflow-auto" : "hidden"}>
-              <table className="w-full min-w-[1080px] table-fixed text-left text-sm">
+            <div className={hasAnyRecords || rows.length ? "max-h-[65vh] overflow-auto" : "hidden"}>
+              <table className="w-full min-w-[1100px] table-fixed text-left text-sm">
+                <colgroup>
+                  {[140, 240, 140, 100, 120, 90, 160, 110].map((width, index) => <col key={index} style={{ width }} />)}
+                </colgroup>
                 <thead className="sticky top-0 z-10 bg-slate-50 shadow-[0_1px_0_0_#e2e8f0]">
                   <tr>
                     {[
                 tr("Ngày công", "Work date"),
                 tr("Nhân viên", "Employee"),
                 tr("Vào / ra", "Check in / out"),
-                tr("Thời lượng công", "Work duration"),
+                tr("Thời lượng", "Duration"),
                 tr("Muộn / sớm", "Late / early"),
                 tr("Tăng ca", "Overtime"),
                 tr("Trạng thái", "Status"),
@@ -912,49 +656,52 @@ export default function AttendanceWorkspace({ own = false, }: {
                 </thead>
                 <tbody>
                   {visibleRows.map((r) => {
-                const state = attendanceState(r);
+                const state = attendanceState(r, tr);
+                const department = employeeByCode.get(r.employee_code)?.departmentId;
+                const avatarTone = ["bg-slate-100 text-slate-700", "bg-indigo-100 text-indigo-800", "bg-teal-100 text-teal-800", "bg-sky-100 text-sky-800", "bg-violet-100 text-violet-800"][(Number(department) || 0) % 5];
                 return (<tr key={String(r.id)} className="border-b border-slate-100 hover:bg-slate-50/60">
-                        <td className="p-3 whitespace-nowrap text-slate-700">{workDayFormat[language === "vi" ? "vi" : "en"].format(new Date(r.work_date + "T00:00:00Z"))}</td>
-                        <td className="p-3"><div className="flex items-center gap-2"><span aria-hidden="true" className="grid size-8 shrink-0 place-items-center rounded-full bg-slate-100 text-xs font-semibold text-slate-700">{r.full_name?.trim().split(/\s+/).slice(-2).map(part => part[0]).join("").toUpperCase()}</span><div className="min-w-0">
-                          <strong className="block font-mono text-xs text-slate-700">
-                            {r.employee_code}
-                          </strong>
-                          <p className="mt-0.5 font-semibold text-slate-950">
-                            {r.full_name}
-                          </p></div></div>
+                        <td className="whitespace-nowrap p-3 tabular-nums text-slate-700">{workDayFormat[language === "vi" ? "vi" : "en"].format(new Date(r.work_date + "T00:00:00Z"))}</td>
+                        <td className="p-3">
+                          <div className="flex min-w-0 items-center gap-2">
+                            <span aria-hidden="true" className={`grid size-9 shrink-0 place-items-center rounded-full text-xs font-semibold ${avatarTone}`}>{attendanceInitials(r.full_name)}</span>
+                            <div className="min-w-0">
+                              <p className="wrap-break-word font-semibold leading-5 text-slate-950">{r.full_name}</p>
+                              <span className="mt-0.5 inline-block max-w-full wrap-break-word rounded bg-slate-100 px-1.5 py-0.5 font-mono text-xs text-slate-600">{r.employee_code}</span>
+                            </div>
+                          </div>
                         </td>
-                        <td className="p-3 font-mono text-sm font-semibold text-slate-700">
-                          {displayTime(r.check_in)}{" "}
-                          <span className="text-slate-400">→</span>{" "}
-                          {displayTime(r.check_out)}
-                          {matchesEvent(r, "INCOMPLETE") && <span className="mt-1 block w-fit rounded-full bg-rose-50 px-2 py-0.5 font-sans text-xs text-rose-800">{r.check_in ? tr("Thiếu quẹt ra", "Missing check-out") : tr("Thiếu quẹt vào", "Missing check-in")}</span>}
+                        <td className="p-3">
+                          <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-md bg-slate-100 px-1.5 py-1 font-mono text-xs font-medium text-slate-700">
+                            <Clock3 size={12} aria-hidden="true" />
+                            {displayTime(r.check_in)} <span aria-hidden="true">→</span> {displayTime(r.check_out)}
+                          </span>
                         </td>
                         <td className="p-3 font-semibold tabular-nums text-slate-800">
                           {durationLabel(r.working_minutes)}
                         </td>
                         <td className="p-3">
                           <div className="flex flex-col items-start gap-1">
-                            {r.late_mins ? (<span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-800">
-                                {tr("Trễ", "Late")}: {r.late_mins}p
+                            {r.late_mins ? (<span className="rounded-full border border-rose-200 bg-rose-50 px-2 py-0.5 text-xs font-semibold text-rose-800">
+                                {tr("Muộn", "Late")} {r.late_mins}p
                               </span>) : null}
-                            {r.early_mins ? (<span className="rounded-full border border-orange-200 bg-orange-50 px-2 py-0.5 text-xs font-semibold text-orange-800">
-                                {tr("Sớm", "Early")}: {r.early_mins}p
+                            {r.early_mins ? (<span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-800">
+                                {tr("Sớm", "Early")} {r.early_mins}p
                               </span>) : null}
                             {!r.late_mins && !r.early_mins && (<span className="text-slate-400">—</span>)}
                           </div>
                         </td>
                         <td className="p-3 font-semibold tabular-nums text-violet-700">
                           {r.overtime_minutes
-                        ? `+${(r.overtime_minutes / 60).toFixed(1)}h OT`
+                        ? <span className="inline-flex whitespace-nowrap rounded-md bg-violet-50 px-1.5 py-1 text-xs">{`+${(r.overtime_minutes / 60).toFixed(1)}h OT`}</span>
                         : "—"}
                         </td>
                         <td className="p-3">
-                          <span className={`inline-flex h-7 items-center rounded-full border px-2.5 text-xs font-semibold ${state.tone}`}>
+                          <span className={`inline-flex max-w-full items-center rounded-full border px-2.5 py-1 text-xs font-semibold leading-4 ${state.tone}`}>
                             {state.label}
                           </span>
                         </td>
                         <td className="p-3">
-                          <Button variant="secondary" size="sm" disabled={busy} onClick={() => void open(r)}>
+                          <Button variant="secondary" size="sm" className="h-8 min-h-8 whitespace-nowrap px-2 text-xs hover:border-orange-300 hover:bg-orange-50" disabled={busy} onClick={() => void open(r)}>
                             {tr("Xem chi tiết", "View details")}
                           </Button>
                         </td>
@@ -1023,11 +770,10 @@ export default function AttendanceWorkspace({ own = false, }: {
                   </p>
                 </div>))}
           </>)}
-        {hasAnyRecords && (<div className="mt-4 flex flex-col gap-3 border-t border-slate-200 pt-4 sm:flex-row sm:items-center sm:justify-between">
+        {(hasAnyRecords || rows.length > 0) && (<div className="mt-4 flex flex-col gap-3 border-t border-slate-200 pt-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex flex-wrap items-center gap-3 text-sm font-medium text-slate-600">
               <p>
-                {tr("Hiển thị", "Showing")} {pageStart} - {pageEnd}{" "}
-                {tr("bản ghi", "records")} / {filteredRowCount}
+                {tr("Hiển thị", "Showing")} {pageStart} – {pageEnd} {tr("trong tổng số", "of")} {filteredRowCount} {tr("bản ghi", "records")}
               </p>
               <label className="flex items-center gap-2">
                 {tr("Số dòng", "Rows")}
@@ -1035,7 +781,7 @@ export default function AttendanceWorkspace({ own = false, }: {
                 setPageSize(Number(event.target.value));
                 setOffset(0);
             }} className="h-9 rounded-md border border-slate-300 bg-white px-2 text-sm font-semibold text-slate-700">
-                  {[25, 50, 100].map((size) => (<option key={size} value={size}>
+                  {[10, 25, 50, 100].map((size) => (<option key={size} value={size}>
                       {size}
                     </option>))}
                 </SelectControl>
@@ -1046,17 +792,9 @@ export default function AttendanceWorkspace({ own = false, }: {
               <Button variant="secondary" disabled={loading || currentPage === 1} onClick={() => setOffset(pageOffset - pageSize)}>
                 {tr("Trước", "Previous")}
               </Button>
-              <label className="flex items-center gap-1 text-xs text-slate-700">
-                {tr("Trang", "Page")}
-                <input key={currentPage} type="number" aria-label={tr("Nhảy tới trang", "Jump to page")} min={1} max={pageCount} defaultValue={currentPage} onBlur={(event) => {
-                    const next = Math.max(1, Math.min(pageCount, Math.trunc(event.currentTarget.valueAsNumber || currentPage)));
-                    event.currentTarget.value = String(next);
-                    setOffset((next - 1) * pageSize);
-                }} onKeyDown={(event) => { if (event.key === "Enter") event.currentTarget.blur(); }} className="w-16 rounded-md border border-slate-300 px-2 py-1 text-center" />
-                / {pageCount}
-              </label>
+              <span className="self-center px-1 text-sm tabular-nums text-slate-700">{tr("Trang", "Page")} {currentPage} / {pageCount}</span>
               <Button variant="secondary" disabled={loading || !hasNextPage} onClick={() => setOffset(pageOffset + pageSize)}>
-                {tr("Trang sau", "Next page")}
+                {tr("Sau", "Next")}
               </Button>
               <Button variant="secondary" disabled={loading || !hasNextPage} onClick={() => setOffset((pageCount - 1) * pageSize)}>{tr("Cuối", "Last")}</Button>
             </div>

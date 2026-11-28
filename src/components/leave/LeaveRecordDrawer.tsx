@@ -1,86 +1,156 @@
-import { AlertTriangle, CalendarDays, Clock3, UserRound, X } from "lucide-react"
-import { Button, Card } from "../ui"
+import { useEffect, useRef, useState } from "react"
+import { CalendarDays, CheckCircle2, ChevronDown, ClipboardList, FileText, History, X } from "lucide-react"
+import { Button } from "../ui"
 import { useLanguage } from "../../context/LanguageContext"
-import type { LeaveRecord } from "../../services/attendance"
+import { fetchLeaveSummary, type LeaveRecord } from "../../services/attendance"
 
 interface LeaveRecordDrawerProps {
   record: LeaveRecord | null
   employeeName: string
+  employeeCode?: string
+  department?: string
+  reason: string
   leaveTypeLabel: string
   leaveTypeTone: string
   dayCount: number
+  annualTypeIds: string
+  own: boolean
   busy: boolean
+  error: string
   cancellationReason: string
   onReasonChange: (value: string) => void
   onClose: () => void
   onCancel: () => void
+  formatDate: (value: string) => string
   formatDateTime: (value?: string | null) => string
 }
 
-export default function LeaveRecordDrawer({
-  record,
-  employeeName,
-  leaveTypeLabel,
-  leaveTypeTone,
-  dayCount,
-  busy,
-  cancellationReason,
-  onReasonChange,
-  onClose,
-  onCancel,
-  formatDateTime,
-}: LeaveRecordDrawerProps) {
-  const { language } = useLanguage()
-  const tr = (vi: string, en: string) => (language === "vi" ? vi : en)
+export default function LeaveRecordDrawer(props: LeaveRecordDrawerProps) {
+  return props.record ? <LeaveRecordDetail key={props.record.id} {...props} record={props.record} /> : null
+}
 
-  if (!record) return null
+function LeaveRecordDetail({
+  record, employeeName, employeeCode, department, reason, leaveTypeLabel, leaveTypeTone,
+  dayCount, annualTypeIds, own, busy, error, cancellationReason,
+  onReasonChange, onClose, onCancel, formatDate, formatDateTime,
+}: LeaveRecordDrawerProps & { record: LeaveRecord }) {
+  const { language } = useLanguage()
+  const tr = (vi: string, en: string) => language === "vi" ? vi : en
+  const dialogRef = useRef<HTMLDialogElement>(null)
+  const [cancelOpen, setCancelOpen] = useState(false)
+  const [annualUsed, setAnnualUsed] = useState<number | null>(null)
+  const [balanceLoading, setBalanceLoading] = useState(false)
+  const year = record.start_date.slice(0, 4)
+
+  useEffect(() => {
+    const dialog = dialogRef.current
+    const previousOverflow = document.body.style.overflow
+    dialog?.showModal()
+    document.body.style.overflow = "hidden"
+    return () => {
+      dialog?.close()
+      document.body.style.overflow = previousOverflow
+    }
+  }, [])
+
+  useEffect(() => {
+    if (own || !annualTypeIds || !/^\d{4}$/.test(year)) return
+    const controller = new AbortController()
+    const typeIds = new Set(annualTypeIds.split(",").map(Number))
+    setBalanceLoading(true)
+    setAnnualUsed(null)
+    void fetchLeaveSummary({ employee_id: String(record.employee_id), from: year + "-01-01", to: year + "-12-31" }, controller.signal)
+      .then(({ data }) => {
+        if (controller.signal.aborted) return
+        const types = data.filter(item => typeIds.has(item.leave_type_id))
+        if (types.every(item => item.total_days !== null && Number.isFinite(Number(item.total_days)))) {
+          setAnnualUsed(types.reduce((days, item) => days + Number(item.total_days), 0))
+        }
+      })
+      .catch(() => undefined)
+      .finally(() => { if (!controller.signal.aborted) setBalanceLoading(false) })
+    return () => controller.abort()
+  }, [annualTypeIds, own, record.employee_id, year])
+
+  const effective = record.record_status === "ACTIVE"
+  const activity = [
+    record.created_at && { date: record.created_at, label: tr("Ghi nhận hồ sơ nghỉ", "Leave record created") },
+    record.updated_at && (record.updated_at !== record.created_at || !effective) && {
+      date: record.updated_at,
+      label: effective ? tr("Cập nhật hồ sơ", "Leave record updated") : tr("Hủy hồ sơ nghỉ", "Leave record cancelled"),
+    },
+  ]
 
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="leave-detail-title"
-      className="fixed inset-0 z-[90] bg-slate-950/40 backdrop-blur-[1px]"
-      onMouseDown={(event) => {
-        if (event.target === event.currentTarget && !busy && !cancellationReason.trim()) onClose()
-      }}
-    >
-      <Card className="absolute inset-y-0 right-0 flex w-full max-w-2xl flex-col overflow-y-auto rounded-none border-0 p-0 shadow-2xl animate-in slide-in-from-right duration-200">
-        <header className="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-slate-200 bg-white/95 px-5 py-4 backdrop-blur sm:px-6">
-          <div className="min-w-0">
-            <p className="text-xs font-bold uppercase tracking-[0.08em] text-slate-600">{record.employee_code || `ID ${record.employee_id}`}</p>
-            <h2 id="leave-detail-title" className="mt-1 truncate text-xl font-bold text-slate-950">{employeeName || tr("Không có tên nhân viên", "Employee name unavailable")}</h2>
+    <dialog ref={dialogRef} aria-labelledby="leave-detail-title"
+      onCancel={event => { event.preventDefault(); onClose() }}
+      onClick={event => { if (event.target === event.currentTarget && !cancellationReason.trim()) onClose() }}
+      className="fixed inset-0 m-0 h-dvh max-h-none w-full max-w-none bg-transparent text-slate-950 backdrop:bg-slate-950/45">
+      <div className="ml-auto flex h-full w-[520px] max-w-full flex-col overflow-y-auto bg-white shadow-2xl motion-safe:animate-in motion-safe:slide-in-from-right motion-safe:duration-200">
+        <header className="sticky top-0 z-10 border-b border-slate-200 bg-white px-5 py-4 sm:px-6">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <h2 id="leave-detail-title" className="text-xs font-semibold uppercase tracking-wide text-slate-600">{tr("Hồ sơ chi tiết nghỉ phép", "Leave record details")}</h2>
+              <p className="mt-1 wrap-break-word text-xl font-semibold">{employeeName || employeeCode || tr("Hồ sơ nhân viên", "Employee record")}</p>
+            </div>
+            <Button type="button" size="sm" variant="ghost" autoFocus disabled={busy} onClick={onClose} aria-label={tr("Đóng chi tiết", "Close details")}><X size={18} /></Button>
           </div>
-          <button type="button" aria-label={tr("Đóng chi tiết", "Close details")} disabled={busy} onClick={onClose} className="flex size-10 shrink-0 items-center justify-center rounded-md text-slate-600 transition-colors duration-200 hover:bg-slate-100 hover:text-slate-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-500 disabled:opacity-50"><X size={19} /></button>
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            {employeeCode && employeeName && <span className="rounded-md bg-slate-100 px-2 py-1 font-mono text-xs text-slate-700">{employeeCode}</span>}
+            {department && <span className="text-xs text-slate-600">{department}</span>}
+            <span className={`ml-auto inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-semibold ${effective ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-slate-200 bg-slate-100 text-slate-700"}`}>
+              {effective && <CheckCircle2 size={13} aria-hidden="true" />}
+              {effective ? tr("Có hiệu lực", "Effective") : tr("Đã hủy", "Cancelled")}
+            </span>
+          </div>
         </header>
 
-        <div className="space-y-5 px-5 py-5 sm:px-6">
-          <section aria-label={tr("Thông tin ngày nghỉ", "Leave information")} className="grid gap-3 rounded-md border border-slate-200 bg-slate-50 p-4 sm:grid-cols-2">
-            <div><p className="text-xs font-semibold text-slate-600">{tr("Loại nghỉ", "Leave type")}</p><span className={`mt-1 inline-flex rounded-full border px-2 py-1 text-xs font-bold ${leaveTypeTone}`}>{leaveTypeLabel}</span></div>
-            <div><p className="text-xs font-semibold text-slate-600">{tr("Trạng thái", "Status")}</p><span className={`mt-1 inline-flex rounded-full border px-2 py-1 text-xs font-bold ${record.record_status === "ACTIVE" ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-slate-200 bg-slate-100 text-slate-700"}`}>{record.record_status === "ACTIVE" ? tr("Đang sử dụng", "Active") : tr("Đã hủy", "Cancelled")}</span></div>
-            <div className="sm:col-span-2"><p className="text-xs font-semibold text-slate-600">{tr("Khoảng nghỉ", "Leave period")}</p><p className="mt-1 flex items-center gap-2 font-semibold text-slate-950"><CalendarDays size={16} className="text-orange-600" />{record.start_date} → {record.end_date} · {dayCount} {tr("ngày", "days")}</p></div>
-            <div className="sm:col-span-2"><p className="text-xs font-semibold text-slate-600">{tr("Lý do", "Reason")}</p><p className="mt-1 whitespace-pre-wrap text-sm leading-6 text-slate-800">{record.reason || "—"}</p></div>
+        <div className="space-y-5 p-5 sm:p-6">
+          <section aria-labelledby="leave-balance" className="rounded-xl border border-sky-200/70 bg-gradient-to-br from-sky-50/70 to-white p-4">
+            <h3 id="leave-balance" className="flex items-center gap-2 font-semibold"><ClipboardList size={16} className="text-sky-700" aria-hidden="true" />{tr(`Quỹ phép năm ${year}`, `Annual leave balance · ${year}`)}</h3>
+            <dl className="mt-3 grid gap-2 min-[430px]:grid-cols-3">
+              <Metric label={tr("Tiêu chuẩn năm", "Annual entitlement")} value="—" />
+              <Metric label={tr("Đã ghi nhận", "Recorded")} value={balanceLoading ? "…" : annualUsed === null ? "—" : `${annualUsed} ${tr("ngày công", "working days")}`} />
+              <Metric label={tr("Còn lại", "Remaining")} value="—" />
+            </dl>
+            <p className="mt-3 text-xs leading-5 text-slate-600">{tr("Chưa có hạn mức phép năm để tính số ngày còn lại.", "Annual entitlement is unavailable, so the remaining balance cannot be calculated.")}</p>
+            {annualUsed === null && !balanceLoading && <p className="text-xs leading-5 text-slate-600">{tr("Chưa có số ngày công phép năm được xác nhận.", "Verified annual leave working days are unavailable.")}</p>}
           </section>
-
-          <section aria-labelledby="leave-audit-title" className="rounded-md border border-slate-200 p-4">
-            <div className="flex items-center gap-2"><span className="flex size-9 items-center justify-center rounded-md bg-slate-100 text-slate-700"><Clock3 size={17} /></span><div><h3 id="leave-audit-title" className="font-bold text-slate-950">{tr("Thông tin kiểm tra", "Audit information")}</h3><p className="text-xs text-slate-600">{tr("Dấu vết ghi nhận và cập nhật hồ sơ.", "Record creation and update trail.")}</p></div></div>
-            <dl className="mt-4 grid gap-3 sm:grid-cols-2">
-              <div className="rounded-md bg-slate-50 p-3"><dt className="flex items-center gap-1.5 text-xs font-semibold text-slate-600"><UserRound size={14} />{tr("Người ghi nhận", "Recorded by")}</dt><dd className="mt-1 font-semibold text-slate-900">{record.recorded_by ?? "—"}</dd></div>
-              <div className="rounded-md bg-slate-50 p-3"><dt className="text-xs font-semibold text-slate-600">{tr("Mã hồ sơ", "Record ID")}</dt><dd className="mt-1 font-semibold text-slate-900">#{record.id}</dd></div>
-              <div className="rounded-md bg-slate-50 p-3"><dt className="text-xs font-semibold text-slate-600">{tr("Ngày tạo", "Created")}</dt><dd className="mt-1 text-sm text-slate-900">{formatDateTime(record.created_at)}</dd></div>
-              <div className="rounded-md bg-slate-50 p-3"><dt className="text-xs font-semibold text-slate-600">{tr("Cập nhật gần nhất", "Last updated")}</dt><dd className="mt-1 text-sm text-slate-900">{formatDateTime(record.updated_at)}</dd></div>
+          <section aria-labelledby="leave-period-title" className="rounded-xl border border-slate-200 p-4">
+            <h3 id="leave-period-title" className="flex items-center gap-2 font-semibold"><CalendarDays size={16} className="text-orange-600" aria-hidden="true" />{tr("Chi tiết đợt nghỉ", "Leave period details")}</h3>
+            <dl className="mt-3 space-y-3 text-sm">
+              <div><dt className="text-xs font-medium text-slate-600">{tr("Loại nghỉ", "Leave type")}</dt><dd><span className={`mt-1 inline-flex rounded-full border px-2 py-1 text-xs font-semibold ${leaveTypeTone}`}>{leaveTypeLabel}</span></dd></div>
+              <div><dt className="text-xs font-medium text-slate-600">{tr("Thời gian", "Date range")}</dt><dd className="mt-1 flex flex-wrap items-center gap-2 tabular-nums"><span>{formatDate(record.start_date)} → {formatDate(record.end_date)}</span><span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs">{dayCount} {tr("ngày lịch", "calendar days")}</span></dd></div>
+              <div><dt className="text-xs font-medium text-slate-600">{tr("Lý do", "Reason")}</dt><dd className="mt-1 whitespace-pre-wrap wrap-break-word leading-relaxed text-slate-800">{reason}</dd></div>
+              <div className="flex items-start gap-2 border-t border-slate-100 pt-3 text-slate-600"><FileText size={15} className="mt-0.5 shrink-0" aria-hidden="true" /><div><dt className="text-xs font-medium">{tr("Giấy tờ minh chứng", "Supporting documents")}</dt><dd className="mt-1">{tr("Chưa có dữ liệu đính kèm.", "Attachment data is unavailable.")}</dd></div></div>
             </dl>
           </section>
-
-          {record.record_status === "ACTIVE" && (
-            <section aria-labelledby="leave-cancel-title" className="rounded-md border border-rose-200 bg-rose-50/40 p-4">
-              <div className="flex items-start gap-2"><AlertTriangle className="mt-0.5 size-5 shrink-0 text-rose-700" /><div><h3 id="leave-cancel-title" className="font-bold text-rose-950">{tr("Hủy hồ sơ ngày nghỉ", "Cancel leave record")}</h3><p className="mt-1 text-sm leading-6 text-rose-900">{tr("Hồ sơ sẽ chuyển sang trạng thái Đã hủy. Nếu cần sửa, hãy tạo hồ sơ mới sau khi hủy.", "The record will be marked Cancelled. Create a new record afterward if a correction is needed.")}</p></div></div>
-              <label className="mt-4 block text-sm font-semibold text-slate-800">{tr("Lý do hủy", "Cancellation reason")} <span className="text-rose-600">*</span><textarea required rows={3} maxLength={500} value={cancellationReason} onChange={event => onReasonChange(event.target.value)} placeholder={tr("Ví dụ: Sai khoảng ngày nghỉ", "Example: Incorrect leave dates")} className="mt-2 min-h-24 w-full resize-y rounded-md border border-slate-300 bg-white px-3 py-2.5 text-sm font-normal text-slate-900 outline-none transition-colors duration-200 focus:border-orange-400 focus:ring-4 focus:ring-orange-100" /></label>
-              <div className="mt-4 flex justify-end"><Button type="button" variant="danger" disabled={busy || !cancellationReason.trim()} onClick={onCancel}>{busy ? tr("Đang xử lý...", "Processing...") : tr("Hủy hồ sơ", "Cancel record")}</Button></div>
-            </section>
-          )}
+          <section aria-labelledby="leave-audit-title" className="rounded-xl border border-slate-200 p-4">
+            <h3 id="leave-audit-title" className="flex items-center gap-2 font-semibold"><History size={16} className="text-slate-600" aria-hidden="true" />{tr("Lịch sử ghi nhận & phê duyệt", "Record and approval history")}</h3>
+            <p className="mt-2 text-sm text-slate-600">{tr("Chưa có lịch sử phê duyệt liên kết với hồ sơ này.", "No approval history is linked to this record.")}</p>
+            {activity.some(Boolean) && <ol className="ml-2 mt-4 space-y-3 border-l border-slate-200">
+              {activity.map((item, index) => item && <li key={index} className="relative pl-4">
+                <span aria-hidden="true" className="absolute -left-[5px] top-1.5 size-2.5 rounded-full bg-sky-500 ring-4 ring-white" />
+                <p className="text-xs tabular-nums text-slate-600">{formatDateTime(item.date)}</p><p className="mt-1 text-sm font-semibold">{item.label}</p>
+              </li>)}
+            </ol>}
+          </section>
+          {!own && effective && <section className="rounded-xl border border-slate-200">
+            <button type="button" aria-expanded={cancelOpen} aria-controls="leave-cancel-form" onClick={() => setCancelOpen(value => !value)} className="flex w-full items-center justify-between rounded-xl px-4 py-3 text-left text-sm font-semibold hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-orange-500">{tr("Hủy hồ sơ ngày nghỉ", "Cancel leave record")}<ChevronDown size={16} className={cancelOpen ? "rotate-180" : ""} /></button>
+            {cancelOpen && <form id="leave-cancel-form" onSubmit={event => { event.preventDefault(); onCancel() }} className="space-y-3 border-t border-slate-200 p-4">
+              <label className="block text-sm font-semibold">{tr("Lý do hủy (bắt buộc)", "Cancellation reason (required)")}
+                <textarea required rows={3} maxLength={500} disabled={busy} value={cancellationReason} onChange={event => onReasonChange(event.target.value)} className="mt-2 w-full resize-y rounded-md border border-slate-300 p-2 text-sm font-normal focus-visible:outline-2 focus-visible:outline-orange-500" />
+              </label>
+              {error && <p role="alert" className="rounded-md bg-rose-50 p-3 text-sm text-rose-800">{error}</p>}
+              <Button type="submit" variant="danger" disabled={busy || !cancellationReason.trim()}>{busy ? tr("Đang hủy…", "Cancelling…") : tr("Xác nhận hủy", "Confirm cancellation")}</Button>
+            </form>}
+          </section>}
         </div>
-      </Card>
-    </div>
+      </div>
+    </dialog>
   )
+}
+
+function Metric({ label, value }: { label: string; value: string }) {
+  return <div className="rounded-md border border-slate-200 bg-white p-2.5"><dt className="text-xs text-slate-600">{label}</dt><dd className="mt-1 text-sm font-semibold tabular-nums">{value}</dd></div>
 }

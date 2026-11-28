@@ -1,8 +1,6 @@
+import { ChevronRight, Clock, Compass, FileCheck2 } from "lucide-react"
 import { useAiTr } from "./aiWorkspaceLanguage"
 import { useLanguage } from "../../context/LanguageContext"
-import { useId, useState } from "react"
-import { AnimatePresence, motion, useReducedMotion } from "motion/react"
-import { Check, ChevronDown, ClipboardCheck, Database, Target, Zap } from "lucide-react"
 import { featureLabel } from "./analysis"
 import type { AiPolicyEvidence, AiUnifiedPolicyAnalysis } from "../../services/api"
 
@@ -10,28 +8,53 @@ export function ActionDossier({ analysis }: { analysis: AiUnifiedPolicyAnalysis 
   const tr = useAiTr()
   const { language } = useLanguage()
   if (!analysis.recommendations.length) return <section className="rounded-2xl border border-emerald-200 bg-emerald-50/40 p-6"><h3 className="font-semibold text-emerald-900">{tr("Chưa có kế hoạch hành động phù hợp")}</h3><p className="mt-1 text-sm leading-6 text-emerald-800">{analysis.noRecommendationReason || tr("Thông tin trong kỳ chưa đủ để hình thành khuyến nghị có căn cứ.")}</p></section>
-  return <section className="space-y-5"><header className="flex flex-wrap items-end justify-between gap-3"><div><p className="text-xs font-bold uppercase tracking-[.16em] text-slate-600">{tr("Hồ sơ hành động điều hành")}</p><h3 className="mt-1 text-lg font-semibold tracking-tight">{analysis.recommendations.length} {tr("kế hoạch cần Nhân sự xem xét")}</h3></div>{analysis.generatedAt && <span className="rounded-full bg-slate-100 px-3 py-1 text-xs text-slate-600">{tr("Tạo lúc")} {dateTime(analysis.generatedAt, language)}</span>}</header>{analysis.recommendations.map((item, index) => <RecommendationCard key={`${item.policy.id}-${index}`} item={item} />)}</section>
+  return <section className="space-y-4">
+    <header className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-100 pb-3">
+      <div>
+        <h3 className="text-base font-semibold text-slate-900">{tr("Hồ sơ hành động & khuyến nghị")}</h3>
+        <p className="mt-1 text-xs text-slate-600">{tr("Các định hướng giữ chân đề xuất dựa trên dữ liệu đối soát thực tế.")}</p>
+      </div>
+      <span className="rounded-full border border-orange-200 bg-orange-50 px-2.5 py-1 text-xs font-medium text-orange-800">{analysis.recommendations.length} {tr("kế hoạch đề xuất")}</span>
+    </header>
+    {analysis.generatedAt && <p className="text-xs text-slate-600">{tr("Tạo lúc")} {dateTime(analysis.generatedAt, language)}</p>}
+    {analysis.recommendations.map((item, index) => <RecommendationCard key={`${item.policy.id}-${index}`} item={item} number={index + 1} />)}
+  </section>
 }
 
-function RecommendationCard({ item }: { item: AiUnifiedPolicyAnalysis["recommendations"][number] }) {
+function RecommendationCard({ item, number }: { item: AiUnifiedPolicyAnalysis["recommendations"][number]; number: number }) {
   const tr = useAiTr()
-  const [checked, setChecked] = useState([false, false])
-  const [evidenceOpen, setEvidenceOpen] = useState(false)
-  const reduceMotion = useReducedMotion()
-  const evidenceId = useId()
-  const tasks = [tr("Đã đối chiếu bối cảnh cùng Quản lý trực tiếp"), tr("Đã thống nhất mốc kiểm tra lại với nhân viên")]
-  const completed = checked.filter(Boolean).length
-  return <article className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_1px_2px_rgba(15,23,42,.04),0_16px_40px_rgba(15,23,42,.06)]">
-    <header className="flex flex-wrap items-start gap-3 border-b border-slate-100 bg-gradient-to-r from-white to-slate-50/70 px-5 py-4"><span className="rounded-md bg-slate-900 px-2.5 py-1 font-mono text-xs font-bold text-white">{item.policy.code || item.policy.id}</span><div className="min-w-0 flex-1"><h4 className="font-semibold tracking-tight text-slate-950">{item.policy.name}</h4><span className="mt-1.5 inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-800"><ClipboardCheck className="size-3.5" />{tr("Cần Nhân sự xác minh")}</span></div></header>
-    <div className="p-5"><section className="relative overflow-hidden rounded-2xl border border-orange-200 bg-gradient-to-br from-orange-50 to-amber-50/40 p-5"><Zap aria-hidden="true" className="absolute right-4 top-4 size-10 text-orange-100" /><p className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-orange-700"><Target className="size-4" />{tr("Hành động đề xuất")}</p><p className="relative mt-2 max-w-3xl text-sm font-medium leading-7 text-slate-800">{item.policy.description || item.policy.name}</p></section>
-      <div className="mt-4 grid gap-4 md:grid-cols-2"><section className="rounded-xl border border-slate-100 bg-slate-50/80 p-4"><h5 className="text-sm font-semibold text-slate-900">{tr("Lý do đề xuất")}</h5><p className="mt-2 text-sm leading-6 text-slate-700">{item.reason}</p></section><section className="rounded-xl border border-amber-200/70 bg-amber-50/60 p-4"><div className="flex flex-wrap items-center justify-between gap-2"><h5 className="flex items-center gap-2 text-sm font-semibold text-amber-950"><ClipboardCheck className="size-4" />{tr("Nhân sự cần xác minh")}</h5><span role="status" className={`rounded-full px-2.5 py-1 text-xs font-semibold ${completed === tasks.length ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-900"}`}>{completed}/{tasks.length} {completed === tasks.length ? tr("đã đối soát") : tr("hoàn tất")}</span></div><p className="mt-2 text-sm leading-6 text-amber-950">{item.hrVerification}</p><div className="mt-4 space-y-2 border-t border-amber-200/70 pt-3">{tasks.map((task, index) => <label key={task} className="flex min-h-11 cursor-pointer items-start gap-2 rounded-md bg-white/80 p-2.5 text-sm text-slate-700 transition-colors hover:bg-white focus-within:ring-2 focus-within:ring-orange-400"><input type="checkbox" checked={checked[index]} onChange={() => setChecked(values => values.map((value, i) => i === index ? !value : value))} className="mt-0.5 accent-orange-600" /><motion.span animate={{ opacity: checked[index] ? .65 : 1 }} transition={{ duration: reduceMotion ? 0 : .18 }} className={checked[index] ? "line-through" : ""}>{task}</motion.span>{checked[index] && <Check aria-hidden="true" className="ml-auto size-4 shrink-0 text-emerald-700" />}</label>)}</div>
-        {item.evidence.length > 0 && <div className="mt-4 border-t border-amber-200/70 pt-3"><button type="button" aria-expanded={evidenceOpen} aria-controls={evidenceId} onClick={() => setEvidenceOpen(value => !value)} className="flex min-h-10 w-full items-center gap-2 rounded-md text-left text-sm font-semibold text-amber-950 transition-colors hover:bg-amber-100/60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-500"><Database className="size-4" />{tr("Bằng chứng thực tế (")}{item.evidence.length})<ChevronDown className={`ml-auto size-4 transition-transform duration-200 ${evidenceOpen ? "rotate-180" : ""}`} /></button><AnimatePresence initial={false}>{evidenceOpen && <motion.div id={evidenceId} initial={reduceMotion ? false : { height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={reduceMotion ? undefined : { height: 0, opacity: 0 }} transition={{ duration: reduceMotion ? 0 : .22 }} className="overflow-hidden"><div className="grid gap-3 pt-3">{item.evidence.map((evidence, index) => <EvidenceCard key={evidence.id || index} evidence={evidence} />)}</div></motion.div>}</AnimatePresence></div>}
-      </section></div>
+  return <article className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-5 pt-6 shadow-sm transition-shadow hover:shadow-md">
+    <div aria-hidden="true" className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-orange-500 to-amber-400" />
+    <header className="mb-4 flex flex-wrap items-start justify-between gap-3 border-b border-slate-100 pb-3">
+      <h4 className="flex min-w-0 items-start gap-2.5 text-sm font-semibold text-slate-950">
+        <span className="grid size-6 shrink-0 place-items-center rounded-lg bg-orange-600 text-xs text-white">{String(number).padStart(2, "0")}</span>
+        <span className="min-w-0 [overflow-wrap:anywhere]">{item.policy.name}</span>
+      </h4>
+      <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs text-slate-700">
+        <Clock aria-hidden="true" className="size-3.5" />{tr("Chưa có mốc riêng")}
+      </span>
+    </header>
+    <div className="grid grid-cols-1 items-start gap-4 md:grid-cols-2">
+      <section className="min-w-0 rounded-xl border border-slate-100 bg-slate-50/70 p-3.5">
+        <h5 className="flex items-center gap-1.5 text-xs font-semibold text-slate-800"><Compass aria-hidden="true" className="size-3.5 shrink-0 text-orange-700" />{tr("Hướng xử lý đề xuất")}</h5>
+        {item.policy.description && <p className="mt-2 whitespace-pre-line text-sm leading-6 text-slate-700 [overflow-wrap:anywhere]">{item.policy.description}</p>}
+        {item.hrVerification && <><h5 className="mt-3 text-xs font-semibold text-slate-700">{tr("Nhân sự cần xác minh")}</h5><p className="mt-1 whitespace-pre-line text-sm leading-6 text-slate-700 [overflow-wrap:anywhere]">{item.hrVerification}</p></>}
+        <p className="mt-3 border-t border-slate-200 pt-2 text-xs text-slate-600">{tr("Đầu mối phối hợp")}: {tr("Chưa chỉ định")}</p>
+      </section>
+      <section className="min-w-0 rounded-xl border border-slate-100 bg-slate-50/70 p-3.5 [overflow-wrap:anywhere]">
+        <h5 className="flex items-center gap-1.5 text-xs font-semibold text-slate-800"><FileCheck2 aria-hidden="true" className="size-3.5 shrink-0 text-emerald-700" />{tr("Căn cứ thực tế")}</h5>
+        <p className="mt-2 whitespace-pre-line text-sm leading-6 text-slate-700">{item.reason}</p>
+        {item.evidence.length > 0 && <details className="group mt-3 border-t border-slate-200 pt-2">
+          <summary className="flex cursor-pointer items-center gap-1 rounded-md py-1 text-xs font-semibold text-orange-800 hover:underline focus-visible:outline-2 focus-visible:outline-orange-500">{tr("Xem chi tiết dẫn chứng")} ({item.evidence.length}) <ChevronRight aria-hidden="true" className="size-3 group-open:rotate-90" /></summary>
+          <div className="mt-2 grid gap-2">{item.evidence.map((evidence, index) => <EvidenceCard key={evidence.id || index} evidence={evidence} />)}</div>
+        </details>}
+      </section>
     </div>
   </article>
 }
 
-export function EvidenceCard({ evidence }: { evidence: AiPolicyEvidence }) {
+
+function EvidenceCard({ evidence }: { evidence: AiPolicyEvidence }) {
   const tr = useAiTr()
   const { language } = useLanguage()
   const source = String(evidence.source || "EVIDENCE").toUpperCase()

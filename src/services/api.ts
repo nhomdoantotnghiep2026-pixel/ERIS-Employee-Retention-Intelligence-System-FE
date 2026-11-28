@@ -527,7 +527,7 @@ export interface EmployeeProfile {
   id: number; employeeCode: string; fullName: string; email: string;
   phone: string | null; dateOfBirth: string | null; gender: string | null;
   address: string | null; departmentId: number; positionId: number; hireDate: string;
-  employmentType: string | null; employmentStatus: string; currentSalary: string | number | null;
+  employmentType: string | null; employmentStatus: string; currentSalary: string | number | null; workScheduleId?: number | null;
   educations?: EmployeeEducation[];
   workExperiences?: EmployeeWorkExperience[];
   distanceFromHomeKm: number | null;
@@ -798,8 +798,8 @@ export const previewAiEmployee = (id: number, body: { periodStart?: string; peri
 export const predictAiEmployee = (id: number, snapshotId: number, save: boolean) => request<{ data: AiPrediction }>(`/ai/employees/${id}/predict`, { method: 'POST', body: JSON.stringify({ snapshotId, save }) });
 export const analyzeAiEmployee = (id: number, body: UnifiedAnalyzeRequest) => request<{ data: UnifiedAnalyzeResponse }>(`/ai/employees/${id}/analyze`, { method: 'POST', body: JSON.stringify(body) });
 export type AiResultHistoryItem = { predictionId: number; snapshotId: number; createdAt: string };
-export const listAiEmployeeResults = (id: number) => request<{ data: AiResultHistoryItem[] }>(`/ai/employees/${id}/results`, { cache: 'no-store' });
-export const getAiResult = (id: number) => request<{ data: AiPrediction }>(`/ai/results/${id}`);
+export const listAiEmployeeResults = (id: number, signal?: AbortSignal) => request<{ data: AiResultHistoryItem[] }>(`/ai/employees/${id}/results`, { signal, cache: 'no-store' });
+export const getAiResult = (id: number, signal?: AbortSignal) => request<{ data: AiPrediction }>(`/ai/results/${id}`, { signal });
 export interface AiPolicyRecommendations {
   predictionId: number;
   warning: string;
@@ -1192,7 +1192,7 @@ export function importEmployees(file: File, choices: ImportInstitutionChoice[] =
 export interface WorkSchedule { id: number; name: string; shift_type: string | null; attendance_policy?: Record<string, number>; start_time: string; end_time: string; break_start: string | null; break_end: string | null; working_days: number[]; status: 'ACTIVE' | 'INACTIVE' }
 export type WorkScheduleInput = Omit<WorkSchedule, 'id'>;
 export interface ScheduleAssignment extends Omit<WorkSchedule, 'id'> { employee_id: number; work_schedule_id: number }
-export const listWorkSchedules = () => request<{data: WorkSchedule[]}>('/work-schedules', {cache: 'no-store'});
+export const listWorkSchedules = (signal?: AbortSignal) => request<{data: WorkSchedule[]}>('/work-schedules', {signal, cache: 'no-store'});
 export const createWorkSchedule = (input: WorkScheduleInput) => request<{data: WorkSchedule}>('/work-schedules', {method: 'POST', body: JSON.stringify(input)});
 export const createIndividualSchedule = (input: WorkScheduleInput & {employee_id: number}) => request('/work-schedules/individual', {method: 'POST', body: JSON.stringify(input)});
 export const updateWorkSchedule = (id: number, input: Partial<WorkScheduleInput>) => request('/work-schedules/' + id, {method: 'PATCH', body: JSON.stringify(input)});
