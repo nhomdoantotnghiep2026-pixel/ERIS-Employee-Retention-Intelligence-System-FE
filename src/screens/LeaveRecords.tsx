@@ -486,14 +486,14 @@ export default function LeaveRecords({ own = false }: { own?: boolean }) {
         tr("Nhân sự", "Workforce"),
         tr(
           own ? "Ngày nghỉ của tôi" : "Dữ liệu ngày nghỉ nhân viên",
-          own ? "My leave records" : "Employee leave records",
+          own ? "My Leave Records" : "Employee leave records",
         ),
       ]}
     >
       <SectionHeader
         title={tr(
           own ? "Ngày nghỉ của tôi" : "Dữ liệu ngày nghỉ nhân viên",
-          own ? "My leave data" : "Employee leave data",
+          own ? "My Leave Data" : "Employee leave data",
         )}
         description={tr(
           own

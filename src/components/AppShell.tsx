@@ -58,7 +58,7 @@ const NAV_BY_ROLE: Record<UserRole, NavGroup[]> = {
       group: 'Self Service',
       items: [
         { label: 'My Attendance', icon: Activity, to: '/my-attendance' },
-        { label: 'My leave records', icon: ClipboardList, to: '/my-requests' },
+        { label: 'My Leave Records', icon: ClipboardList, to: '/my-requests' },
         { label: 'My Surveys', icon: HeartPulse, to: '/my-surveys' },
       ],
     },

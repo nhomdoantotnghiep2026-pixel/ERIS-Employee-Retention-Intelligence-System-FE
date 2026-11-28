@@ -108,7 +108,7 @@ export default function Login() {
     return () => window.clearInterval(timer);
   }, []);
 
-  const portalError = 'Không thể đăng nhập. Vui lòng kiểm tra thông tin và thử lại.';
+  const portalError = 'Email hoặc mật khẩu không đúng. Vui lòng kiểm tra lại.';
 
   async function handleSignIn(e: React.FormEvent) {
     e.preventDefault();

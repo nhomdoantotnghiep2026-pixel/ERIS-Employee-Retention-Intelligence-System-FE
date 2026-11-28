@@ -360,9 +360,9 @@ export default function AttendanceWorkspace({ own = false, }: {
     };
     return (<AppShell breadcrumb={[
             tr("Nhân sự", "Workforce"),
-            tr(own ? "Chấm công của tôi" : "Quản lý chấm công", own ? "My attendance" : "Attendance data"),
+            tr(own ? "Chấm công của tôi" : "Quản lý chấm công", own ? "My Attendance" : "Attendance data"),
         ]}>
-      <SectionHeader title={tr(own ? "Chấm công của tôi" : "Dữ liệu chấm công", own ? "My attendance" : "Attendance data")} description={tr(own
+      <SectionHeader title={tr(own ? "Chấm công của tôi" : "Dữ liệu chấm công", own ? "My Attendance" : "Attendance data")} description={tr(own
             ? "Xem dữ liệu chấm công do HR đã thu thập từ tệp nguồn."
             : "HR nhập tệp chấm công từ nguồn bên ngoài; hệ thống kiểm tra và lưu dữ liệu, không tự động chấm công.", own
             ? "View attendance data collected by HR from source files."

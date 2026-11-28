@@ -1364,7 +1364,7 @@ export default function ErdSurveys() {
       ]}
     >
       <SectionHeader
-        title={t(isHr ? "Employee engagement surveys" : "My surveys")}
+        title={t(isHr ? "Employee engagement surveys" : "My Surveys")}
         description={t(
           isHr
             ? "Design survey topics and questions, publish and review results."

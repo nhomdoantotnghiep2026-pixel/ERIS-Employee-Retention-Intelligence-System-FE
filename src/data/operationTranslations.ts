@@ -43,7 +43,6 @@ const pairs: Array<[string, string]> = [
   ["The employee profile must be active to manage education.", "Hồ sơ nhân viên phải đang hoạt động để chỉnh sửa học vấn."],
   ['Loading data…', 'Đang tải dữ liệu…'],
   ['Employee engagement surveys', 'Khảo sát gắn kết nhân viên'],
-  ['My surveys', 'Khảo sát của tôi'],
   ['Design surveys by cycle, manage questions, publish and review results.', 'Thiết kế khảo sát theo chu kỳ, quản lý câu hỏi, xuất bản và xem kết quả.'],
   ['Design survey topics and questions, publish and review results.', 'Thiết kế chủ đề và câu hỏi khảo sát, xuất bản và xem kết quả.'],
   ['Complete open surveys and send confidential feedback to HR.', 'Hoàn thành các khảo sát đang mở và gửi phản hồi bảo mật cho HR.'],
